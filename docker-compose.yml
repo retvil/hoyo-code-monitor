@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  genshin-monitor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: genshin-code-monitor
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./config:/app/config
+    environment:
+      - CONFIG_PATH=/app/config/config.toml
+      - DB_PATH=/app/data/monitor.db
+      - LOG_FILE=/app/logs/app.log
+      - GENSHIN_ENCRYPTION_KEY=${GENSHIN_ENCRYPTION_KEY:-}
+    # Uncomment to enable web UI when implemented
+    # ports:
+    #   - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sqlite3; conn = sqlite3.connect('/app/data/monitor.db'); conn.execute('SELECT 1'); conn.close()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Optional: Add a separate service for manual commands
+  genshin-cli:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: genshin-code-monitor-cli
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./config:/app/config
+    environment:
+      - CONFIG_PATH=/app/config/config.toml
+      - DB_PATH=/app/data/monitor.db
+      - LOG_FILE=/app/logs/app.log
+      - GENSHIN_ENCRYPTION_KEY=${GENSHIN_ENCRYPTION_KEY:-}
+    entrypoint: ["python", "-m", "genshin_code_monitor"]
+    command: ["--help"]
+    profiles:
+      - cli

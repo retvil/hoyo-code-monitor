@@ -1,0 +1,19 @@
+include README.md
+include config.toml
+include requirements.txt
+include LICENSE
+recursive-include templates *.html
+recursive-include src *.py
+recursive-exclude src __pycache__
+recursive-exclude src *.pyc
+recursive-exclude tests *.pyc
+recursive-exclude .pytest_cache *
+recursive-exclude .mypy_cache *
+recursive-exclude .ruff_cache *
+recursive-exclude .omo *
+recursive-exclude .git *
+recursive-exclude .venv *
+recursive-exclude data *
+recursive-exclude logs *
+recursive-exclude *.db
+recursive-exclude *.log

@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block title %}Дашборд - Genshin Code Monitor{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">📊 Статус системы</h2>
+        <div>
+            {% if scheduler and scheduler.running %}
+                <span class="status-badge status-running">🟢 Работает</span>
+            {% else %}
+                <span class="status-badge status-stopped">🔴 Остановлен</span>
+            {% endif %}
+        </div>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
+        <div class="stat-card">
+            <div class="stat-value">{{ scheduler.last_run_codes_found if scheduler else 0 }}</div>
+            <div class="stat-label">Кодов найдено (последний запуск)</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value stat-success">{{ scheduler.last_run_codes_redeemed if scheduler else 0 }}</div>
+            <div class="stat-label">Погашено (последний запуск)</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ scheduler.next_run if scheduler else '—' }}</div>
+            <div class="stat-label">Следующий запуск</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ scheduler.last_run if scheduler else '—' }}</div>
+            <div class="stat-label">Последний запуск</div>
+        </div>
+    </div>
+    {% if scheduler and scheduler.error_message %}
+    <div class="flash flash-error" style="margin-top: 15px;">
+        ⚠️ Ошибка: {{ scheduler.error_message }}
+    </div>
+    {% endif %}
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">📈 Общая статистика</h2>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px;">
+        <div class="stat-card">
+            <div class="stat-value">{{ stats.total_codes }}</div>
+            <div class="stat-label">Всего кодов</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value stat-success">{{ stats.successful }}</div>
+            <div class="stat-label">Успешно погашено</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value stat-failed">{{ stats.failed }}</div>
+            <div class="stat-label">Не погашено</div>
+        </div>
+    </div>
+    {% if stats.by_source %}
+    <h4 style="margin: 20px 0 10px;">По источникам:</h4>
+    <table>
+        <thead>
+            <tr><th>Источник</th><th style="text-align: right;">Кодов</th></tr>
+        </thead>
+        <tbody>
+            {% for source, count in stats.by_source.items() %}
+            <tr>
+                <td>{{ source }}</td>
+                <td style="text-align: right;">{{ count }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">🎯 Управление планировщиком</h2>
+    </div>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px;">
+        <button class="btn btn-success" hx-post="/scheduler/start" hx-target="#scheduler-status" hx-swap="innerHTML" {% if scheduler and scheduler.running %}disabled{% endif %}>
+            ▶️ Запустить
+        </button>
+        <button class="btn btn-danger" hx-post="/scheduler/stop" hx-target="#scheduler-status" hx-swap="innerHTML" {% if not scheduler or not scheduler.running %}disabled{% endif %}>
+            ⏹️ Остановить
+        </button>
+        <button class="btn btn-primary" hx-post="/scheduler/run-once" hx-target="#run-once-result" hx-swap="innerHTML" hx-indicator=".loading">
+            🔄 Проверить сейчас <span class="loading" style="display:none;"></span>
+        </button>
+        <button class="btn btn-secondary" hx-get="/health" hx-target="#health-result" hx-swap="innerHTML">
+            🏥 Health Check
+        </button>
+    </div>
+    <div id="scheduler-status"></div>
+    <div id="run-once-result" style="margin-top: 15px;"></div>
+    <div id="health-result" style="margin-top: 15px;"></div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">📋 Последние коды (20)</h2>
+    </div>
+    {% if codes %}
+    <table>
+        <thead>
+            <tr>
+                <th>Код</th>
+                <th>Источники</th>
+                <th>Статус</th>
+                <th>Награда</th>
+                <th>Попытка</th>
+                <th>Погашение</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for code in codes %}
+            <tr>
+                <td><span class="code-masked">{{ code.code[:4] }}****</span></td>
+                <td>
+                    {% for src in code.sources %}
+                        <span class="badge badge-{{ 'enabled' if loop.first else 'disabled' }}">{{ src }}</span>
+                    {% endfor %}
+                </td>
+                <td>
+                    {% if code.redeemed %}
+                        <span class="badge badge-enabled">✅ Погашен</span>
+                    {% else %}
+                        <span class="badge badge-disabled">⏳ Ожидает</span>
+                    {% endif %}
+                </td>
+                <td>{{ code.reward or '—' }}</td>
+                <td>{{ code.attempted_at[:19] if code.attempted_at else '—' }}</td>
+                <td>{{ code.redeemed_at[:19] if code.redeemed_at else '—' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+        </svg>
+        <p>Кодов пока нет. Запустите проверку или подождите следующего цикла.</p>
+    </div>
+    {% endif %}
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">📝 Последние логи погашений</h2>
+    </div>
+    {% if logs %}
+    <div style="max-height: 300px; overflow-y: auto;">
+        {% for log in logs %}
+        <div class="log-entry log-{{ log.status }}">
+            <strong>{{ log.code[:4] }}****</strong> | {{ log.status | upper }} | {{ log.reward or '—' }} | {{ log.attempted_at[:19] }}
+            {% if log.error_message %} | Ошибка: {{ log.error_message }}{% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>Логов погашений пока нет.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+{% endblock %}

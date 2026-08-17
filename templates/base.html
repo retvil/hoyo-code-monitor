@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Genshin Code Monitor{% endblock %}</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://unpkg.com/htmx.org/dist/ext/ws.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; line-height: 1.6; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        header { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
+        h1 { color: #2c3e50; font-size: 1.8rem; }
+        .header-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+        .btn { padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s; }
+        .btn-primary { background: #3498db; color: #fff; }
+        .btn-primary:hover { background: #2980b9; }
+        .btn-success { background: #27ae60; color: #fff; }
+        .btn-success:hover { background: #229954; }
+        .btn-danger { background: #e74c3c; color: #fff; }
+        .btn-danger:hover { background: #c0392b; }
+        .btn-secondary { background: #95a5a6; color: #fff; }
+        .btn-secondary:hover { background: #7f8c8d; }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .card { background: #fff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 20px; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #eee; }
+        .card-title { font-size: 1.2rem; font-weight: 600; color: #2c3e50; }
+        .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; }
+        .status-running { background: #d5f5e3; color: #27ae60; }
+        .status-stopped { background: #fadbd8; color: #e74c3c; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .stat-card { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; }
+        .stat-value { font-size: 2.5rem; font-weight: 700; color: #2c3e50; }
+        .stat-label { color: #7f8c8d; font-size: 0.9rem; margin-top: 5px; }
+        .stat-success { color: #27ae60; }
+        .stat-failed { color: #e74c3c; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #f8f9fa; font-weight: 600; color: #2c3e50; }
+        tr:hover { background: #f8f9fa; }
+        .code-masked { font-family: monospace; background: #f8f9fa; padding: 2px 6px; border-radius: 4px; }
+        .badge { padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+        .badge-enabled { background: #d5f5e3; color: #27ae60; }
+        .badge-disabled { background: #fadbd8; color: #e74c3c; }
+        .badge-css { background: #d6eaf8; color: #2980b9; }
+        .badge-json { background: #fadbd8; color: #c0392b; }
+        .badge-xpath { background: #e8daef; color: #8e44ad; }
+        .badge-regex { background: #fef9e7; color: #f39c12; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: 500; color: #2c3e50; }
+        input, select, textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 1rem; }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: #3498db; box-shadow: 0 0 0 3px rgba(52,152,219,0.2); }
+        .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+        .modal.active { display: flex; }
+        .modal-content { background: #fff; padding: 25px; border-radius: 12px; width: 90%; max-width: 500px; max-height: 90vh; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #95a5a6; }
+        .flash { padding: 12px 20px; border-radius: 6px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+        .flash-success { background: #d5f5e3; color: #27ae60; }
+        .flash-error { background: #fadbd8; color: #e74c3c; }
+        .flash-info { background: #d6eaf8; color: #2980b9; }
+        .code-input { font-family: monospace; text-transform: uppercase; letter-spacing: 1px; }
+        .loading { display: inline-block; width: 16px; height: 16px; border: 2px solid #3498db; border-radius: 50%; border-top-color: transparent; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .empty-state { text-align: center; padding: 40px 20px; color: #95a5a6; }
+        .empty-state svg { width: 64px; height: 64px; margin-bottom: 15px; opacity: 0.5; }
+        .tabs { display: flex; border-bottom: 2px solid #eee; margin-bottom: 20px; }
+        .tab { padding: 12px 24px; cursor: pointer; font-weight: 500; color: #7f8c8d; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.2s; }
+        .tab.active { color: #3498db; border-bottom-color: #3498db; }
+        .tab:hover:not(.active) { color: #2c3e50; }
+        .source-row:hover { background: #f8f9fa; }
+        .action-buttons { display: flex; gap: 8px; }
+        .action-btn { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem; transition: all 0.2s; }
+        .action-btn.test { background: #d6eaf8; color: #2980b9; }
+        .action-btn.test:hover { background: #aed6f1; }
+        .action-btn.enable { background: #d5f5e3; color: #27ae60; }
+        .action-btn.enable:hover { background: #abebc6; }
+        .action-btn.disable { background: #fef9e7; color: #f39c12; }
+        .action-btn.disable:hover { background: #fdebd0; }
+        .action-btn.delete { background: #fadbd8; color: #e74c3c; }
+        .action-btn.delete:hover { background: #f5b7b1; }
+        .action-btn.edit { background: #e8daef; color: #8e44ad; }
+        .action-btn.edit:hover { background: #d7bde2; }
+        .config-section { margin-bottom: 30px; }
+        .config-section h3 { margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #eee; color: #2c3e50; }
+        .log-entry { font-family: monospace; font-size: 0.85rem; padding: 8px 12px; background: #f8f9fa; border-radius: 4px; margin-bottom: 5px; white-space: pre-wrap; word-break: break-all; }
+        .log-error { background: #fadbd8; color: #c0392b; }
+        .log-warning { background: #fef9e7; color: #f39c12; }
+        .log-info { background: #d6eaf8; color: #2980b9; }
+        .log-success { background: #d5f5e3; color: #27ae60; }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎮 Genshin Code Monitor</h1>
+            <div class="header-actions">
+                <a href="/" class="btn btn-primary">📊 Дашборд</a>
+                <a href="/sources" class="btn btn-secondary">🔍 Источники</a>
+                <a href="/accounts" class="btn btn-secondary">👤 Аккаунты</a>
+                <a href="/config" class="btn btn-secondary">⚙️ Настройки</a>
+            </div>
+        </header>
+
+        {% if flashes %}
+            {% for category, message in flashes %}
+                <div class="flash flash-{{ category }}">
+                    {{ message }}
+                    <button onclick="this.parentElement.remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:inherit;">×</button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    <script>
+        // Auto-hide flash messages after 5 seconds
+        document.querySelectorAll('.flash').forEach(flash => {
+            setTimeout(() => flash.remove(), 5000);
+        });
+
+        // Confirm delete actions
+        document.querySelectorAll('.action-btn.delete').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                if (!confirm('Удалить? Это действие нельзя отменить.')) {
+                    e.preventDefault();
+                }
+            });
+        });
+
+        // HTMX response handling
+        document.body.addEventListener('htmx:afterRequest', (e) => {
+            if (e.detail.successful) {
+                // Close modals on successful form submit
+                document.querySelectorAll('.modal.active').forEach(m => m.classList.remove('active'));
+            }
+        });
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

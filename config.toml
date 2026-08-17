@@ -1,0 +1,13 @@
+poll_interval_seconds = 900
+source_timeout_seconds = 30
+redemption_enabled = false
+redemption_min_gap_seconds = 8
+max_retry_attempts = 3
+retry_backoff_seconds = [30, 120, 600]
+heartbeat_seconds = 5
+heartbeat_timeout_seconds = 30
+db_path = "data/monitor.db"
+log_level = "INFO"
+log_file = "logs/app.log"
+max_log_size = 10485760
+backup_count = 5
