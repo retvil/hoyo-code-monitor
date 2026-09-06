@@ -172,7 +172,7 @@ class Storage:
                     (code_id, source),
                 ).fetchone()
                 if existing_source:
-                    raise sqlite3.IntegrityError(
+                    raise sqlite3.IntegrityError(  # noqa: TRY003 -- validation message needs interpolation
                         f"Code '{code}' already exists from source '{source}'"
                     )
                 # Add new source association
