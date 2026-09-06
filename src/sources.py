@@ -236,11 +236,19 @@ class SourceFetcher:
 
             except aiohttp.ClientError as e:
                 if attempt == max_retries - 1:
-                    logger.error("HTTP error fetching %s after %d retries: %s", source.name, max_retries, e)
+                    logger.error(
+                        "HTTP error fetching %s after %d retries: %s", source.name, max_retries, e
+                    )
                     raise
-                delay = base_delay * (2 ** attempt)
-                logger.warning("Fetch attempt %d/%d failed for %s: %s. Retrying in %.1fs",
-                               attempt + 1, max_retries, source.name, e, delay)
+                delay = base_delay * (2**attempt)
+                logger.warning(
+                    "Fetch attempt %d/%d failed for %s: %s. Retrying in %.1fs",
+                    attempt + 1,
+                    max_retries,
+                    source.name,
+                    e,
+                    delay,
+                )
                 await asyncio.sleep(delay)
             except Exception as e:
                 logger.error("Error extracting from %s: %s", source.name, e)
@@ -252,10 +260,14 @@ class SourceFetcher:
         page = await browser.new_page()
 
         try:
-            await page.goto(source.url, wait_until="networkidle", timeout=source.timeout_seconds * 1000)
+            await page.goto(
+                source.url, wait_until="networkidle", timeout=source.timeout_seconds * 1000
+            )
 
             if source.browser_wait_selector:
-                await page.wait_for_selector(source.browser_wait_selector, timeout=source.browser_wait_seconds * 1000)
+                await page.wait_for_selector(
+                    source.browser_wait_selector, timeout=source.browser_wait_seconds * 1000
+                )
             else:
                 await asyncio.sleep(source.browser_wait_seconds)
 
@@ -288,6 +300,7 @@ class SourceFetcher:
             if isinstance(headers, str):
                 try:
                     import json as _json
+
                     headers = _json.loads(headers)
                 except Exception:
                     headers = {}
@@ -616,10 +629,10 @@ SOURCE_PRESETS: dict[str, SourceConfig] = {
         name="hoyoverse_news",
         url="https://genshin.hoyoverse.com/en/news",
         selector_type="css",
-        selector="[class*=\"news\"]",
+        selector='[class*="news"]',
         enabled=False,  # Requires browser, no codes in listing
         requires_browser=True,
-        browser_wait_selector="[class*=\"news\"]",
+        browser_wait_selector='[class*="news"]',
         timeout_seconds=60,
         rate_limit_seconds=10.0,
         max_retries=3,

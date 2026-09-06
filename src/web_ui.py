@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import time
 from contextlib import asynccontextmanager
@@ -15,7 +14,6 @@ from pydantic import BaseModel
 
 from src.config import ConfigManager
 from src.constants import MASK_VISIBLE_CHARS
-from src.exceptions import StorageError
 from src.scheduler import create_scheduler_from_storage
 from src.sources import SOURCE_PRESETS, SourceConfig, SourceFetcher, list_presets
 from src.storage import Storage
@@ -32,14 +30,14 @@ scheduler = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-        global scheduler
-        # Startup
+    global scheduler
+    # Startup
 
-        scheduler = create_scheduler_from_storage()
-        yield
-        # Shutdown
-        if scheduler and scheduler.is_running():
-            scheduler.stop()
+    scheduler = create_scheduler_from_storage()
+    yield
+    # Shutdown
+    if scheduler and scheduler.is_running():
+        scheduler.stop()
 
 
 app = FastAPI(
@@ -112,17 +110,21 @@ async def dashboard(request: Request):
     # Scheduler status
     sched_status = scheduler.status if scheduler else None
 
-    return templates.TemplateResponse(request, "dashboard.html", {
-        "request": request,
-        "stats": stats,
-        "codes": codes,
-        "sources": sources,
-        "accounts": accounts,
-        "logs": logs,
-        "config": config,
-        "scheduler": sched_status,
-        "source_presets": list_presets(),
-    })
+    return templates.TemplateResponse(
+        request,
+        "dashboard.html",
+        {
+            "request": request,
+            "stats": stats,
+            "codes": codes,
+            "sources": sources,
+            "accounts": accounts,
+            "logs": logs,
+            "config": config,
+            "scheduler": sched_status,
+            "source_presets": list_presets(),
+        },
+    )
 
 
 @app.get("/sources", response_class=HTMLResponse)
@@ -130,11 +132,15 @@ async def sources_page(request: Request):
     """Sources management page."""
     storage = Storage()
     sources = storage.list_sources()
-    return templates.TemplateResponse(request, "sources.html", {
-        "request": request,
-        "sources": sources,
-        "source_presets": {k: v.__dict__ for k, v in SOURCE_PRESETS.items()},
-    })
+    return templates.TemplateResponse(
+        request,
+        "sources.html",
+        {
+            "request": request,
+            "sources": sources,
+            "source_presets": {k: v.__dict__ for k, v in SOURCE_PRESETS.items()},
+        },
+    )
 
 
 @app.post("/sources")
@@ -210,7 +216,10 @@ async def test_source(name: str, request: Request):
     now = time.time()
     last = _test_rate_limit.get(key, 0)
     if now - last < _RATE_LIMIT_SECONDS:
-        raise HTTPException(status_code=429, detail=f"Rate limited, try in {_RATE_LIMIT_SECONDS - (now-last):.1f}s")
+        raise HTTPException(
+            status_code=429,
+            detail=f"Rate limited, try in {_RATE_LIMIT_SECONDS - (now - last):.1f}s",
+        )
     _test_rate_limit[key] = now
 
     storage = Storage()
@@ -247,10 +256,14 @@ async def accounts_page(request: Request):
     """Accounts management page."""
     storage = Storage()
     accounts = storage.list_accounts()
-    return templates.TemplateResponse(request, "accounts.html", {
-        "request": request,
-        "accounts": accounts,
-    })
+    return templates.TemplateResponse(
+        request,
+        "accounts.html",
+        {
+            "request": request,
+            "accounts": accounts,
+        },
+    )
 
 
 @app.post("/accounts")
@@ -324,10 +337,14 @@ async def config_page(request: Request):
     """Configuration page."""
     config_manager = ConfigManager()
     config = config_manager.get_all()
-    return templates.TemplateResponse(request, "config.html", {
-        "request": request,
-        "config": config,
-    })
+    return templates.TemplateResponse(
+        request,
+        "config.html",
+        {
+            "request": request,
+            "config": config,
+        },
+    )
 
 
 @app.post("/config")
@@ -440,15 +457,23 @@ async def partial_scheduler_status(request: Request):
     """HTMX partial for scheduler status."""
     global scheduler
     if not scheduler:
-        return templates.TemplateResponse(request, "partials/scheduler_status.html", {
-            "request": request,
-            "scheduler": None,
-        })
+        return templates.TemplateResponse(
+            request,
+            "partials/scheduler_status.html",
+            {
+                "request": request,
+                "scheduler": None,
+            },
+        )
     status = scheduler.status
-    return templates.TemplateResponse(request, "partials/scheduler_status.html", {
-        "request": request,
-        "scheduler": status,
-    })
+    return templates.TemplateResponse(
+        request,
+        "partials/scheduler_status.html",
+        {
+            "request": request,
+            "scheduler": status,
+        },
+    )
 
 
 @app.get("/partials/stats")
@@ -456,10 +481,14 @@ async def partial_stats(request: Request):
     """HTMX partial for statistics."""
     storage = Storage()
     stats = storage.get_stats()
-    return templates.TemplateResponse(request, "partials/stats.html", {
-        "request": request,
-        "stats": stats,
-    })
+    return templates.TemplateResponse(
+        request,
+        "partials/stats.html",
+        {
+            "request": request,
+            "stats": stats,
+        },
+    )
 
 
 @app.get("/partials/recent-codes")
@@ -467,10 +496,14 @@ async def partial_recent_codes(request: Request):
     """HTMX partial for recent codes."""
     storage = Storage()
     codes = storage.list_codes(limit=20, only_unredeemed=False)
-    return templates.TemplateResponse(request, "partials/recent_codes.html", {
-        "request": request,
-        "codes": codes,
-    })
+    return templates.TemplateResponse(
+        request,
+        "partials/recent_codes.html",
+        {
+            "request": request,
+            "codes": codes,
+        },
+    )
 
 
 @app.get("/partials/recent-logs")
@@ -478,12 +511,17 @@ async def partial_recent_logs(request: Request):
     """HTMX partial for recent redemption logs."""
     storage = Storage()
     logs = storage.get_redemption_logs(limit=20)
-    return templates.TemplateResponse(request, "partials/recent_logs.html", {
-        "request": request,
-        "logs": logs,
-    })
+    return templates.TemplateResponse(
+        request,
+        "partials/recent_logs.html",
+        {
+            "request": request,
+            "logs": logs,
+        },
+    )
 
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="127.0.0.1", port=8000)

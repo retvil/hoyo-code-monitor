@@ -26,7 +26,7 @@ def _tray_command() -> str:
     return f'"{python}" "{cli_py}" tray'
 
 
-def _open_key(write: bool = False):  # noqa: ANN202
+def _open_key(write: bool = False):
     import winreg
 
     access = winreg.KEY_SET_VALUE if write else winreg.KEY_READ

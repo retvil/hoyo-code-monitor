@@ -110,7 +110,9 @@ class Storage:
 
         Uses DEFERRED transaction, timeout 30s, and proper commit/rollback.
         """
-        conn = sqlite3.connect(str(self.db_path), timeout=30.0, check_same_thread=False, isolation_level=None)
+        conn = sqlite3.connect(
+            str(self.db_path), timeout=30.0, check_same_thread=False, isolation_level=None
+        )
         conn.row_factory = sqlite3.Row
         try:
             conn.execute("PRAGMA journal_mode=WAL;")
@@ -160,9 +162,7 @@ class Storage:
 
         with self._connection() as conn:
             # Check if code already exists
-            existing = conn.execute(
-                "SELECT id FROM codes WHERE code = ?", (code,)
-            ).fetchone()
+            existing = conn.execute("SELECT id FROM codes WHERE code = ?", (code,)).fetchone()
 
             if existing:
                 code_id = existing[0]
@@ -345,9 +345,19 @@ class Storage:
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    name, url, selector_type, selector, int(enabled), headers_json,
-                    timeout_seconds, rate_limit_seconds, int(requires_browser),
-                    browser_wait_selector, browser_wait_seconds, max_retries, retry_base_delay,
+                    name,
+                    url,
+                    selector_type,
+                    selector,
+                    int(enabled),
+                    headers_json,
+                    timeout_seconds,
+                    rate_limit_seconds,
+                    int(requires_browser),
+                    browser_wait_selector,
+                    browser_wait_seconds,
+                    max_retries,
+                    retry_base_delay,
                 ),
             )
             conn.commit()
@@ -363,9 +373,7 @@ class Storage:
             Dictionary with source data or None if not found.
         """
         with self._connection() as conn:
-            row = conn.execute(
-                "SELECT * FROM sources WHERE name = ?", (name,)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM sources WHERE name = ?", (name,)).fetchone()
             return self._decode_source_row(row) if row else None
 
     def list_sources(self, enabled_only: bool = False) -> list[dict[str, Any]]:
@@ -536,9 +544,7 @@ class Storage:
     def get_account(self, name: str) -> dict[str, Any] | None:
         """Retrieve an account by name."""
         with self._connection() as conn:
-            row = conn.execute(
-                "SELECT * FROM accounts WHERE name = ?", (name,)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM accounts WHERE name = ?", (name,)).fetchone()
             return dict(row) if row else None
 
     def list_accounts(self) -> list[dict[str, Any]]:
@@ -613,7 +619,12 @@ class Storage:
                 INSERT INTO sessions (account_id, cookies_encrypted, user_agent, expires_at)
                 VALUES (?, ?, ?, ?)
                 """,
-                (account_id, cookies_encrypted, user_agent, expires_at.isoformat() if expires_at else None),
+                (
+                    account_id,
+                    cookies_encrypted,
+                    user_agent,
+                    expires_at.isoformat() if expires_at else None,
+                ),
             )
             conn.commit()
             return cursor.lastrowid
@@ -663,7 +674,15 @@ class Storage:
                 INSERT INTO redemption_log (code, account_id, status, reward, error_message, attempted_at, redeemed_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (code, account_id, status, reward, error_message, attempted_at.isoformat(), redeemed_at.isoformat() if redeemed_at else None),
+                (
+                    code,
+                    account_id,
+                    status,
+                    reward,
+                    error_message,
+                    attempted_at.isoformat(),
+                    redeemed_at.isoformat() if redeemed_at else None,
+                ),
             )
             conn.commit()
             return cursor.lastrowid
@@ -719,9 +738,7 @@ class Storage:
             Configuration value or default.
         """
         with self._connection() as conn:
-            row = conn.execute(
-                "SELECT value FROM config WHERE key = ?", (key,)
-            ).fetchone()
+            row = conn.execute("SELECT value FROM config WHERE key = ?", (key,)).fetchone()
             return row["value"] if row else default
 
     def delete_config(self, key: str) -> bool:

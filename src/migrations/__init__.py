@@ -273,7 +273,9 @@ CURRENT_VERSION = 9
 def get_db_version(conn: sqlite3.Connection) -> int:
     """Get current database schema version."""
     try:
-        row = conn.execute("SELECT version FROM schema_version ORDER BY version DESC LIMIT 1").fetchone()
+        row = conn.execute(
+            "SELECT version FROM schema_version ORDER BY version DESC LIMIT 1"
+        ).fetchone()
         return row[0] if row else 0
     except sqlite3.OperationalError:
         return 0
@@ -321,6 +323,7 @@ def get_migration_status(db_path: str) -> list[dict]:
 
 if __name__ == "__main__":
     import sys
+
     db_path = sys.argv[1] if len(sys.argv) > 1 else "data/monitor.db"
     run_migrations(db_path)
     print(f"Migrations applied to {db_path}")

@@ -131,14 +131,17 @@ class SystemTray:
             current = self._current_interval()
             sub_items = []
             for label, seconds in self.INTERVALS:
-                def _make_action(s: int):  # noqa: ANN202
+
+                def _make_action(s: int):
                     def _action(icon: pystray.Icon, item: pystray.MenuItem) -> None:
                         self._on_set_interval(icon, item, s)
+
                     return _action
 
-                def _make_checked(s: int):  # noqa: ANN202
+                def _make_checked(s: int):
                     def _checked(item: pystray.MenuItem) -> bool:
                         return current == s
+
                     return _checked
 
                 sub_items.append(

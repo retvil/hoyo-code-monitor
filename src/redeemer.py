@@ -40,9 +40,7 @@ class Redeemer:
         default_form_data: Default form data parameters for redemption.
     """
 
-    DEFAULT_ENDPOINT = (
-        "https://sg-hk4e-api.hoyolab.com/common/apicdkey/api/webExchangeCdkey"
-    )
+    DEFAULT_ENDPOINT = "https://sg-hk4e-api.hoyolab.com/common/apicdkey/api/webExchangeCdkey"
     DEFAULT_USER_AGENT = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -106,9 +104,7 @@ class Redeemer:
             Formatted Cookie header string.
         """
         # Filter out None/empty values and build cookie string
-        cookie_parts = [
-            f"{key}={value}" for key, value in cookies.items() if value
-        ]
+        cookie_parts = [f"{key}={value}" for key, value in cookies.items() if value]
         return "; ".join(cookie_parts)
 
     def _build_headers(self, cookies: dict[str, str]) -> dict[str, str]:
@@ -251,9 +247,7 @@ class Redeemer:
         logger.info("Attempting to redeem code: %s", code[:4] + "****")
 
         try:
-            async with session.post(
-                self.endpoint, headers=headers, data=form_data
-            ) as response:
+            async with session.post(self.endpoint, headers=headers, data=form_data) as response:
                 response.raise_for_status()
                 json_data = await response.json()
 
@@ -275,9 +269,7 @@ class Redeemer:
                 return result
 
         except aiohttp.ClientResponseError as e:
-            logger.error(
-                "HTTP error redeeming code %s: %s", code[:4] + "****", e
-            )
+            logger.error("HTTP error redeeming code %s: %s", code[:4] + "****", e)
             return RedemptionResult(
                 success=False,
                 reward="",
@@ -285,9 +277,7 @@ class Redeemer:
                 raw_response={"retcode": -1, "message": str(e), "data": {}},
             )
         except aiohttp.ClientError as e:
-            logger.error(
-                "Network error redeeming code %s: %s", code[:4] + "****", e
-            )
+            logger.error("Network error redeeming code %s: %s", code[:4] + "****", e)
             return RedemptionResult(
                 success=False,
                 reward="",
@@ -295,9 +285,7 @@ class Redeemer:
                 raw_response={"retcode": -1, "message": str(e), "data": {}},
             )
         except Exception as e:
-            logger.exception(
-                "Unexpected error redeeming code %s", code[:4] + "****"
-            )
+            logger.exception("Unexpected error redeeming code %s", code[:4] + "****")
             return RedemptionResult(
                 success=False,
                 reward="",

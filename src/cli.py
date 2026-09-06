@@ -10,7 +10,7 @@ from src.autostart import disable as autostart_disable
 from src.autostart import enable as autostart_enable
 from src.autostart import is_enabled as autostart_is_enabled
 from src.config import ConfigManager
-from src.constants import MASK_VISIBLE_CHARS, MAX_DISPLAY_CODES
+from src.constants import MASK_VISIBLE_CHARS
 from src.scheduler import create_scheduler_from_storage
 from src.single_instance import SingleInstance
 from src.sources import SourceFetcher
@@ -48,16 +48,18 @@ def show():
     config = config_manager.get_all()
     masked = {}
     for key, value in config.items():
-        if key in ('uid', 'cookies') and isinstance(value, str) and value:
-            masked[key] = '*' * len(value) if len(value) <= 4 else value[:4] + '*' * (len(value) - 4)
+        if key in ("uid", "cookies") and isinstance(value, str) and value:
+            masked[key] = (
+                "*" * len(value) if len(value) <= 4 else value[:4] + "*" * (len(value) - 4)
+            )
         else:
             masked[key] = value
     click.echo(json.dumps(masked, indent=2))
 
 
 @config.command()
-@click.argument('key')
-@click.argument('value')
+@click.argument("key")
+@click.argument("value")
 def set(key, value):
     """Set a configuration key to a value."""
     config_manager = ConfigManager()
@@ -243,7 +245,7 @@ def sources():
     pass
 
 
-@sources.command(name='list')
+@sources.command(name="list")
 def list_sources():
     """List all stored sources."""
     storage = Storage()
@@ -268,7 +270,7 @@ def list_sources():
     sys.exit(0)
 
 
-@sources.command(name='add')
+@sources.command(name="add")
 @click.argument("name")
 @click.argument("url")
 @click.option("--selector-type", "-t", default="css", help="Type of selector (css, json, xpath).")
@@ -296,7 +298,7 @@ def add_source(name, url, selector_type, selector):
     sys.exit(0)
 
 
-@sources.command(name='remove')
+@sources.command(name="remove")
 @click.argument("name")
 def remove_source(name):
     """Remove a source <name>."""
@@ -420,7 +422,7 @@ def stats():
     click.echo(f"Total codes: {stats.get('total_codes', 0)}")
     click.echo(f"Successful: {stats.get('successful', 0)}")
     click.echo(f"Failed: {stats.get('failed', 0)}")
-    by_source = stats.get('by_source', {})
+    by_source = stats.get("by_source", {})
     if by_source:
         click.echo("By source:")
         for source, count in by_source.items():
@@ -528,7 +530,6 @@ def tray():
     import webbrowser
 
     from src.constants import WEB_HOST, WEB_PORT
-    from src.system_tray import create_tray_icon
 
     _ensure_single_instance()
     scheduler = create_scheduler_from_storage()
@@ -579,8 +580,7 @@ def tray():
     def on_run_once() -> None:
         result = scheduler.run_once()
         click.echo(
-            f"Check done: {result['codes_found']} found, "
-            f"{result['codes_redeemed']} redeemed."
+            f"Check done: {result['codes_found']} found, {result['codes_redeemed']} redeemed."
         )
 
     def on_set_interval(seconds: int) -> None:

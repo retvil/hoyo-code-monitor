@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 from src.config import Config, load_config_from_storage
 from src.exceptions import ConfigError
 from src.redeemer import Redeemer
-from src.sources import SourceConfig, SourceFetcher, seed_default_sources
+from src.sources import SourceFetcher, seed_default_sources
 from src.storage import Storage
 
 logger = logging.getLogger(__name__)
@@ -137,8 +137,6 @@ class Scheduler:
                 "errors": ["No enabled sources configured"],
             }
 
-
-
         # Check if redemption is enabled and configured
         can_redeem = (
             getattr(self.config, "redemption_enabled", False)
@@ -207,7 +205,10 @@ class Scheduler:
                             # Log redemption per account
                             for idx, acc in enumerate(redeem_accounts):
                                 try:
-                                    cookies = self.storage.load_account_cookies(acc["name"]) or self.config.cookies
+                                    cookies = (
+                                        self.storage.load_account_cookies(acc["name"])
+                                        or self.config.cookies
+                                    )
                                     res = await self.redeemer.redeem_code(
                                         code=code,
                                         cookies=cookies,
@@ -227,8 +228,15 @@ class Scheduler:
                                     if res.success:
                                         codes_redeemed += 1
                                 except Exception as e:
-                                    logger.error("Error redeeming code %s for %s: %s", code[:4] + "****", acc["name"], e)
-                                    errors.append(f"Redemption error for {code[:4]}**** ({acc['name']}): {e}")
+                                    logger.error(
+                                        "Error redeeming code %s for %s: %s",
+                                        code[:4] + "****",
+                                        acc["name"],
+                                        e,
+                                    )
+                                    errors.append(
+                                        f"Redemption error for {code[:4]}**** ({acc['name']}): {e}"
+                                    )
                                 await asyncio.sleep(gap)
                         except Exception as e:
                             logger.error("Error redeeming code %s: %s", code[:4] + "****", e)
