@@ -1,168 +1,43 @@
 {% extends "base.html" %}
-
-{% block title %}Настройки - Genshin Code Monitor{% endblock %}
-
+{% block title %}Config - Genshin Code Monitor{% endblock %}
 {% block content %}
 <div class="card">
-    <div class="card-header">
-        <h2 class="card-title">⚙️ Конфигурация приложения</h2>
-    </div>
-    <form id="config-form" hx-post="/config" hx-target="#config-result" hx-swap="innerHTML">
-        <div class="config-section">
-            <h3>🕐 Интервалы и таймауты</h3>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Интервал проверки (секунды)</label>
-                    <input type="number" name="poll_interval_seconds" value="{{ config.poll_interval_seconds }}" min="60" max="86400">
-                    <small style="color: #7f8c8d;">По умолчанию: 900 (15 минут)</small>
-                </div>
-                <div class="form-group">
-                    <label>Таймаут источника (секунды)</label>
-                    <input type="number" name="source_timeout_seconds" value="{{ config.source_timeout_seconds }}" min="5" max="300">
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Мин. интервал между погашениями (сек)</label>
-                    <input type="number" name="redemption_min_gap_seconds" value="{{ config.redemption_min_gap_seconds }}" min="6" max="3600">
-                </div>
-                <div class="form-group">
-                    <label>Макс. попыток повтора</label>
-                    <input type="number" name="max_retry_attempts" value="{{ config.max_retry_attempts }}" min="0" max="10">
-                </div>
-            </div>
-            <div class="form-group">
-                <label>Backoff при повторах (секунды, JSON массив)</label>
-                <input type="text" name="retry_backoff_seconds" value="{{ config.retry_backoff_seconds | tojson }}" style="font-family: monospace;">
-                <small style="color: #7f8c8d;">Например: [30, 120, 600]</small>
-            </div>
+    <div class="card-title" style="margin-bottom: 14px;">Application config</div>
+    <form hx-post="/config" hx-target="#config-result" hx-swap="innerHTML">
+        <h4 style="margin: 12px 0 8px;">Intervals</h4>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px;">
+            <div><label>Poll interval (sec)</label><input type="number" name="poll_interval_seconds" value="{{ config.poll_interval_seconds }}" min="60" max="86400"></div>
+            <div><label>Source timeout (sec)</label><input type="number" name="source_timeout_seconds" value="{{ config.source_timeout_seconds }}" min="5" max="300"></div>
+            <div><label>Min redeem gap (sec)</label><input type="number" name="redemption_min_gap_seconds" value="{{ config.redemption_min_gap_seconds }}" min="6" max="3600"></div>
+            <div><label>Max retries</label><input type="number" name="max_retry_attempts" value="{{ config.max_retry_attempts }}" min="0" max="10"></div>
         </div>
-
-        <div class="config-section">
-            <h3>💰 Настройки погашения</h3>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" name="redemption_enabled" value="true" {% if config.redemption_enabled %}checked{% endif %}>
-                        Включить автопогашение
-                    </label>
-                </div>
-            </div>
-            <div class="form-row" id="redemption-fields" style="display: {% if config.redemption_enabled %}grid{% else %}none{% endif %};">
-                <div class="form-group">
-                    <label>UID</label>
-                    <input type="text" name="uid" value="{{ config.uid or '' }}" placeholder="123456789">
-                </div>
-                <div class="form-group">
-                    <label>Регион</label>
-                    <select name="region">
-                        <option value="os_usa" {% if config.region == 'os_usa' %}selected{% endif %}>os_usa (America)</option>
-                        <option value="os_euro" {% if config.region == 'os_euro' %}selected{% endif %}>os_euro (Europe)</option>
-                        <option value="os_asia" {% if config.region == 'os_asia' %}selected{% endif %}>os_asia (Asia)</option>
-                        <option value="os_cht" {% if config.region == 'os_cht' %}selected{% endif %}>os_cht (TW/HK/MO)</option>
-                    </select>
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Game Biz</label>
-                    <input type="text" name="game_biz" value="{{ config.game_biz or 'hk4e_global' }}">
-                </div>
-                <div class="form-group">
-                    <label>Язык</label>
-                    <input type="text" name="lang" value="{{ config.lang or 'en-us' }}">
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>S_Lang_Key</label>
-                    <input type="text" name="s_lang_key" value="{{ config.s_lang_key or 'en-us' }}">
-                </div>
-            </div>
+        <h4 style="margin: 16px 0 8px;">Redemption</h4>
+        <div><label><input type="checkbox" name="redemption_enabled" value="true" {% if config.redemption_enabled %}checked{% endif %} style="width: auto;"> Enable auto-redeem</label></div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin-top: 8px;">
+            <div><label>Game biz</label><input type="text" name="game_biz" value="{{ config.game_biz or 'hk4e_global' }}"></div>
+            <div><label>Lang</label><input type="text" name="lang" value="{{ config.lang or 'en-us' }}"></div>
         </div>
-
-        <div class="config-section">
-            <h3>🗄️ База данных и логирование</h3>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Путь к БД</label>
-                    <input type="text" name="db_path" value="{{ config.db_path }}">
-                </div>
-                <div class="form-group">
-                    <label>Уровень логов</label>
-                    <select name="log_level">
-                        <option value="DEBUG" {% if config.log_level == 'DEBUG' %}selected{% endif %}>DEBUG</option>
-                        <option value="INFO" {% if config.log_level == 'INFO' %}selected{% endif %}>INFO</option>
-                        <option value="WARNING" {% if config.log_level == 'WARNING' %}selected{% endif %}>WARNING</option>
-                        <option value="ERROR" {% if config.log_level == 'ERROR' %}selected{% endif %}>ERROR</option>
-                        <option value="CRITICAL" {% if config.log_level == 'CRITICAL' %}selected{% endif %}>CRITICAL</option>
-                    </select>
-                </div>
+        <h4 style="margin: 16px 0 8px;">Storage / logging</h4>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px;">
+            <div><label>DB path</label><input type="text" name="db_path" value="{{ config.db_path }}"></div>
+            <div><label>Log level</label>
+                <select name="log_level">
+                    <option value="DEBUG" {% if config.log_level == 'DEBUG' %}selected{% endif %}>DEBUG</option>
+                    <option value="INFO" {% if config.log_level == 'INFO' %}selected{% endif %}>INFO</option>
+                    <option value="WARNING" {% if config.log_level == 'WARNING' %}selected{% endif %}>WARNING</option>
+                    <option value="ERROR" {% if config.log_level == 'ERROR' %}selected{% endif %}>ERROR</option>
+                </select>
             </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Файл лога</label>
-                    <input type="text" name="log_file" value="{{ config.log_file }}">
-                </div>
-                <div class="form-group">
-                    <label>Макс. размер лога (байт)</label>
-                    <input type="number" name="max_log_size" value="{{ config.max_log_size }}" min="1048576">
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Количество бэкапов</label>
-                    <input type="number" name="backup_count" value="{{ config.backup_count }}" min="1" max="20">
-                </div>
-            </div>
+            <div><label>Log file</label><input type="text" name="log_file" value="{{ config.log_file }}"></div>
         </div>
-
-        <div class="config-section">
-            <h3>💓 Heartbeat (для внешнего мониторинга)</h3>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Интервал heartbeat (сек)</label>
-                    <input type="number" name="heartbeat_seconds" value="{{ config.heartbeat_seconds }}" min="1" max="300">
-                </div>
-                <div class="form-group">
-                    <label>Таймаут heartbeat (сек)</label>
-                    <input type="number" name="heartbeat_timeout_seconds" value="{{ config.heartbeat_timeout_seconds }}" min="5" max="600">
-                </div>
-            </div>
-        </div>
-
-        <div id="config-result" style="margin-top: 15px;"></div>
-        <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
-            <button type="button" class="btn btn-secondary" onclick="resetConfig()">🔄 Сбросить к дефолту</button>
-            <button type="submit" class="btn btn-primary">💾 Сохранить настройки</button>
+        <div id="config-result" style="margin-top: 12px;"></div>
+        <div style="display: flex; justify-content: flex-end; margin-top: 14px;">
+            <button type="submit" class="btn btn-primary">Save</button>
         </div>
     </form>
 </div>
-
 <div class="card">
-    <div class="card-header">
-        <h2 class="card-title">📋 Текущая конфигурация (JSON)</h2>
-    </div>
-    <pre style="background: #f8f9fa; padding: 15px; border-radius: 6px; overflow-x: auto; font-size: 0.85rem;">{{ config | tojson(indent=2) }}</pre>
+    <div class="card-title" style="margin-bottom: 8px;">Current config (JSON)</div>
+    <pre style="background: #f8fafc; padding: 12px; border-radius: 8px; overflow-x: auto; font-size: 0.8rem;">{{ config | tojson(indent=2) }}</pre>
 </div>
-
-<script>
-    document.querySelector('input[name="redemption_enabled"]').addEventListener('change', (e) => {
-        document.getElementById('redemption-fields').style.display = e.target.checked ? 'grid' : 'none';
-    });
-
-    async function resetConfig() {
-        if (!confirm('Сбросить все настройки к значениям по умолчанию?')) return;
-        try {
-            const response = await fetch('/config/reset', { method: 'POST' });
-            if (response.ok) {
-                location.reload();
-            } else {
-                alert('Ошибка при сбросе');
-            }
-        } catch (e) {
-            alert('Ошибка: ' + e.message);
-        }
-    }
-</script>
 {% endblock %}

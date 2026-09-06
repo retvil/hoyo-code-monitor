@@ -170,6 +170,19 @@ class TestJSONExtractor:
         assert "GENSHIN123" in codes
         assert "STARRAIL456" in codes
 
+    def test_extract_active_only(self) -> None:
+        extractor = JSONExtractor()
+        json_str = '{"active": [{"code": "GENSHIN123"}], "inactive": [{"code": "OLDCODE999"}]}'
+        codes = extractor.extract(json_str, "active")
+        assert "GENSHIN123" in codes
+        assert "OLDCODE999" not in codes
+
+    def test_extract_missing_selector_falls_back(self) -> None:
+        extractor = JSONExtractor()
+        json_str = '{"active": [{"code": "GENSHIN123"}]}'
+        codes = extractor.extract(json_str, "nonexistent.path")
+        assert "GENSHIN123" in codes
+
 
 class TestRegexExtractor:
     """Tests for RegexExtractor."""
@@ -220,6 +233,25 @@ class TestCreateDefaultSources:
         names = {s.name for s in sources}
         assert "wiki" in names
         assert "wiki_api" in names
+        assert "hoyo_codes_api" in names
+        assert "ennead_codes_api" in names
+        assert "ennead_mihoyo_api" in names
+
+    def test_new_guide_presets_exist(self) -> None:
+        from src.sources import SOURCE_PRESETS, get_preset
+
+        for name in (
+            "ennead_mihoyo_api",
+            "pockettactics_guides",
+            "theclick_guides",
+            "eurogamer_guides",
+            "mmoculture_guides",
+        ):
+            preset = get_preset(name)
+            assert preset is not None
+            preset.validate()
+        assert "hoyo_codes_api" in SOURCE_PRESETS
+        assert "ennead_codes_api" in SOURCE_PRESETS
 
     def test_sources_have_required_fields(self) -> None:
         sources = create_default_sources()
@@ -227,7 +259,8 @@ class TestCreateDefaultSources:
             assert source.name
             assert source.url
             assert source.selector_type
-            assert source.selector
+            if source.selector_type != "json":
+                assert source.selector
             source.validate()  # Should not raise
 
 

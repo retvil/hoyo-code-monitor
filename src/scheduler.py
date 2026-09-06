@@ -6,11 +6,14 @@ and attempts redemption if enabled.
 
 import asyncio
 import logging
+import sqlite3
 import threading
-from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 from src.config import Config, load_config_from_storage
 from src.redeemer import Redeemer
@@ -79,6 +82,7 @@ class Scheduler:
         self._status = SchedulerStatus()
         self._status_lock = threading.Lock()
         self._run_callback: Callable[[], None] | None = None
+        self._seed_done = False
 
     @property
     def status(self) -> SchedulerStatus:
@@ -113,6 +117,7 @@ class Scheduler:
         Returns:
             Dictionary with cycle results.
         """
+        gap = 8
         codes_found = 0
         codes_redeemed = 0
         errors = []
@@ -131,23 +136,7 @@ class Scheduler:
                 "errors": ["No enabled sources configured"],
             }
 
-        # Convert to SourceConfig objects
-        sources = [
-            SourceConfig(
-                name=s["name"],
-                url=s["url"],
-                selector_type=s["selector_type"],
-                selector=s["selector"],
-                enabled=bool(s["enabled"]),
-                headers=s.get("headers", {}),
-                timeout_seconds=s.get("timeout_seconds", 30),
-                rate_limit_seconds=s.get("rate_limit_seconds", 1.0),
-                requires_browser=bool(s.get("requires_browser", False)),
-                browser_wait_selector=s.get("browser_wait_selector"),
-                browser_wait_seconds=s.get("browser_wait_seconds", 5),
-            )
-            for s in sources_data
-        ]
+
 
         # Check if redemption is enabled and configured
         can_redeem = (
@@ -157,6 +146,20 @@ class Scheduler:
             and self.config.cookies.get("ltuid")
             and self.config.cookies.get("ltoken")
         )
+
+        # Resolve accounts for redemption (multi-account)
+        redeem_accounts: list[dict[str, Any]] = []
+        if can_redeem:
+            accounts = self.storage.list_accounts()
+            if accounts:
+                redeem_accounts = accounts
+                acc0 = accounts[0]
+                ac = self.storage.load_account_cookies(acc0["name"])
+                if ac:
+                    self.config.cookies = ac
+            else:
+                logger.warning("Redemption enabled but no accounts configured")
+                can_redeem = False
 
         if getattr(self.config, "redemption_enabled", False) and not can_redeem:
             missing = []
@@ -200,51 +203,41 @@ class Scheduler:
                     # Attempt redemption if enabled and configured
                     if can_redeem:
                         try:
-                            result = await self.redeemer.redeem_code(
-                                code=code,
-                                cookies=self.config.cookies,
-                                uid=self.config.uid,
-                                region=self.config.region,
-                                game_biz=getattr(self.config, "game_biz", "hk4e_global"),
-                                lang=getattr(self.config, "lang", "en-us"),
-                                s_lang_key=getattr(self.config, "s_lang_key", "en-us"),
-                            )
-
-                            self.storage.update_code_redemption(
-                                code=code,
-                                redeemed=result.success,
-                                reward=result.reward if result.success else None,
-                            )
-
-                            # Log redemption attempt
-                            self.storage.add_redemption_log(
-                                code=code,
-                                account_id=1,  # Default account for now
-                                status="success" if result.success else "failed",
-                                reward=result.reward if result.success else None,
-                                error_message=result.message if not result.success else None,
-                            )
-
-                            if result.success:
-                                codes_redeemed += 1
-                                logger.info(
-                                    "Code redeemed: %s - %s", code[:4] + "****", result.reward
-                                )
-                            else:
-                                logger.warning(
-                                    "Code redemption failed: %s - %s",
-                                    code[:4] + "****",
-                                    result.message,
-                                )
+                            # Log redemption per account
+                            for idx, acc in enumerate(redeem_accounts):
+                                try:
+                                    cookies = self.storage.load_account_cookies(acc["name"]) or self.config.cookies
+                                    res = await self.redeemer.redeem_code(
+                                        code=code,
+                                        cookies=cookies,
+                                        uid=acc["uid"],
+                                        region=acc["region"],
+                                        game_biz=acc.get("game_biz", "hk4e_global"),
+                                        lang=acc.get("lang", "en-us"),
+                                        s_lang_key=acc.get("s_lang_key", "en-us"),
+                                    )
+                                    self.storage.add_redemption_log(
+                                        code=code,
+                                        account_id=acc["id"],
+                                        status="success" if res.success else "failed",
+                                        reward=res.reward if res.success else None,
+                                        error_message=res.message if not res.success else None,
+                                    )
+                                    if res.success:
+                                        codes_redeemed += 1
+                                except Exception as e:
+                                    logger.error("Error redeeming code %s for %s: %s", code[:4] + "****", acc["name"], e)
+                                    errors.append(f"Redemption error for {code[:4]}**** ({acc['name']}): {e}")
+                                await asyncio.sleep(gap)
                         except Exception as e:
                             logger.error("Error redeeming code %s: %s", code[:4] + "****", e)
                             errors.append(f"Redemption error for {code[:4]}****: {e}")
 
+                except sqlite3.IntegrityError:
+                    continue
                 except Exception as e:
-                    # Code already exists or other DB error
-                    if "UNIQUE constraint failed" not in str(e):
-                        logger.error("Error storing code %s: %s", code[:4] + "****", e)
-                        errors.append(f"Storage error for {code[:4]}****: {e}")
+                    logger.error("Error storing code %s: %s", code[:4] + "****", e)
+                    errors.append(f"Storage error for {code[:4]}****: {e}")
 
         return {
             "success": len(errors) == 0,

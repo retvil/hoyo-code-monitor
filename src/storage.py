@@ -45,15 +45,19 @@ class Storage:
         Tries in order:
         1. Environment variable GENSHIN_ENCRYPTION_KEY
         2. Keyring (system credential store)
-        3. Generate and store new key in keyring
+        3. File data/.key (600 perms)
+        4. Generate and persist to file + keyring
 
         Returns:
             Fernet instance for encryption/decryption.
         """
-        # Try environment variable first
+        # 1. Env
         key_env = os.environ.get("GENSHIN_ENCRYPTION_KEY")
         if key_env:
-            return Fernet(key_env.encode() if isinstance(key_env, str) else key_env)
+            try:
+                return Fernet(key_env.encode() if isinstance(key_env, str) else key_env)
+            except Exception as e:
+                logger.warning("Invalid GENSHIN_ENCRYPTION_KEY: %s, falling back", e)
 
         # Try keyring
         try:
@@ -65,7 +69,17 @@ class Storage:
         except Exception:
             pass
 
-        # Generate new key and store in keyring
+        # 3. File fallback data/.key
+        try:
+            key_path = self.db_path.parent / ".key"
+            alt_path = Path("data") / ".key"
+            for p in (key_path, alt_path):
+                if p.exists():
+                    return Fernet(p.read_text(encoding="utf-8").strip().encode())
+        except Exception:
+            pass
+
+        # 4. Generate new key and persist
         key = Fernet.generate_key().decode()
         try:
             import keyring
@@ -73,7 +87,18 @@ class Storage:
             keyring.set_password("genshin-code-monitor", "encryption-key", key)
             logger.info("Generated new encryption key and stored in keyring")
         except Exception:
-            logger.warning("Could not store encryption key in keyring; using ephemeral key")
+            pass
+        try:
+            key_path = self.db_path.parent / ".key"
+            key_path.parent.mkdir(parents=True, exist_ok=True)
+            key_path.write_text(key, encoding="utf-8")
+            try:
+                os.chmod(key_path, 0o600)
+            except Exception:
+                pass
+            logger.info("Stored encryption key at %s", key_path)
+        except Exception as e:
+            logger.warning("Could not persist encryption key: %s; using ephemeral key", e)
         return Fernet(key.encode())
 
     @contextlib.contextmanager
@@ -82,17 +107,32 @@ class Storage:
 
         Yields:
             sqlite3.Connection: Database connection with row factory set.
+
+        Uses DEFERRED transaction, timeout 30s, and proper commit/rollback.
         """
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(str(self.db_path), timeout=30.0, check_same_thread=False, isolation_level=None)
         conn.row_factory = sqlite3.Row
         try:
+            conn.execute("PRAGMA journal_mode=WAL;")
+            conn.execute("PRAGMA busy_timeout=30000;")
+            conn.execute("PRAGMA foreign_keys=ON;")
+        except Exception:
+            pass
+        try:
+            conn.execute("BEGIN")
             yield conn
             conn.commit()
         except Exception:
-            conn.rollback()
+            try:
+                conn.rollback()
+            except Exception:
+                pass
             raise
         finally:
-            conn.close()
+            try:
+                conn.close()
+            except Exception:
+                pass
 
     # --- Codes CRUD ---
 
@@ -288,29 +328,28 @@ class Storage:
         selector_type: str,
         selector: str,
         enabled: bool = True,
+        headers: dict[str, str] | None = None,
+        timeout_seconds: int = 30,
+        rate_limit_seconds: float = 1.0,
+        requires_browser: bool = False,
+        browser_wait_selector: str | None = None,
+        browser_wait_seconds: int = 5,
+        max_retries: int = 3,
+        retry_base_delay: float = 1.0,
     ) -> int:
-        """Add a new source to the database.
-
-        Args:
-            name: Unique name for the source.
-            url: URL of the source.
-            selector_type: Type of selector (e.g., "css", "xpath", "json").
-            selector: Selector string for extracting codes.
-            enabled: Whether the source is active.
-
-        Returns:
-            The ID of the inserted row.
-
-        Raises:
-            sqlite3.IntegrityError: If source name already exists.
-        """
+        """Add a new source to the database."""
+        headers_json = json.dumps(headers or {})
         with self._connection() as conn:
             cursor = conn.execute(
                 """
-                INSERT INTO sources (name, url, selector_type, selector, enabled)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO sources (name, url, selector_type, selector, enabled, headers, timeout_seconds, rate_limit_seconds, requires_browser, browser_wait_selector, browser_wait_seconds, max_retries, retry_base_delay)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (name, url, selector_type, selector, int(enabled)),
+                (
+                    name, url, selector_type, selector, int(enabled), headers_json,
+                    timeout_seconds, rate_limit_seconds, int(requires_browser),
+                    browser_wait_selector, browser_wait_seconds, max_retries, retry_base_delay,
+                ),
             )
             conn.commit()
             return cursor.lastrowid
@@ -328,7 +367,7 @@ class Storage:
             row = conn.execute(
                 "SELECT * FROM sources WHERE name = ?", (name,)
             ).fetchone()
-            return dict(row) if row else None
+            return self._decode_source_row(row) if row else None
 
     def list_sources(self, enabled_only: bool = False) -> list[dict[str, Any]]:
         """List all sources.
@@ -349,7 +388,18 @@ class Storage:
 
         with self._connection() as conn:
             rows = conn.execute(query, params).fetchall()
-            return [dict(row) for row in rows]
+            return [self._decode_source_row(r) for r in rows]
+
+    @staticmethod
+    def _decode_source_row(row: sqlite3.Row) -> dict[str, Any]:
+        data = dict(row)
+        try:
+            data["headers"] = json.loads(data.get("headers") or "{}")
+        except Exception:
+            data["headers"] = {}
+        data["enabled"] = bool(data.get("enabled", 1))
+        data["requires_browser"] = bool(data.get("requires_browser", 0))
+        return data
 
     def update_source(
         self,
@@ -358,6 +408,14 @@ class Storage:
         selector_type: str | None = None,
         selector: str | None = None,
         enabled: bool | None = None,
+        headers: dict[str, str] | None = None,
+        timeout_seconds: int | None = None,
+        rate_limit_seconds: float | None = None,
+        requires_browser: bool | None = None,
+        browser_wait_selector: str | None = None,
+        browser_wait_seconds: int | None = None,
+        max_retries: int | None = None,
+        retry_base_delay: float | None = None,
     ) -> bool:
         """Update a source's fields.
 
@@ -386,6 +444,30 @@ class Storage:
         if enabled is not None:
             fields.append("enabled = ?")
             params.append(int(enabled))
+        if headers is not None:
+            fields.append("headers = ?")
+            params.append(json.dumps(headers))
+        if timeout_seconds is not None:
+            fields.append("timeout_seconds = ?")
+            params.append(timeout_seconds)
+        if rate_limit_seconds is not None:
+            fields.append("rate_limit_seconds = ?")
+            params.append(rate_limit_seconds)
+        if requires_browser is not None:
+            fields.append("requires_browser = ?")
+            params.append(int(requires_browser))
+        if browser_wait_selector is not None:
+            fields.append("browser_wait_selector = ?")
+            params.append(browser_wait_selector)
+        if browser_wait_seconds is not None:
+            fields.append("browser_wait_seconds = ?")
+            params.append(browser_wait_seconds)
+        if max_retries is not None:
+            fields.append("max_retries = ?")
+            params.append(max_retries)
+        if retry_base_delay is not None:
+            fields.append("retry_base_delay = ?")
+            params.append(retry_base_delay)
 
         if not fields:
             return False
@@ -717,6 +799,34 @@ class Storage:
             return {}
         return self.decrypt_cookies(encrypted)
 
+    # --- Account cookies (per-account, encrypted) ---
+
+    def _decrypt_maybe(self, value: str) -> dict[str, str]:
+        """Try Fernet decrypt, fallback to plain JSON for legacy rows."""
+        if not value:
+            return {}
+        try:
+            return self.decrypt_cookies(value)
+        except Exception:
+            pass
+        try:
+            return json.loads(value)
+        except Exception:
+            logger.warning("Failed to decode account cookies; returning empty")
+            return {}
+
+    def store_account_cookies(self, account_name: str, cookies: dict[str, str]) -> None:
+        """Store encrypted per-account cookies."""
+        enc = self.encrypt_cookies(cookies)
+        self.set_config(f"account_cookies_{account_name}", enc)
+
+    def load_account_cookies(self, account_name: str) -> dict[str, str]:
+        """Load per-account cookies (handles legacy plain JSON)."""
+        val = self.get_config(f"account_cookies_{account_name}")
+        if val is None:
+            return {}
+        return self._decrypt_maybe(val)
+
 
 if __name__ == "__main__":
     # Quick test
@@ -731,4 +841,4 @@ if __name__ == "__main__":
         print("Storage initialized successfully")
         print("Tables:", storage.list_config())
     finally:
-        os.unlink(db_path)
+        Path(db_path).unlink(missing_ok=True)

@@ -9,14 +9,18 @@ import asyncio
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from pathlib import Path
+from typing import Any, Protocol, Self
 
 import aiohttp
 from bs4 import BeautifulSoup
+from lxml import html as lxml_html
 
 from src.storage import Storage
 
 logger = logging.getLogger(__name__)
+
+_CODE_RE = re.compile(r"\b[A-Z0-9]{8,14}\b")
 
 
 class Extractor(Protocol):
@@ -31,65 +35,80 @@ class CSSExtractor:
     """Extract codes using CSS selectors."""
 
     def extract(self, content: str, selector: str) -> list[str]:
-        soup = BeautifulSoup(content, "html.parser")
+        soup = BeautifulSoup(content, "lxml")
         elements = soup.select(selector)
-        codes = []
+        codes: list[str] = []
         for el in elements:
-            text = el.get_text(strip=True)
-            matches = re.findall(r"\b[A-Z0-9]{10,}\b", text)
-            codes.extend(matches)
-        return codes
+            codes.extend(_CODE_RE.findall(el.get_text(strip=True).upper()))
+        return list(dict.fromkeys(codes))
 
 
 class XPathExtractor:
     """Extract codes using XPath selectors (via lxml)."""
 
     def extract(self, content: str, selector: str) -> list[str]:
-        from lxml import html
-
-        tree = html.fromstring(content)
+        tree = lxml_html.fromstring(content)
         elements = tree.xpath(selector)
-        codes = []
+        codes: list[str] = []
         for el in elements:
             if isinstance(el, str):
-                text = el
+                text = el.upper()
             else:
-                text = el.text_content() if hasattr(el, "text_content") else str(el)
-            matches = re.findall(r"\b[A-Z0-9]{10,}\b", text)
-            codes.extend(matches)
-        return codes
+                text = el.text_content().upper() if hasattr(el, "text_content") else str(el).upper()
+            codes.extend(_CODE_RE.findall(text))
+        return list(dict.fromkeys(codes))
 
 
 class JSONExtractor:
-    """Extract codes from JSON using JSONPath-like selectors."""
+    """Extract codes from JSON using dot-path selectors.
+
+    Selector examples: "" (whole document), "active", "data.list".
+    Falls back to whole-document scan if path is missing.
+    """
 
     def extract(self, content: str, selector: str) -> list[str]:
         import json
 
         data = json.loads(content)
-        codes = []
+        target: Any = data
+        if selector:
+            try:
+                for part in selector.split("."):
+                    if isinstance(target, dict) and part in target:
+                        target = target[part]
+                    else:
+                        raise KeyError(part)
+            except KeyError:
+                logger.warning("JSON selector %r not found, scanning whole document", selector)
+                target = data
+        codes: list[str] = []
 
-        def find_codes(obj: Any, path: str = "") -> None:
+        def find_codes(obj: Any) -> None:
             if isinstance(obj, dict):
-                for k, v in obj.items():
-                    find_codes(v, f"{path}.{k}")
+                for v in obj.values():
+                    find_codes(v)
             elif isinstance(obj, list):
-                for i, v in enumerate(obj):
-                    find_codes(v, f"{path}[{i}]")
+                for v in obj:
+                    find_codes(v)
             elif isinstance(obj, str):
-                matches = re.findall(r"\b[A-Z0-9]{10,}\b", obj)
-                codes.extend(matches)
+                codes.extend(_CODE_RE.findall(obj.upper()))
 
-        find_codes(data)
-        return codes
+        find_codes(target)
+        return list(dict.fromkeys(codes))
 
 
 class RegexExtractor:
     """Extract codes using regex pattern."""
 
+    def __init__(self) -> None:
+        self._cache: dict[str, re.Pattern[str]] = {}
+
     def extract(self, content: str, selector: str) -> list[str]:
-        pattern = re.compile(selector)
-        return pattern.findall(content)
+        pat = self._cache.get(selector)
+        if pat is None:
+            pat = re.compile(selector)
+            self._cache[selector] = pat
+        return pat.findall(content)
 
 
 EXTRACTORS: dict[str, Extractor] = {
@@ -124,7 +143,7 @@ class SourceConfig:
             raise ValueError(f"Unknown selector_type: {self.selector_type}")
         if not self.url:
             raise ValueError("url is required")
-        if not self.selector:
+        if not self.selector and self.selector_type != "json":
             raise ValueError("selector is required")
         if self.timeout_seconds <= 0:
             raise ValueError("timeout_seconds must be positive")
@@ -151,7 +170,7 @@ class SourceFetcher:
         self.user_agent = user_agent
         self._browser = None
 
-    async def __aenter__(self) -> SourceFetcher:
+    async def __aenter__(self) -> Self:
         if self._session is None:
             timeout = aiohttp.ClientTimeout(total=30)
             self._session = aiohttp.ClientSession(
@@ -261,12 +280,27 @@ class SourceFetcher:
         results = {}
 
         for source_data in sources:
+            headers = source_data.get("headers")
+            if isinstance(headers, str):
+                try:
+                    import json as _json
+                    headers = _json.loads(headers)
+                except Exception:
+                    headers = {}
             source = SourceConfig(
                 name=source_data["name"],
                 url=source_data["url"],
                 selector_type=source_data["selector_type"],
                 selector=source_data["selector"],
                 enabled=bool(source_data["enabled"]),
+                headers=headers or {},
+                timeout_seconds=int(source_data.get("timeout_seconds") or 30),
+                rate_limit_seconds=float(source_data.get("rate_limit_seconds") or 1.0),
+                requires_browser=bool(source_data.get("requires_browser")),
+                browser_wait_selector=source_data.get("browser_wait_selector"),
+                browser_wait_seconds=int(source_data.get("browser_wait_seconds") or 5),
+                max_retries=int(source_data.get("max_retries") or 3),
+                retry_base_delay=float(source_data.get("retry_base_delay") or 1.0),
             )
             try:
                 codes = await self.fetch_source(source)
@@ -310,7 +344,7 @@ def create_default_sources() -> list[SourceConfig]:
             name="wiki_api",
             url="https://genshin-impact.fandom.com/api.php",
             selector_type="json",
-            selector="parse.text.*",
+            selector="",
             enabled=True,
             headers={"User-Agent": "GenshinCodeMonitor/1.0"},
             timeout_seconds=30,
@@ -322,10 +356,94 @@ def create_default_sources() -> list[SourceConfig]:
             name="genshin_codes_github",
             url="https://raw.githubusercontent.com/GenshinCodeArchive/codes/main/codes.json",
             selector_type="json",
-            selector="[*].code",
-            enabled=True,
+            selector="",
+            enabled=False,  # Repo removed (404 as of 2026-09) - kept for manual URL fix
             timeout_seconds=30,
             rate_limit_seconds=1.0,
+            max_retries=3,
+            retry_base_delay=1.0,
+        ),
+        SourceConfig(
+            name="ennead_mihoyo_api",
+            url="https://api.ennead.cc/mihoyo/genshin/codes",
+            selector_type="json",
+            selector="active",
+            enabled=True,
+            headers={"User-Agent": "GenshinCodeMonitor/1.0"},
+            timeout_seconds=30,
+            rate_limit_seconds=2.0,
+            max_retries=3,
+            retry_base_delay=1.0,
+        ),
+        SourceConfig(
+            name="pockettactics_guides",
+            url="https://www.pockettactics.com/genshin-impact/codes",
+            selector_type="css",
+            selector="li strong",
+            enabled=True,
+            headers={"User-Agent": "GenshinCodeMonitor/1.0"},
+            timeout_seconds=30,
+            rate_limit_seconds=5.0,
+            max_retries=3,
+            retry_base_delay=1.0,
+        ),
+        SourceConfig(
+            name="theclick_guides",
+            url="https://www.theclick.gg/genshin-impact-codes-2/",
+            selector_type="css",
+            selector=".entry-content code",
+            enabled=True,
+            headers={"User-Agent": "GenshinCodeMonitor/1.0"},
+            timeout_seconds=30,
+            rate_limit_seconds=5.0,
+            max_retries=3,
+            retry_base_delay=1.0,
+        ),
+        SourceConfig(
+            name="eurogamer_guides",
+            url="https://www.eurogamer.net/genshin-impact-codes-livestream-active-working-how-to-redeem-9026",
+            selector_type="css",
+            selector="article ul li",
+            enabled=True,
+            headers={"User-Agent": "GenshinCodeMonitor/1.0"},
+            timeout_seconds=30,
+            rate_limit_seconds=5.0,
+            max_retries=3,
+            retry_base_delay=1.0,
+        ),
+        SourceConfig(
+            name="mmoculture_guides",
+            url="https://mmoculture.com/2026/08/genshin-impact-redeem-codes/",
+            selector_type="css",
+            selector="article li",
+            enabled=True,
+            headers={"User-Agent": "GenshinCodeMonitor/1.0"},
+            timeout_seconds=30,
+            rate_limit_seconds=5.0,
+            max_retries=3,
+            retry_base_delay=1.0,
+        ),
+        SourceConfig(
+            name="hoyo_codes_api",
+            url="https://hoyo-codes.seria.moe/codes?game=genshin",
+            selector_type="json",
+            selector="",
+            enabled=True,
+            headers={"User-Agent": "GenshinCodeMonitor/1.0"},
+            timeout_seconds=30,
+            rate_limit_seconds=2.0,
+            max_retries=3,
+            retry_base_delay=1.0,
+        ),
+        SourceConfig(
+            name="ennead_codes_api",
+            url="https://api.ennead.cc/codes/genshin",
+            selector_type="json",
+            selector="",
+            enabled=True,
+            headers={"User-Agent": "GenshinCodeMonitor/1.0"},
+            timeout_seconds=30,
+            rate_limit_seconds=2.0,
             max_retries=3,
             retry_base_delay=1.0,
         ),
@@ -362,7 +480,7 @@ SOURCE_PRESETS: dict[str, SourceConfig] = {
         name="genshin_wiki_api",
         url="https://genshin-impact.fandom.com/api.php",
         selector_type="json",
-        selector="parse.text.*",
+        selector="",
         enabled=True,
         headers={"User-Agent": "GenshinCodeMonitor/1.0"},
         timeout_seconds=30,
@@ -399,10 +517,94 @@ SOURCE_PRESETS: dict[str, SourceConfig] = {
         name="genshin_codes_github",
         url="https://raw.githubusercontent.com/GenshinCodeArchive/codes/main/codes.json",
         selector_type="json",
-        selector="[*].code",
-        enabled=True,
+        selector="",
+        enabled=False,  # Repo removed (404 as of 2026-09)
         timeout_seconds=30,
         rate_limit_seconds=1.0,
+        max_retries=3,
+        retry_base_delay=1.0,
+    ),
+    "ennead_mihoyo_api": SourceConfig(
+        name="ennead_mihoyo_api",
+        url="https://api.ennead.cc/mihoyo/genshin/codes",
+        selector_type="json",
+        selector="active",  # skip inactive/expired codes
+        enabled=True,
+        headers={"User-Agent": "GenshinCodeMonitor/1.0"},
+        timeout_seconds=30,
+        rate_limit_seconds=2.0,
+        max_retries=3,
+        retry_base_delay=1.0,
+    ),
+    "pockettactics_guides": SourceConfig(
+        name="pockettactics_guides",
+        url="https://www.pockettactics.com/genshin-impact/codes",
+        selector_type="css",
+        selector="li strong",
+        enabled=True,
+        headers={"User-Agent": "GenshinCodeMonitor/1.0"},
+        timeout_seconds=30,
+        rate_limit_seconds=5.0,
+        max_retries=3,
+        retry_base_delay=1.0,
+    ),
+    "theclick_guides": SourceConfig(
+        name="theclick_guides",
+        url="https://www.theclick.gg/genshin-impact-codes-2/",
+        selector_type="css",
+        selector=".entry-content code",
+        enabled=True,
+        headers={"User-Agent": "GenshinCodeMonitor/1.0"},
+        timeout_seconds=30,
+        rate_limit_seconds=5.0,
+        max_retries=3,
+        retry_base_delay=1.0,
+    ),
+    "eurogamer_guides": SourceConfig(
+        name="eurogamer_guides",
+        url="https://www.eurogamer.net/genshin-impact-codes-livestream-active-working-how-to-redeem-9026",
+        selector_type="css",
+        selector="article ul li",
+        enabled=True,
+        headers={"User-Agent": "GenshinCodeMonitor/1.0"},
+        timeout_seconds=30,
+        rate_limit_seconds=5.0,
+        max_retries=3,
+        retry_base_delay=1.0,
+    ),
+    "mmoculture_guides": SourceConfig(
+        name="mmoculture_guides",
+        url="https://mmoculture.com/2026/08/genshin-impact-redeem-codes/",
+        selector_type="css",
+        selector="article li",
+        enabled=True,
+        headers={"User-Agent": "GenshinCodeMonitor/1.0"},
+        timeout_seconds=30,
+        rate_limit_seconds=5.0,
+        max_retries=3,
+        retry_base_delay=1.0,
+    ),
+    "hoyo_codes_api": SourceConfig(
+        name="hoyo_codes_api",
+        url="https://hoyo-codes.seria.moe/codes?game=genshin",
+        selector_type="json",
+        selector="",
+        enabled=True,
+        headers={"User-Agent": "GenshinCodeMonitor/1.0"},
+        timeout_seconds=30,
+        rate_limit_seconds=2.0,
+        max_retries=3,
+        retry_base_delay=1.0,
+    ),
+    "ennead_codes_api": SourceConfig(
+        name="ennead_codes_api",
+        url="https://api.ennead.cc/codes/genshin",
+        selector_type="json",
+        selector="",
+        enabled=True,
+        headers={"User-Agent": "GenshinCodeMonitor/1.0"},
+        timeout_seconds=30,
+        rate_limit_seconds=2.0,
         max_retries=3,
         retry_base_delay=1.0,
     ),
@@ -479,6 +681,15 @@ async def seed_default_sources(storage: Storage) -> int:
                 url=source.url,
                 selector_type=source.selector_type,
                 selector=source.selector,
+                enabled=source.enabled,
+                headers=source.headers,
+                timeout_seconds=source.timeout_seconds,
+                rate_limit_seconds=source.rate_limit_seconds,
+                requires_browser=source.requires_browser,
+                browser_wait_selector=source.browser_wait_selector,
+                browser_wait_seconds=source.browser_wait_seconds,
+                max_retries=source.max_retries,
+                retry_base_delay=source.retry_base_delay,
             )
             count += 1
             logger.info("Seeded source: %s", source.name)
@@ -492,7 +703,6 @@ async def seed_default_sources(storage: Storage) -> int:
 
 if __name__ == "__main__":
     import asyncio
-    import os
     import tempfile
 
     async def test():
@@ -510,6 +720,6 @@ if __name__ == "__main__":
                     for code in codes[:3]:
                         print(f"  {code}")
         finally:
-            os.unlink(db_path)
+            Path(db_path).unlink(missing_ok=True)
 
     asyncio.run(test())

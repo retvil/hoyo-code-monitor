@@ -183,10 +183,11 @@ class TestSchedulerRedemption:
 
     def test_redemption_enabled_with_cookies(self, storage: Storage) -> None:
         storage.add_source("test", "https://example.com", "css", ".code")
+        storage.add_account("test_account", "12345", "os_usa")
         storage.set_config("uid", "12345")
         storage.set_config("region", "os_usa")
         storage.set_config("redemption_enabled", "true")
-        storage.store_cookies({"ltuid": "12345", "ltoken": "abcdef"})
+        storage.store_account_cookies("test_account", {"ltuid": "12345", "ltoken": "abcdef"})
 
         from src.config import load_config_from_storage
         config = load_config_from_storage(storage)
@@ -210,7 +211,10 @@ class TestSchedulerRedemption:
 
             with patch("src.scheduler.seed_default_sources", new_callable=AsyncMock) as mock_seed:
                 mock_seed.return_value = 0
+                print("DEBUG list_accounts before run_once:", storage.list_accounts())
+                print("DEBUG config uid:", getattr(config, "uid", "MISSING"), "region:", getattr(config, "region", "MISSING"))
                 result = scheduler.run_once()
+                print("DEBUG result:", result)
 
         assert result["codes_redeemed"] == 1
         mock_redeemer.redeem_code.assert_called_once()
@@ -220,10 +224,11 @@ class TestSchedulerRedemption:
 
     def test_redemption_failure_logged(self, storage: Storage) -> None:
         storage.add_source("test", "https://example.com", "css", ".code")
+        storage.add_account("test_account", "12345", "os_usa")
         storage.set_config("uid", "12345")
         storage.set_config("region", "os_usa")
         storage.set_config("redemption_enabled", "true")
-        storage.store_cookies({"ltuid": "12345", "ltoken": "abcdef"})
+        storage.store_account_cookies("test_account", {"ltuid": "12345", "ltoken": "abcdef"})
 
         from src.config import load_config_from_storage
         config = load_config_from_storage(storage)

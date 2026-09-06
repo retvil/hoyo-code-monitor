@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+*.exe
+
+# Testing / linting caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# App runtime data - NEVER commit
+data/
+*.db
+*.db-wal
+*.db-shm
+*.log
+logs/
+
+# Encryption keys - NEVER commit
+.key
+
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Temp / probes
+probe_*.py
+test_*.py.tmp
+uvicorn.log
+.omo/

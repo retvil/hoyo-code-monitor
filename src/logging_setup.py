@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
+    from prometheus_client import Counter, Gauge, Histogram, generate_latest
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False

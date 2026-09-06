@@ -1,0 +1,20 @@
+<div class="card-title" style="margin-bottom: 12px;">Recent codes (20)</div>
+{% if codes %}
+<table>
+    <thead><tr><th>Code</th><th>Sources</th><th>Status</th><th>Reward</th><th>Attempted</th><th>Redeemed</th></tr></thead>
+    <tbody>
+        {% for code in codes %}
+        <tr>
+            <td class="mono">{{ code.code[:4] }}****</td>
+            <td>{% for src in code.sources %}<span class="badge badge-info">{{ src }}</span> {% endfor %}</td>
+            <td>{% if code.redeemed %}<span class="badge badge-ok">Done</span>{% else %}<span class="badge badge-bad">Pending</span>{% endif %}</td>
+            <td>{{ code.reward or '-' }}</td>
+            <td>{{ code.attempted_at[:19] if code.attempted_at else '-' }}</td>
+            <td>{{ code.redeemed_at[:19] if code.redeemed_at else '-' }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p style="color: #94a3b8;">No codes yet.</p>
+{% endif %}

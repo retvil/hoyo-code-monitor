@@ -1,231 +1,66 @@
 {% extends "base.html" %}
-
-{% block title %}Источники - Genshin Code Monitor{% endblock %}
-
+{% block title %}Sources - Genshin Code Monitor{% endblock %}
 {% block content %}
 <div class="card">
-    <div class="card-header">
-        <h2 class="card-title">🔍 Управление источниками</h2>
-        <button class="btn btn-primary" onclick="openSourceModal()">➕ Добавить источник</button>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+        <div class="card-title">Code sources</div>
+        <button class="btn btn-primary" onclick="document.getElementById('source-modal').classList.add('active')">Add source</button>
     </div>
-
     {% if sources %}
     <table>
-        <thead>
-            <tr>
-                <th>Название</th>
-                <th>URL</th>
-                <th>Тип селектора</th>
-                <th>Селектор</th>
-                <th>Статус</th>
-                <th>Действия</th>
-            </tr>
-        </thead>
+        <thead><tr><th>Name</th><th>URL</th><th>Type</th><th>Selector</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody>
             {% for src in sources %}
-            <tr class="source-row">
+            <tr>
                 <td><strong>{{ src.name }}</strong></td>
-                <td><span class="code-masked" style="max-width: 300px; display: inline-block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ src.url }}</span></td>
-                <td><span class="badge badge-{{ src.selector_type }}">{{ src.selector_type }}</span></td>
-                <td><span class="code-masked" style="max-width: 200px; display: inline-block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ src.selector }}</span></td>
-                <td>
+                <td class="mono" style="max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ src.url }}</td>
+                <td><span class="badge badge-info">{{ src.selector_type }}</span></td>
+                <td class="mono" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ src.selector }}</td>
+                <td>{% if src.enabled %}<span class="badge badge-ok">Enabled</span>{% else %}<span class="badge badge-bad">Disabled</span>{% endif %}</td>
+                <td style="white-space: nowrap;">
+                    <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;" hx-post="/sources/{{ src.name }}/test" hx-target="#test-{{ src.name }}" hx-swap="innerHTML">Test</button>
                     {% if src.enabled %}
-                        <span class="badge badge-enabled">✅ Включен</span>
+                    <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;" hx-post="/sources/{{ src.name }}/disable" hx-swap="none" onclick="setTimeout(()=>location.reload(),500)">Disable</button>
                     {% else %}
-                        <span class="badge badge-disabled">❌ Отключен</span>
+                    <button class="btn btn-success" style="padding: 4px 10px; font-size: 0.8rem;" hx-post="/sources/{{ src.name }}/enable" hx-swap="none" onclick="setTimeout(()=>location.reload(),500)">Enable</button>
                     {% endif %}
-                </td>
-                <td>
-                    <div class="action-buttons">
-                        <button class="action-btn test" hx-post="/sources/{{ src.name }}/test" hx-target="#test-result-{{ src.name }}" hx-swap="innerHTML" hx-indicator=".loading-{{ src.name }}">
-                            🧪 Тест <span class="loading loading-{{ src.name }}" style="display:none;"></span>
-                        </button>
-                        {% if src.enabled %}
-                            <button class="action-btn disable" hx-post="/sources/{{ src.name }}/disable" hx-target="#source-row-{{ src.name }}" hx-swap="outerHTML">⏸️ Отключить</button>
-                        {% else %}
-                            <button class="action-btn enable" hx-post="/sources/{{ src.name }}/enable" hx-target="#source-row-{{ src.name }}" hx-swap="outerHTML">▶️ Включить</button>
-                        {% endif %}
-                        <button class="action-btn edit" onclick="openSourceModal('{{ src.name }}')">✏️ Изменить</button>
-                        <button class="action-btn delete" hx-delete="/sources/{{ src.name }}" hx-target="#source-row-{{ src.name }}" hx-swap="outerHTML" hx-confirm="Удалить источник '{{ src.name }}'?">🗑️ Удалить</button>
-                    </div>
-                    <div id="test-result-{{ src.name }}" style="margin-top: 5px; font-size: 0.85rem;"></div>
+                    <button class="btn btn-danger" style="padding: 4px 10px; font-size: 0.8rem;" hx-delete="/sources/{{ src.name }}" hx-confirm="Delete source '{{ src.name }}'?" hx-swap="none" onclick="setTimeout(()=>location.reload(),800)">Delete</button>
+                    <div id="test-{{ src.name }}" style="font-size: 0.8rem; margin-top: 4px;"></div>
                 </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
     {% else %}
-    <div class="empty-state">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-        </svg>
-        <p>Источников пока нет. Добавьте первый источник.</p>
-    </div>
+    <p style="color: #94a3b8;">No sources yet. Add the first one.</p>
     {% endif %}
 </div>
 
-<div class="card">
-    <div class="card-header">
-        <h2 class="card-title">📦 Предустановленные источники</h2>
-    </div>
-    <p style="color: #7f8c8d; margin-bottom: 15px;">Нажмите, чтобы быстро добавить популярный источник:</p>
-    <div style="display: flex; flex-wrap: wrap; gap: 10px;">
-        {% for preset_name in source_presets %}
-            {% set preset = source_presets[preset_name] if source_presets is mapping else get_preset(preset_name) %}
-            {% if preset %}
-            <button class="btn btn-secondary" onclick="loadPreset('{{ preset_name }}')" {% if preset.enabled %}disabled{% endif %}>
-                {{ preset_name }} {% if preset.enabled %}(уже добавлен){% endif %}
-            </button>
-            {% endif %}
-        {% endfor %}
-    </div>
-</div>
-
-<!-- Source Modal -->
 <div class="modal" id="source-modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3 id="modal-title">➕ Добавить источник</h3>
-            <button class="modal-close" onclick="closeSourceModal()">&times;</button>
+    <div class="modal-box">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3>Add source</h3>
+            <button style="background: none; border: none; font-size: 1.4rem; cursor: pointer;" onclick="document.getElementById('source-modal').classList.remove('active')">×</button>
         </div>
-        <form id="source-form" hx-post="/sources" hx-target="#sources-table-body" hx-swap="beforeend" hx-on::after-request="if(event.detail.successful) closeSourceModal()">
-            <input type="hidden" name="name" id="form-name">
-            <div class="form-group">
-                <label>Название *</label>
-                <input type="text" name="name" id="form-display-name" required placeholder="Например: genshin_wiki">
-            </div>
-            <div class="form-group">
-                <label>URL *</label>
-                <input type="url" name="url" id="form-url" required placeholder="https://example.com">
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Тип селектора *</label>
-                    <select name="selector_type" id="form-selector-type" required>
-                        <option value="css">CSS</option>
-                        <option value="json">JSON</option>
-                        <option value="xpath">XPath</option>
-                        <option value="regex">Regex</option>
-                    </select>
+        <form hx-post="/sources" hx-swap="none" hx-on::after-request="if(event.detail.successful){document.getElementById('source-modal').classList.remove('active');location.reload()}">
+            <div style="margin-bottom: 10px;"><label>Name</label><input type="text" name="name" required placeholder="genshin_wiki"></div>
+            <div style="margin-bottom: 10px;"><label>URL</label><input type="url" name="url" required placeholder="https://example.com"></div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div style="margin-bottom: 10px;"><label>Selector type</label>
+                    <select name="selector_type"><option value="css">css</option><option value="json">json</option><option value="xpath">xpath</option><option value="regex">regex</option></select>
                 </div>
-                <div class="form-group">
-                    <label>Таймаут (сек)</label>
-                    <input type="number" name="timeout_seconds" id="form-timeout" value="30" min="5" max="300">
-                </div>
+                <div style="margin-bottom: 10px;"><label>Timeout (sec)</label><input type="number" name="timeout_seconds" value="30" min="5" max="300"></div>
             </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Rate limit (сек)</label>
-                    <input type="number" step="0.1" name="rate_limit_seconds" id="form-rate-limit" value="1.0" min="0" max="60">
-                </div>
-                <div class="form-group">
-                    <label>Макс. попыток</label>
-                    <input type="number" name="max_retries" id="form-max-retries" value="3" min="0" max="10">
-                </div>
+            <div style="margin-bottom: 10px;"><label>Selector</label><textarea name="selector" rows="2" required placeholder=".code-class"></textarea></div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div style="margin-bottom: 10px;"><label>Rate limit (sec)</label><input type="number" step="0.1" name="rate_limit_seconds" value="1.0" min="0" max="60"></div>
+                <div style="margin-bottom: 10px;"><label>Max retries</label><input type="number" name="max_retries" value="3" min="0" max="10"></div>
             </div>
-            <div class="form-group">
-                <label>Селектор *</label>
-                <textarea name="selector" id="form-selector" rows="3" required placeholder=".code-class, #code-id, //div[@class='code']"></textarea>
-            </div>
-            <div class="form-group">
-                <label>Headers (JSON)</label>
-                <textarea name="headers" id="form-headers" rows="2" placeholder='{"User-Agent": "Custom"}'>{{ '{}' }}</textarea>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" name="requires_browser" id="form-requires-browser" value="true"> Требует браузер (Playwright)
-                    </label>
-                </div>
-                <div class="form-group">
-                    <label>Включен</label>
-                    <input type="checkbox" name="enabled" id="form-enabled" value="true" checked>
-                </div>
-            </div>
-            <div class="form-group" id="browser-options" style="display: none;">
-                <label>Селектор ожидания (CSS)</label>
-                <input type="text" name="browser_wait_selector" id="form-browser-wait-selector" placeholder=".content, #main">
-                <label>Время ожидания (сек)</label>
-                <input type="number" name="browser_wait_seconds" id="form-browser-wait-seconds" value="5" min="1" max="60">
-            </div>
-            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
-                <button type="button" class="btn btn-secondary" onclick="closeSourceModal()">Отмена</button>
-                <button type="submit" class="btn btn-primary">💾 Сохранить</button>
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px;">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('source-modal').classList.remove('active')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save</button>
             </div>
         </form>
     </div>
 </div>
-
-<script>
-    const sourcePresets = {{ source_presets | tojson }};
-
-    function openSourceModal(editName = null) {
-        const modal = document.getElementById('source-modal');
-        const form = document.getElementById('source-form');
-        form.reset();
-        document.getElementById('form-headers').value = '{}';
-        document.getElementById('browser-options').style.display = 'none';
-
-        if (editName && sourcePresets[editName]) {
-            const preset = sourcePresets[editName];
-            document.getElementById('modal-title').textContent = '✏️ Изменить источник';
-            document.getElementById('form-name').value = editName;
-            document.getElementById('form-display-name').value = editName;
-            document.getElementById('form-display-name').readOnly = true;
-            document.getElementById('form-url').value = preset.url;
-            document.getElementById('form-selector-type').value = preset.selector_type;
-            document.getElementById('form-selector').value = preset.selector;
-            document.getElementById('form-timeout').value = preset.timeout_seconds;
-            document.getElementById('form-rate-limit').value = preset.rate_limit_seconds;
-            document.getElementById('form-max-retries').value = preset.max_retries;
-            document.getElementById('form-selector').value = preset.selector;
-            document.getElementById('form-headers').value = JSON.stringify(preset.headers || {}, null, 2);
-            document.getElementById('form-requires-browser').checked = preset.requires_browser || false;
-            document.getElementById('form-enabled').checked = preset.enabled;
-            document.getElementById('form-browser-wait-selector').value = preset.browser_wait_selector || '';
-            document.getElementById('form-browser-wait-seconds').value = preset.browser_wait_seconds || 5;
-            document.getElementById('browser-options').style.display = preset.requires_browser ? 'block' : 'none';
-            form.setAttribute('hx-post', '/sources/' + editName);
-        } else {
-            document.getElementById('modal-title').textContent = '➕ Добавить источник';
-            document.getElementById('form-display-name').readOnly = false;
-            form.setAttribute('hx-post', '/sources');
-        }
-        document.getElementById('source-modal').classList.add('active');
-    }
-
-    function closeSourceModal() {
-        document.getElementById('source-modal').classList.remove('active');
-    }
-
-    document.getElementById('form-requires-browser').addEventListener('change', (e) => {
-        document.getElementById('browser-options').style.display = e.target.checked ? 'block' : 'none';
-    });
-
-    function loadPreset(name) {
-        if (!sourcePresets[name]) return;
-        const preset = sourcePresets[name];
-        openSourceModal();
-        document.getElementById('form-name').value = name;
-        document.getElementById('form-display-name').value = name;
-        document.getElementById('form-url').value = preset.url;
-        document.getElementById('form-selector-type').value = preset.selector_type;
-        document.getElementById('form-selector').value = preset.selector;
-        document.getElementById('form-timeout').value = preset.timeout_seconds;
-        document.getElementById('form-rate-limit').value = preset.rate_limit_seconds;
-        document.getElementById('form-max-retries').value = preset.max_retries;
-        document.getElementById('form-selector').value = preset.selector;
-        document.getElementById('form-headers').value = JSON.stringify(preset.headers || {}, null, 2);
-        document.getElementById('form-requires-browser').checked = preset.requires_browser || false;
-        document.getElementById('form-enabled').checked = preset.enabled;
-        document.getElementById('form-browser-wait-selector').value = preset.browser_wait_selector || '';
-        document.getElementById('form-browser-wait-seconds').value = preset.browser_wait_seconds || 5;
-        document.getElementById('browser-options').style.display = preset.requires_browser ? 'block' : 'none';
-    }
-
-    // Close modal on outside click
-    document.getElementById('source-modal').addEventListener('click', (e) => {
-        if (e.target.id === 'source-modal') closeSourceModal();
-    });
-</script>
 {% endblock %}

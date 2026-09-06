@@ -1,185 +1,82 @@
 {% extends "base.html" %}
-
-{% block title %}Аккаунты - Genshin Code Monitor{% endblock %}
-
+{% block title %}Accounts - Genshin Code Monitor{% endblock %}
 {% block content %}
 <div class="card">
-    <div class="card-header">
-        <h2 class="card-title">👤 Управление аккаунтами</h2>
-        <button class="btn btn-primary" onclick="openAccountModal()">➕ Добавить аккаунт</button>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+        <div class="card-title">HoYoLAB accounts</div>
+        <button class="btn btn-primary" onclick="document.getElementById('account-modal').classList.add('active')">Add account</button>
     </div>
-
     {% if accounts %}
     <table>
-        <thead>
-            <tr>
-                <th>Название</th>
-                <th>UID</th>
-                <th>Регион</th>
-                <th>Game Biz</th>
-                <th>Язык</th>
-                <th>Куки</th>
-                <th>Действия</th>
-            </tr>
-        </thead>
+        <thead><tr><th>Name</th><th>UID</th><th>Region</th><th>Game</th><th>Lang</th><th>Actions</th></tr></thead>
         <tbody>
             {% for acc in accounts %}
             <tr>
                 <td><strong>{{ acc.name }}</strong></td>
-                <td>{{ acc.uid }}</td>
+                <td class="mono">{{ acc.uid }}</td>
                 <td>{{ acc.region }}</td>
                 <td>{{ acc.game_biz }}</td>
                 <td>{{ acc.lang }}</td>
-                <td>
-                    {% set cookies_json = storage.get_config('account_cookies_' + acc.name) if storage else '{}' %}
-                    {% if cookies_json and cookies_json != '{}' %}
-                        <span class="badge badge-enabled">✅ Заданы</span>
-                    {% else %}
-                        <span class="badge badge-disabled">Не заданы</span>
-                    {% endif %}
-                </td>
-                <td>
-                    <div class="action-buttons">
-                        <button class="action-btn edit" onclick="openAccountModal('{{ acc.name }}')">✏️ Изменить</button>
-                        <button class="action-btn edit" onclick="openCookiesModal('{{ acc.name }}')">🍪 Куки</button>
-                        <button class="action-btn delete" hx-delete="/accounts/{{ acc.name }}" hx-target="#account-row-{{ acc.name }}" hx-swap="outerHTML" hx-confirm="Удалить аккаунт '{{ acc.name }}'?">🗑️ Удалить</button>
-                    </div>
+                <td style="white-space: nowrap;">
+                    <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;" onclick="openCookies('{{ acc.name }}')">Cookies</button>
+                    <button class="btn btn-danger" style="padding: 4px 10px; font-size: 0.8rem;" hx-delete="/accounts/{{ acc.name }}" hx-confirm="Delete account '{{ acc.name }}'?" hx-swap="none" onclick="setTimeout(()=>location.reload(),800)">Delete</button>
                 </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
     {% else %}
-    <div class="empty-state">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
-        </svg>
-        <p>Аккаунтов пока нет. Добавьте первый аккаунт для автопогашения кодов.</p>
-    </div>
+    <p style="color: #94a3b8;">No accounts yet. Add one to enable auto-redeem. Cookies are stored encrypted (Fernet).</p>
     {% endif %}
 </div>
 
-<!-- Account Modal -->
 <div class="modal" id="account-modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3 id="account-modal-title">➕ Добавить аккаунт</h3>
-            <button class="modal-close" onclick="closeAccountModal()">&times;</button>
+    <div class="modal-box">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3>Add account</h3>
+            <button style="background: none; border: none; font-size: 1.4rem; cursor: pointer;" onclick="document.getElementById('account-modal').classList.remove('active')">×</button>
         </div>
-        <form id="account-form" hx-post="/accounts" hx-target="#accounts-table-body" hx-swap="beforeend" hx-on::after-request="if(event.detail.successful) closeAccountModal()">
-            <input type="hidden" name="name" id="account-form-name">
-            <div class="form-group">
-                <label>Название аккаунта *</label>
-                <input type="text" name="name" id="account-form-display-name" required placeholder="Например: main, alt1, family">
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>UID *</label>
-                    <input type="text" name="uid" id="account-form-uid" required placeholder="123456789">
-                </div>
-                <div class="form-group">
-                    <label>Регион *</label>
-                    <select name="region" id="account-form-region" required>
-                        <option value="os_usa">🇺🇸 America (os_usa)</option>
-                        <option value="os_euro">🇪🇺 Europe (os_euro)</option>
-                        <option value="os_asia">🇭🇰 Asia (os_asia)</option>
-                        <option value="os_cht">🇹🇼 TW/HK/MO (os_cht)</option>
-                    </select>
+        <form hx-post="/accounts" hx-swap="none" hx-on::after-request="if(event.detail.successful){document.getElementById('account-modal').classList.remove('active');location.reload()}">
+            <div style="margin-bottom: 10px;"><label>Name</label><input type="text" name="name" required placeholder="main"></div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div style="margin-bottom: 10px;"><label>UID</label><input type="text" name="uid" required placeholder="123456789"></div>
+                <div style="margin-bottom: 10px;"><label>Region</label>
+                    <select name="region"><option value="os_usa">os_usa (America)</option><option value="os_euro">os_euro (Europe)</option><option value="os_asia">os_asia (Asia)</option><option value="os_cht">os_cht (TW/HK/MO)</option></select>
                 </div>
             </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Game Biz</label>
-                    <input type="text" name="game_biz" id="account-form-game-biz" value="hk4e_global">
-                </div>
-                <div class="form-group">
-                    <label>Язык</label>
-                    <input type="text" name="lang" id="account-form-lang" value="en-us">
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>S_Lang_Key</label>
-                    <input type="text" name="s_lang_key" id="account-form-s-lang-key" value="en-us">
-                </div>
-            </div>
-            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
-                <button type="button" class="btn btn-secondary" onclick="closeAccountModal()">Отмена</button>
-                <button type="submit" class="btn btn-primary">💾 Сохранить</button>
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px;">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('account-modal').classList.remove('active')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save</button>
             </div>
         </form>
     </div>
 </div>
 
-<!-- Cookies Modal -->
 <div class="modal" id="cookies-modal">
-    <div class="modal-content" style="max-width: 600px;">
-        <div class="modal-header">
-            <h3 id="cookies-modal-title">🍪 Куки для аккаунта</h3>
-            <button class="modal-close" onclick="closeCookiesModal()">&times;</button>
+    <div class="modal-box">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3 id="cookies-title">Cookies</h3>
+            <button style="background: none; border: none; font-size: 1.4rem; cursor: pointer;" onclick="document.getElementById('cookies-modal').classList.remove('active')">×</button>
         </div>
-        <form id="cookies-form" hx-post="/accounts/{{ cookies_account_name }}/cookies" hx-target="#cookies-result" hx-swap="innerHTML" hx-on::after-request="if(event.detail.successful) closeCookiesModal()">
-            <input type="hidden" name="name" id="cookies-form-name">
-            <div class="form-group">
-                <label>JSON с куками *</label>
-                <textarea name="cookies" id="cookies-json" rows="8" required placeholder='{"ltuid": "123456", "ltoken": "abcdef...", "cookie_token_v2": "xyz..."}'></textarea>
-                <small style="color: #7f8c8d;">Обязательные поля: ltuid, ltoken. Опционально: cookie_token_v2</small>
-            </div>
-            <div id="cookies-result" style="margin-top: 10px;"></div>
-            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
-                <button type="button" class="btn btn-secondary" onclick="closeCookiesModal()">Отмена</button>
-                <button type="submit" class="btn btn-primary">💾 Сохранить куки</button>
+        <form id="cookies-form" method="post" hx-swap="none" hx-on::after-request="if(event.detail.successful){document.getElementById('cookies-modal').classList.remove('active')}">
+            <div style="margin-bottom: 10px;"><label>Cookies JSON (ltuid, ltoken)</label>
+            <textarea id="cookies-json" name="cookies" rows="6" required placeholder='{"ltuid": "...", "ltoken": "..."}'></textarea></div>
+            <div id="cookies-result" style="margin-top: 8px; font-size: 0.85rem;"></div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px;">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('cookies-modal').classList.remove('active')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save cookies</button>
             </div>
         </form>
     </div>
 </div>
-
+{% endblock %}
+{% block extra_js %}
 <script>
-    function openAccountModal(editName = null) {
-        const modal = document.getElementById('account-modal');
-        const form = document.getElementById('account-form');
-        form.reset();
-        document.getElementById('account-form-game-biz').value = 'hk4e_global';
-        document.getElementById('account-form-lang').value = 'en-us';
-        document.getElementById('account-form-s-lang-key').value = 'en-us';
-
-        if (editName) {
-            // TODO: Load existing account data for editing
-            document.getElementById('account-modal-title').textContent = '✏️ Изменить аккаунт';
-            document.getElementById('account-form-name').value = editName;
-            document.getElementById('account-form-display-name').value = editName;
-            document.getElementById('account-form-display-name').readOnly = true;
-            form.setAttribute('hx-post', '/accounts/' + editName);
-        } else {
-            document.getElementById('account-modal-title').textContent = '➕ Добавить аккаунт';
-            document.getElementById('account-form-display-name').readOnly = false;
-            form.setAttribute('hx-post', '/accounts');
-        }
-        document.getElementById('account-modal').classList.add('active');
-    }
-
-    function closeAccountModal() {
-        document.getElementById('account-modal').classList.remove('active');
-    }
-
-    function openCookiesModal(accountName) {
-        document.getElementById('cookies-form-name').value = accountName;
-        document.getElementById('cookies-modal-title').textContent = '🍪 Куки для ' + accountName;
-        document.getElementById('cookies-json').value = '';
-        document.getElementById('cookies-result').innerHTML = '';
-        document.getElementById('cookies-modal').classList.add('active');
-    }
-
-    function closeCookiesModal() {
-        document.getElementById('cookies-modal').classList.remove('active');
-    }
-
-    // Close modals on outside click
-    document.getElementById('account-modal').addEventListener('click', (e) => {
-        if (e.target.id === 'account-modal') closeAccountModal();
-    });
-    document.getElementById('cookies-modal').addEventListener('click', (e) => {
-        if (e.target.id === 'cookies-modal') closeCookiesModal();
-    });
+function openCookies(name) {
+    document.getElementById('cookies-title').textContent = 'Cookies: ' + name;
+    document.getElementById('cookies-form').setAttribute('hx-post', '/accounts/' + name + '/cookies');
+    if (window.htmx) { htmx.process(document.getElementById('cookies-form')); }
+    document.getElementById('cookies-modal').classList.add('active');
+}
 </script>
 {% endblock %}

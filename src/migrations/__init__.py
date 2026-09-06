@@ -6,7 +6,6 @@ Provides versioned schema migrations with up/down support.
 from __future__ import annotations
 
 import sqlite3
-from typing import List, Tuple
 
 Migration = tuple[int, str, str]  # (version, up_sql, down_sql)
 
@@ -230,9 +229,45 @@ MIGRATIONS: list[Migration] = [
         UPDATE schema_version SET version = 7;
         """,
     ),
+    (
+        9,
+        """
+        -- Migration v9: Persist all SourceConfig fields in sources table
+        ALTER TABLE sources ADD COLUMN headers TEXT NOT NULL DEFAULT '{}';
+        ALTER TABLE sources ADD COLUMN timeout_seconds INTEGER NOT NULL DEFAULT 30;
+        ALTER TABLE sources ADD COLUMN rate_limit_seconds REAL NOT NULL DEFAULT 1.0;
+        ALTER TABLE sources ADD COLUMN requires_browser BOOLEAN NOT NULL DEFAULT 0;
+        ALTER TABLE sources ADD COLUMN browser_wait_selector TEXT;
+        ALTER TABLE sources ADD COLUMN browser_wait_seconds INTEGER NOT NULL DEFAULT 5;
+        ALTER TABLE sources ADD COLUMN max_retries INTEGER NOT NULL DEFAULT 3;
+        ALTER TABLE sources ADD COLUMN retry_base_delay REAL NOT NULL DEFAULT 1.0;
+        UPDATE schema_version SET version = 9;
+        """,
+        """
+        -- Rollback v9: recreate sources without new columns (SQLite compat)
+        CREATE TABLE sources_old (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,
+            url TEXT NOT NULL,
+            selector_type TEXT NOT NULL,
+            selector TEXT NOT NULL,
+            enabled BOOLEAN NOT NULL DEFAULT 1,
+            last_checked TIMESTAMP,
+            last_error TEXT,
+            check_count INTEGER NOT NULL DEFAULT 0,
+            success_count INTEGER NOT NULL DEFAULT 0
+        );
+        INSERT INTO sources_old (id, name, url, selector_type, selector, enabled, last_checked, last_error, check_count, success_count)
+        SELECT id, name, url, selector_type, selector, enabled, last_checked, last_error, check_count, success_count FROM sources;
+        DROP TABLE sources;
+        ALTER TABLE sources_old RENAME TO sources;
+        CREATE INDEX IF NOT EXISTS idx_sources_enabled ON sources(enabled);
+        UPDATE schema_version SET version = 8;
+        """,
+    ),
 ]
 
-CURRENT_VERSION = 8
+CURRENT_VERSION = 9
 
 
 def get_db_version(conn: sqlite3.Connection) -> int:

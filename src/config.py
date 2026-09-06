@@ -11,9 +11,24 @@ import threading
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, ClassVar
 
-import toml
+from src.constants import MIN_REDEMPTION_GAP
+
+try:
+    import tomllib  # Python 3.11+
+except ImportError:
+    import tomli as tomllib  # type: ignore[no-redef]
+
+try:
+    import tomli_w  # type: ignore[import-not-found]
+except ImportError:
+    tomli_w = None  # type: ignore[assignment]
+
+try:
+    import toml as _toml_legacy  # type: ignore[import-not-found]
+except ImportError:
+    _toml_legacy = None  # type: ignore[assignment]
 
 
 @dataclass
@@ -45,7 +60,7 @@ class Settings:
 class ConfigManager:
     """Thread-safe TOML-backed settings manager."""
 
-    VALID_LOG_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+    VALID_LOG_LEVELS: ClassVar[set[str]] = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
 
     DEFAULTS = Settings()
 
@@ -58,26 +73,43 @@ class ConfigManager:
         self._loaded = False
 
     def load(self) -> Settings:
-        with self._lock:
-            if self.config_path.exists():
-                try:
-                    raw = toml.load(self.config_path)
-                    self._settings = Settings.from_dict({**self.DEFAULTS.to_dict(), **raw})
-                except Exception:
+            with self._lock:
+                if self.config_path.exists():
+                    try:
+                        with self.config_path.open("rb") as f:
+                            raw = tomllib.load(f)
+                        self._settings = Settings.from_dict({**self.DEFAULTS.to_dict(), **raw})
+                    except Exception:
+                        try:
+                            if _toml_legacy:
+                                raw = _toml_legacy.load(str(self.config_path))
+                                self._settings = Settings.from_dict({**self.DEFAULTS.to_dict(), **raw})
+                            else:
+                                raise
+                        except Exception:
+                            self._settings = Settings()
+                else:
                     self._settings = Settings()
-            else:
-                self._settings = Settings()
-                self.save()
-            self._validate()
-            self._loaded = True
-            return self._settings
+                    self.save()
+                self._validate()
+                self._loaded = True
+                return self._settings
 
     def save(self) -> None:
-        with self._lock:
-            self.config_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(self.config_path, "w", encoding="utf-8") as f:
-                toml.dump(self._settings.to_dict(), f)
-
+            with self._lock:
+                self.config_path.parent.mkdir(parents=True, exist_ok=True)
+                data = self._settings.to_dict()
+                if tomli_w:
+                    with self.config_path.open("wb") as f:
+                        tomli_w.dump(data, f)
+                elif _toml_legacy:
+                    with self.config_path.open("w", encoding="utf-8") as f:
+                        _toml_legacy.dump(data, f)
+                else:
+                    with self.config_path.open("w", encoding="utf-8") as f:
+                        for k, v in data.items():
+                            f.write(f"{k} = {v!r}\n")
+    
     def get(self, key: str, default: Any = None) -> Any:
         with self._lock:
             if not self._loaded:
@@ -124,8 +156,8 @@ class ConfigManager:
             if not isinstance(value, bool):
                 raise ValueError(f"redemption_enabled must be a boolean, got: {value}")
         elif key == "redemption_min_gap_seconds":
-            if not isinstance(value, int) or value < 6:
-                raise ValueError(f"redemption_min_gap_seconds must be >= 6, got: {value}")
+            if not isinstance(value, int) or value < MIN_REDEMPTION_GAP:
+                raise ValueError(f"redemption_min_gap_seconds must be >= {MIN_REDEMPTION_GAP}, got: {value}")
         elif key == "max_retry_attempts":
             if not isinstance(value, int) or value < 0:
                 raise ValueError(f"max_retry_attempts must be a non-negative integer, got: {value}")
@@ -150,9 +182,8 @@ class ConfigManager:
         elif key == "max_log_size":
             if not isinstance(value, int) or value <= 0:
                 raise ValueError(f"max_log_size must be a positive integer, got: {value}")
-        elif key == "backup_count":
-            if not isinstance(value, int) or value < 0:
-                raise ValueError(f"backup_count must be a non-negative integer, got: {value}")
+        elif key == "backup_count" and (not isinstance(value, int) or value < 0):
+            raise ValueError(f"backup_count must be a non-negative integer, got: {value}")
 
     def reset_to_defaults(self) -> None:
         with self._lock:
@@ -186,6 +217,16 @@ def load_config_from_storage(storage: Any) -> SimpleNamespace:
     cm = ConfigManager()
     cm.load()
     s = cm.settings
+    # Get default account for cookie loading
+    accounts = storage.list_accounts()
+    cookies: dict[str, str] = {}
+    if accounts:
+        default_account = accounts[0]
+        cookies = storage.load_account_cookies(default_account["name"])
+        if not cookies:
+            cookies = storage.load_cookies() if hasattr(storage, "load_cookies") else {}
+    else:
+        cookies = storage.load_cookies() if hasattr(storage, "load_cookies") else {}
     return SimpleNamespace(
         poll_interval_seconds=s.poll_interval_seconds,
         source_timeout_seconds=s.source_timeout_seconds,
@@ -205,7 +246,7 @@ def load_config_from_storage(storage: Any) -> SimpleNamespace:
         game_biz=storage.get_config("game_biz", "hk4e_global") or "hk4e_global",
         lang=storage.get_config("lang", "en-us") or "en-us",
         s_lang_key=storage.get_config("s_lang_key", "en-us") or "en-us",
-        cookies=storage.load_cookies() if hasattr(storage, "load_cookies") else {},
+        cookies=cookies,
     )
 
 

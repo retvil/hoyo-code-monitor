@@ -6,10 +6,27 @@ import sys
 
 import click
 
+from src.autostart import disable as autostart_disable
+from src.autostart import enable as autostart_enable
+from src.autostart import is_enabled as autostart_is_enabled
 from src.config import ConfigManager
+from src.constants import MASK_VISIBLE_CHARS, MAX_DISPLAY_CODES
 from src.scheduler import create_scheduler_from_storage
+from src.single_instance import SingleInstance
 from src.sources import SourceFetcher
 from src.storage import Storage
+from src.system_tray import create_tray_icon
+
+_instance_guard: SingleInstance | None = None
+
+
+def _ensure_single_instance() -> None:
+    """Exit if another instance is already running."""
+    global _instance_guard
+    _instance_guard = SingleInstance()
+    if not _instance_guard.acquire():
+        click.echo("Another instance is already running. Exiting.", err=True)
+        sys.exit(1)
 
 
 @click.group()
@@ -223,8 +240,8 @@ def sources():
     pass
 
 
-@sources.command()
-def list():
+@sources.command(name='list')
+def list_sources():
     """List all stored sources."""
     storage = Storage()
     sources = storage.list_sources()
@@ -248,12 +265,12 @@ def list():
     sys.exit(0)
 
 
-@sources.command()
+@sources.command(name='add')
 @click.argument("name")
 @click.argument("url")
 @click.option("--selector-type", "-t", default="css", help="Type of selector (css, json, xpath).")
 @click.option("--selector", "-s", help="Selector value.")
-def add(name, url, selector_type, selector):
+def add_source(name, url, selector_type, selector):
     """Add a new source <name> <url>."""
     storage = Storage()
     existing = storage.get_source(name)
@@ -276,9 +293,9 @@ def add(name, url, selector_type, selector):
     sys.exit(0)
 
 
-@sources.command()
+@sources.command(name='remove')
 @click.argument("name")
-def remove(name):
+def remove_source(name):
     """Remove a source <name>."""
     storage = Storage()
     try:
@@ -324,6 +341,7 @@ def disable(name):
 @cli.command()
 def start():
     """Start monitoring."""
+    _ensure_single_instance()
     try:
         scheduler = create_scheduler_from_storage()
         if scheduler.start():
@@ -418,8 +436,7 @@ def run_once():
 
     async def run_cycle():
         async with SourceFetcher(storage) as fetcher:
-            results = await fetcher.fetch_all_enabled()
-            return results
+            return await fetcher.fetch_all_enabled()
 
     click.echo("Running single check cycle...")
 
@@ -459,6 +476,148 @@ def run_once():
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
+
+
+@cli.group()
+def autostart():
+    """Manage Windows autostart on login."""
+    pass
+
+
+@autostart.command("enable")
+def autostart_enable_cli():
+    """Enable autostart on Windows login."""
+    try:
+        autostart_enable()
+    except Exception as e:
+        click.echo(f"Error enabling autostart: {e}", err=True)
+        sys.exit(1)
+    click.echo("Autostart enabled (starts in tray on login).")
+
+
+@autostart.command("disable")
+def autostart_disable_cli():
+    """Disable autostart on Windows login."""
+    try:
+        autostart_disable()
+    except Exception as e:
+        click.echo(f"Error disabling autostart: {e}", err=True)
+        sys.exit(1)
+    click.echo("Autostart disabled.")
+
+
+@autostart.command("status")
+def autostart_status_cli():
+    """Show autostart status."""
+    try:
+        enabled = autostart_is_enabled()
+    except Exception as e:
+        click.echo(f"Error checking autostart: {e}", err=True)
+        sys.exit(1)
+    click.echo(f"Autostart: {'enabled' if enabled else 'disabled'}.")
+
+
+@cli.command()
+def tray():
+    """Run in system tray with live menu and embedded settings server."""
+    import threading
+    import time
+    import webbrowser
+
+    from src.constants import WEB_HOST, WEB_PORT
+    from src.system_tray import create_tray_icon
+
+    _ensure_single_instance()
+    scheduler = create_scheduler_from_storage()
+    config_manager = ConfigManager()
+    web_url = f"http://{WEB_HOST}:{WEB_PORT}"
+
+    # Embedded settings web server (local only)
+    def _run_web_server() -> None:
+        try:
+            import uvicorn
+
+            from src.web_ui import app
+
+            uvicorn.run(app, host=WEB_HOST, port=WEB_PORT, log_level="warning")
+        except ImportError:
+            logger_web_missing = __import__("logging").getLogger(__name__)
+            logger_web_missing.warning("Web UI not available (fastapi/uvicorn not installed)")
+        except OSError as e:
+            print(f"Web server already running or port busy: {e}")
+
+    web_thread = threading.Thread(target=_run_web_server, daemon=True, name="WebUI")
+    web_thread.start()
+
+    def on_start() -> None:
+        if scheduler.start():
+            click.echo("Monitoring enabled.")
+        else:
+            click.echo("Monitoring already running.")
+
+    def on_stop() -> None:
+        if scheduler.stop():
+            click.echo("Monitoring disabled.")
+        else:
+            click.echo("Monitoring not running.")
+
+    def on_show() -> None:
+        click.echo(f"Opening settings: {web_url}")
+        webbrowser.open(web_url)
+
+    def on_quit() -> None:
+        click.echo("Shutting down...")
+        if scheduler.is_running():
+            scheduler.stop()
+        import os
+
+        os._exit(0)
+
+    def on_run_once() -> None:
+        result = scheduler.run_once()
+        click.echo(
+            f"Check done: {result['codes_found']} found, "
+            f"{result['codes_redeemed']} redeemed."
+        )
+
+    def on_set_interval(seconds: int) -> None:
+        config_manager.set("poll_interval_seconds", seconds)
+        minutes = seconds // 60
+        click.echo(f"Scan interval set to every {minutes} minutes.")
+
+    def get_interval() -> int:
+        try:
+            return int(config_manager.get("poll_interval_seconds", 900))
+        except (TypeError, ValueError):
+            return 900
+
+    tray_icon = create_tray_icon(
+        on_start,
+        on_stop,
+        on_show,
+        on_quit,
+        on_run_once,
+        on_set_interval,
+        get_interval,
+        scheduler.is_running,
+    )
+
+    if scheduler.start():
+        click.echo("Auto-started monitoring.")
+
+    click.echo("Genshin Code Monitor running in system tray.")
+    click.echo(f"Settings: {web_url}")
+    click.echo("Right-click the tray icon for menu. Press Ctrl+C to exit.")
+
+    tray_icon.run()
+
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        click.echo("\nShutting down...")
+        if scheduler.is_running():
+            scheduler.stop()
 
 
 if __name__ == "__main__":

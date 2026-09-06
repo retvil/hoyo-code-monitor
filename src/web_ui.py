@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -14,10 +15,14 @@ from pydantic import BaseModel
 
 from src.config import ConfigManager
 from src.scheduler import create_scheduler_from_storage
-from src.sources import SourceConfig, SourceFetcher, list_presets
+from src.sources import SOURCE_PRESETS, SourceConfig, SourceFetcher, list_presets
 from src.storage import Storage
 
 logger = logging.getLogger(__name__)
+
+# Rate limit for test_source
+_test_rate_limit: dict[str, float] = {}
+_RATE_LIMIT_SECONDS = 5.0
 
 # Global scheduler instance
 scheduler = None
@@ -25,15 +30,14 @@ scheduler = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global scheduler
-    # Startup
-    storage = Storage()
-    config = ConfigManager().load()
-    scheduler = create_scheduler_from_storage()
-    yield
-    # Shutdown
-    if scheduler and scheduler.is_running():
-        scheduler.stop()
+        global scheduler
+        # Startup
+
+        scheduler = create_scheduler_from_storage()
+        yield
+        # Shutdown
+        if scheduler and scheduler.is_running():
+            scheduler.stop()
 
 
 app = FastAPI(
@@ -47,7 +51,6 @@ app = FastAPI(
 templates = Jinja2Templates(directory="templates")
 
 # Static files (if any)
-# app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 # Pydantic models for API
@@ -107,7 +110,7 @@ async def dashboard(request: Request):
     # Scheduler status
     sched_status = scheduler.status if scheduler else None
 
-    return templates.TemplateResponse("dashboard.html", {
+    return templates.TemplateResponse(request, "dashboard.html", {
         "request": request,
         "stats": stats,
         "codes": codes,
@@ -125,10 +128,10 @@ async def sources_page(request: Request):
     """Sources management page."""
     storage = Storage()
     sources = storage.list_sources()
-    return templates.TemplateResponse("sources.html", {
+    return templates.TemplateResponse(request, "sources.html", {
         "request": request,
         "sources": sources,
-        "source_presets": list_presets(),
+        "source_presets": {k: v.__dict__ for k, v in SOURCE_PRESETS.items()},
     })
 
 
@@ -142,29 +145,19 @@ async def create_source(source: SourceCreate):
             url=source.url,
             selector_type=source.selector_type,
             selector=source.selector,
+            enabled=source.enabled,
+            headers=source.headers,
+            timeout_seconds=source.timeout_seconds,
+            rate_limit_seconds=source.rate_limit_seconds,
+            requires_browser=source.requires_browser,
+            browser_wait_selector=source.browser_wait_selector,
+            browser_wait_seconds=source.browser_wait_seconds,
+            max_retries=source.max_retries,
+            retry_base_delay=source.retry_base_delay,
         )
-        # Update additional fields via config
-        if source.headers:
-            storage.set_config(f"source_headers_{source.name}", json.dumps(source.headers))
-        if source.timeout_seconds != 30:
-            storage.set_config(f"source_timeout_{source.name}", str(source.timeout_seconds))
-        if source.rate_limit_seconds != 1.0:
-            storage.set_config(f"source_rate_limit_{source.name}", str(source.rate_limit_seconds))
-        if source.requires_browser:
-            storage.set_config(f"source_requires_browser_{source.name}", "true")
-        if source.browser_wait_selector:
-            storage.set_config(f"source_browser_wait_selector_{source.name}", source.browser_wait_selector)
-        if source.browser_wait_seconds != 5:
-            storage.set_config(f"source_browser_wait_seconds_{source.name}", str(source.browser_wait_seconds))
-        if source.max_retries != 3:
-            storage.set_config(f"source_max_retries_{source.name}", str(source.max_retries))
-        if source.retry_base_delay != 1.0:
-            storage.set_config(f"source_retry_base_delay_{source.name}", str(source.retry_base_delay))
-        if not source.enabled:
-            storage.disable_source(source.name)
         return {"success": True, "message": f"Source '{source.name}' created"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @app.post("/sources/{name}/enable")
@@ -172,7 +165,8 @@ async def enable_source(name: str):
     """Enable a source."""
     storage = Storage()
     try:
-        storage.enable_source(name)
+        if not storage.update_source(name, enabled=True):
+            raise ValueError(f"Source '{name}' not found")
         return {"success": True}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -183,7 +177,8 @@ async def disable_source(name: str):
     """Disable a source."""
     storage = Storage()
     try:
-        storage.disable_source(name)
+        if not storage.update_source(name, enabled=False):
+            raise ValueError(f"Source '{name}' not found")
         return {"success": True}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -194,15 +189,25 @@ async def delete_source(name: str):
     """Delete a source."""
     storage = Storage()
     try:
-        storage.remove_source(name)
+        if not storage.delete_source(name):
+            raise ValueError(f"Source '{name}' not found")
         return {"success": True}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.post("/sources/{name}/test")
-async def test_source(name: str):
+async def test_source(name: str, request: Request):
     """Test fetch from a source."""
+    # Simple per-IP rate limit (local only)
+    ip = request.client.host if request.client else "unknown"
+    key = f"{ip}:{name}"
+    now = time.time()
+    last = _test_rate_limit.get(key, 0)
+    if now - last < _RATE_LIMIT_SECONDS:
+        raise HTTPException(status_code=429, detail=f"Rate limited, try in {_RATE_LIMIT_SECONDS - (now-last):.1f}s")
+    _test_rate_limit[key] = now
+
     storage = Storage()
     source_data = storage.get_source(name)
     if not source_data:
@@ -214,14 +219,14 @@ async def test_source(name: str):
         selector_type=source_data["selector_type"],
         selector=source_data["selector"],
         enabled=bool(source_data["enabled"]),
-        headers=json.loads(storage.get_config(f"source_headers_{name}", "{}")),
-        timeout_seconds=int(storage.get_config(f"source_timeout_{name}", "30")),
-        rate_limit_seconds=float(storage.get_config(f"source_rate_limit_{name}", "1.0")),
-        requires_browser=storage.get_config(f"source_requires_browser_{name}", "false").lower() == "true",
-        browser_wait_selector=storage.get_config(f"source_browser_wait_selector_{name}"),
-        browser_wait_seconds=int(storage.get_config(f"source_browser_wait_seconds_{name}", "5")),
-        max_retries=int(storage.get_config(f"source_max_retries_{name}", "3")),
-        retry_base_delay=float(storage.get_config(f"source_retry_base_delay_{name}", "1.0")),
+        headers=source_data.get("headers") or {},
+        timeout_seconds=int(source_data.get("timeout_seconds") or 30),
+        rate_limit_seconds=float(source_data.get("rate_limit_seconds") or 1.0),
+        requires_browser=bool(source_data.get("requires_browser")),
+        browser_wait_selector=source_data.get("browser_wait_selector"),
+        browser_wait_seconds=int(source_data.get("browser_wait_seconds") or 5),
+        max_retries=int(source_data.get("max_retries") or 3),
+        retry_base_delay=float(source_data.get("retry_base_delay") or 1.0),
     )
 
     try:
@@ -237,7 +242,7 @@ async def accounts_page(request: Request):
     """Accounts management page."""
     storage = Storage()
     accounts = storage.list_accounts()
-    return templates.TemplateResponse("accounts.html", {
+    return templates.TemplateResponse(request, "accounts.html", {
         "request": request,
         "accounts": accounts,
     })
@@ -311,7 +316,7 @@ async def config_page(request: Request):
     """Configuration page."""
     config_manager = ConfigManager()
     config = config_manager.get_all()
-    return templates.TemplateResponse("config.html", {
+    return templates.TemplateResponse(request, "config.html", {
         "request": request,
         "config": config,
     })
@@ -409,6 +414,68 @@ async def health_check():
         return {"status": "unhealthy", "error": str(e)}
 
 
+@app.get("/metrics")
+async def metrics():
+    """Prometheus metrics endpoint."""
+    from src.logging_setup import get_prometheus_metrics
+
+    metrics_data = get_prometheus_metrics()
+    if metrics_data is None:
+        raise HTTPException(status_code=503, detail="Prometheus client not available")
+    from fastapi.responses import Response
+
+    return Response(content=metrics_data, media_type="text/plain")
+
+
+@app.get("/partials/scheduler-status")
+async def partial_scheduler_status(request: Request):
+    """HTMX partial for scheduler status."""
+    global scheduler
+    if not scheduler:
+        return templates.TemplateResponse(request, "partials/scheduler_status.html", {
+            "request": request,
+            "scheduler": None,
+        })
+    status = scheduler.status
+    return templates.TemplateResponse(request, "partials/scheduler_status.html", {
+        "request": request,
+        "scheduler": status,
+    })
+
+
+@app.get("/partials/stats")
+async def partial_stats(request: Request):
+    """HTMX partial for statistics."""
+    storage = Storage()
+    stats = storage.get_stats()
+    return templates.TemplateResponse(request, "partials/stats.html", {
+        "request": request,
+        "stats": stats,
+    })
+
+
+@app.get("/partials/recent-codes")
+async def partial_recent_codes(request: Request):
+    """HTMX partial for recent codes."""
+    storage = Storage()
+    codes = storage.list_codes(limit=20, only_unredeemed=False)
+    return templates.TemplateResponse(request, "partials/recent_codes.html", {
+        "request": request,
+        "codes": codes,
+    })
+
+
+@app.get("/partials/recent-logs")
+async def partial_recent_logs(request: Request):
+    """HTMX partial for recent redemption logs."""
+    storage = Storage()
+    logs = storage.get_redemption_logs(limit=20)
+    return templates.TemplateResponse(request, "partials/recent_logs.html", {
+        "request": request,
+        "logs": logs,
+    })
+
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="127.0.0.1", port=8000)
