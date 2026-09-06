@@ -211,21 +211,15 @@ class Storage:
             Dictionary with code data including sources list, or None if not found.
         """
         with self._connection() as conn:
-            row = conn.execute(
-                """
-                SELECT c.*, GROUP_CONCAT(cs.source) as sources
-                FROM codes c
-                LEFT JOIN code_sources cs ON c.id = cs.code_id
-                WHERE c.code = ?
-                GROUP BY c.id
-                """,
-                (code,),
-            ).fetchone()
-            if row:
-                data = dict(row)
-                data['sources'] = data['sources'].split(',') if data['sources'] else []
-                return data
-            return None
+            row = conn.execute("SELECT * FROM codes WHERE code = ?", (code,)).fetchone()
+            if not row:
+                return None
+            data = dict(row)
+            src_rows = conn.execute(
+                "SELECT source FROM code_sources WHERE code_id = ?", (data["id"],)
+            ).fetchall()
+            data["sources"] = [r[0] for r in src_rows]
+            return data
 
     def update_code_redemption(
         self,
@@ -276,26 +270,31 @@ class Storage:
         Returns:
             List of code dictionaries with sources.
         """
-        query = """
-            SELECT c.*, GROUP_CONCAT(cs.source) as sources
-            FROM codes c
-            LEFT JOIN code_sources cs ON c.id = cs.code_id
-        """
+        query = "SELECT * FROM codes"
         params: list[Any] = []
 
         if only_unredeemed:
-            query += " WHERE c.redeemed = 0"
+            query += " WHERE redeemed = 0"
 
-        query += " GROUP BY c.id ORDER BY c.attempted_at DESC LIMIT ? OFFSET ?"
+        query += " ORDER BY attempted_at DESC LIMIT ? OFFSET ?"
         params.extend([limit, offset])
 
         with self._connection() as conn:
             rows = conn.execute(query, params).fetchall()
-            result = []
-            for row in rows:
-                data = dict(row)
-                data['sources'] = data['sources'].split(',') if data['sources'] else []
-                result.append(data)
+            if not rows:
+                return []
+            result: list[dict[str, Any]] = [dict(r) for r in rows]
+            ids = [r["id"] for r in result]
+            placeholders = ",".join("?" for _ in ids)
+            src_rows = conn.execute(
+                f"SELECT code_id, source FROM code_sources WHERE code_id IN ({placeholders})",
+                ids,
+            ).fetchall()
+            mapping: dict[int, list[str]] = {i: [] for i in ids}
+            for cid, src in src_rows:
+                mapping[cid].append(src)
+            for d in result:
+                d["sources"] = mapping.get(d["id"], [])
             return result
 
     def get_stats(self) -> dict[str, Any]:
