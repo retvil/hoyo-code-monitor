@@ -74,43 +74,43 @@ class ConfigManager:
         self._loaded = False
 
     def load(self) -> Settings:
-            with self._lock:
-                if self.config_path.exists():
+        with self._lock:
+            if self.config_path.exists():
+                try:
+                    with self.config_path.open("rb") as f:
+                        raw = tomllib.load(f)
+                    self._settings = Settings.from_dict({**self.DEFAULTS.to_dict(), **raw})
+                except Exception:
                     try:
-                        with self.config_path.open("rb") as f:
-                            raw = tomllib.load(f)
-                        self._settings = Settings.from_dict({**self.DEFAULTS.to_dict(), **raw})
+                        if _toml_legacy:
+                            raw = _toml_legacy.load(str(self.config_path))
+                            self._settings = Settings.from_dict({**self.DEFAULTS.to_dict(), **raw})
+                        else:
+                            raise
                     except Exception:
-                        try:
-                            if _toml_legacy:
-                                raw = _toml_legacy.load(str(self.config_path))
-                                self._settings = Settings.from_dict({**self.DEFAULTS.to_dict(), **raw})
-                            else:
-                                raise
-                        except Exception:
-                            self._settings = Settings()
-                else:
-                    self._settings = Settings()
-                    self.save()
-                self._validate()
-                self._loaded = True
-                return self._settings
+                        self._settings = Settings()
+            else:
+                self._settings = Settings()
+                self.save()
+            self._validate()
+            self._loaded = True
+            return self._settings
 
     def save(self) -> None:
-            with self._lock:
-                self.config_path.parent.mkdir(parents=True, exist_ok=True)
-                data = self._settings.to_dict()
-                if tomli_w:
-                    with self.config_path.open("wb") as f:
-                        tomli_w.dump(data, f)
-                elif _toml_legacy:
-                    with self.config_path.open("w", encoding="utf-8") as f:
-                        _toml_legacy.dump(data, f)
-                else:
-                    with self.config_path.open("w", encoding="utf-8") as f:
-                        for k, v in data.items():
-                            f.write(f"{k} = {v!r}\n")
-    
+        with self._lock:
+            self.config_path.parent.mkdir(parents=True, exist_ok=True)
+            data = self._settings.to_dict()
+            if tomli_w:
+                with self.config_path.open("wb") as f:
+                    tomli_w.dump(data, f)
+            elif _toml_legacy:
+                with self.config_path.open("w", encoding="utf-8") as f:
+                    _toml_legacy.dump(data, f)
+            else:
+                with self.config_path.open("w", encoding="utf-8") as f:
+                    for k, v in data.items():
+                        f.write(f"{k} = {v!r}\n")
+
     def get(self, key: str, default: Any = None) -> Any:
         with self._lock:
             if not self._loaded:
@@ -152,25 +152,35 @@ class ConfigManager:
                 raise ConfigError(f"poll_interval_seconds must be a positive integer, got: {value}")  # noqa: TRY003 -- validation message needs interpolation
         elif key == "source_timeout_seconds":
             if not isinstance(value, int) or value <= 0:
-                raise ConfigError(f"source_timeout_seconds must be a positive integer, got: {value}")  # noqa: TRY003 -- validation message needs interpolation
+                raise ConfigError(  # noqa: TRY003 -- validation message needs interpolation
+                    f"source_timeout_seconds must be a positive integer, got: {value}"
+                )
         elif key == "redemption_enabled":
             if not isinstance(value, bool):
                 raise ConfigError(f"redemption_enabled must be a boolean, got: {value}")  # noqa: TRY003 -- validation message needs interpolation
         elif key == "redemption_min_gap_seconds":
             if not isinstance(value, int) or value < MIN_REDEMPTION_GAP:
-                raise ConfigError(f"redemption_min_gap_seconds must be >= {MIN_REDEMPTION_GAP}, got: {value}")  # noqa: TRY003 -- validation message needs interpolation
+                raise ConfigError(  # noqa: TRY003 -- validation message needs interpolation
+                    f"redemption_min_gap_seconds must be >= {MIN_REDEMPTION_GAP}, got: {value}"
+                )
         elif key == "max_retry_attempts":
             if not isinstance(value, int) or value < 0:
-                raise ConfigError(f"max_retry_attempts must be a non-negative integer, got: {value}")  # noqa: TRY003 -- validation message needs interpolation
+                raise ConfigError(  # noqa: TRY003 -- validation message needs interpolation
+                    f"max_retry_attempts must be a non-negative integer, got: {value}"
+                )
         elif key == "retry_backoff_seconds":
             if not isinstance(value, list) or not all(isinstance(x, int) and x > 0 for x in value):
-                raise ConfigError(f"retry_backoff_seconds must be a list of positive integers, got: {value}")  # noqa: TRY003 -- validation message needs interpolation
+                raise ConfigError(  # noqa: TRY003 -- validation message needs interpolation
+                    f"retry_backoff_seconds must be a list of positive integers, got: {value}"
+                )
         elif key == "heartbeat_seconds":
             if not isinstance(value, int) or value <= 0:
                 raise ConfigError(f"heartbeat_seconds must be a positive integer, got: {value}")  # noqa: TRY003 -- validation message needs interpolation
         elif key == "heartbeat_timeout_seconds":
             if not isinstance(value, int) or value <= 0:
-                raise ConfigError(f"heartbeat_timeout_seconds must be a positive integer, got: {value}")  # noqa: TRY003 -- validation message needs interpolation
+                raise ConfigError(  # noqa: TRY003 -- validation message needs interpolation
+                    f"heartbeat_timeout_seconds must be a positive integer, got: {value}"
+                )
         elif key == "db_path":
             if not isinstance(value, str) or not value.strip():
                 raise ConfigError(f"db_path must be a non-empty string, got: {value}")  # noqa: TRY003 -- validation message needs interpolation
@@ -231,7 +241,10 @@ def load_config_from_storage(storage: Any) -> SimpleNamespace:
     return SimpleNamespace(
         poll_interval_seconds=s.poll_interval_seconds,
         source_timeout_seconds=s.source_timeout_seconds,
-        redemption_enabled=storage.get_config("redemption_enabled", str(s.redemption_enabled)).lower() == "true",
+        redemption_enabled=storage.get_config(
+            "redemption_enabled", str(s.redemption_enabled)
+        ).lower()
+        == "true",
         redemption_min_gap_seconds=s.redemption_min_gap_seconds,
         max_retry_attempts=s.max_retry_attempts,
         retry_backoff_seconds=s.retry_backoff_seconds,
