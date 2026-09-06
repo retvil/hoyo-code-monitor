@@ -1,13 +1,13 @@
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-    <div class="card-title">Scheduler status</div>
+    <div class="card-title">Scheduler</div>
     {% if scheduler and scheduler.running %}<span class="badge badge-ok">Running</span>{% else %}<span class="badge badge-bad">Stopped</span>{% endif %}
 </div>
-<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
-    <div><div style="font-size: 1.6rem; font-weight: 700;">{{ scheduler.last_run_codes_found if scheduler else 0 }}</div><div style="color: #64748b; font-size: 0.85rem;">Codes found (last run)</div></div>
-    <div><div style="font-size: 1.6rem; font-weight: 700;">{{ scheduler.last_run_codes_redeemed if scheduler else 0 }}</div><div style="color: #64748b; font-size: 0.85rem;">Redeemed (last run)</div></div>
-    <div><div style="font-size: 1rem; font-weight: 600;">{{ scheduler.next_run if scheduler else '-' }}</div><div style="color: #64748b; font-size: 0.85rem;">Next run</div></div>
-    <div><div style="font-size: 1rem; font-weight: 600;">{{ scheduler.last_run if scheduler else '-' }}</div><div style="color: #64748b; font-size: 0.85rem;">Last run</div></div>
+<div class="kpi-grid">
+    <div class="kpi accent"><div style="font-size: 1.6rem; font-weight: 700;">{{ scheduler.last_run_codes_found if scheduler else 0 }}</div><div class="muted" style="font-size: 0.85rem;">Codes found (last run)</div></div>
+    <div class="kpi good"><div style="font-size: 1.6rem; font-weight: 700;">{{ scheduler.last_run_codes_redeemed if scheduler else 0 }}</div><div class="muted" style="font-size: 0.85rem;">Redeemed (last run)</div></div>
+    <div class="kpi"><div style="font-size: 1rem; font-weight: 600;">{{ scheduler.next_run if scheduler else '-' }}</div><div class="muted" style="font-size: 0.85rem;">Next run</div></div>
+    <div class="kpi"><div style="font-size: 1rem; font-weight: 600;">{{ scheduler.last_run if scheduler else '-' }}</div><div class="muted" style="font-size: 0.85rem;">Last run</div></div>
 </div>
 {% if scheduler and scheduler.error_message %}
-<div style="margin-top: 12px; background: #fee2e2; color: #991b1b; padding: 10px 14px; border-radius: 8px;">Error: {{ scheduler.error_message }}</div>
+<div style="margin-top: 12px; background: var(--bad-soft); color: var(--bad); padding: 10px 14px; border-radius: 8px;">Error: {{ scheduler.error_message }}</div>
 {% endif %}

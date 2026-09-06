@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Sources - Genshin Code Monitor{% endblock %}
+{% block page_title %}Sources{% endblock %}
 {% block content %}
 <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
@@ -7,22 +8,23 @@
         <button class="btn btn-primary" onclick="document.getElementById('source-modal').classList.add('active')">Add source</button>
     </div>
     {% if sources %}
+    <div style="overflow-x: auto;">
     <table>
         <thead><tr><th>Name</th><th>URL</th><th>Type</th><th>Selector</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody>
             {% for src in sources %}
             <tr>
                 <td><strong>{{ src.name }}</strong></td>
-                <td class="mono" style="max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ src.url }}</td>
+                <td class="mono" style="max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ src.url }}</td>
                 <td><span class="badge badge-info">{{ src.selector_type }}</span></td>
                 <td class="mono" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ src.selector }}</td>
                 <td>{% if src.enabled %}<span class="badge badge-ok">Enabled</span>{% else %}<span class="badge badge-bad">Disabled</span>{% endif %}</td>
                 <td style="white-space: nowrap;">
-                    <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;" hx-post="/sources/{{ src.name }}/test" hx-target="#test-{{ src.name }}" hx-swap="innerHTML">Test</button>
+                    <button class="btn" style="padding: 4px 10px; font-size: 0.8rem;" hx-post="/sources/{{ src.name }}/test" hx-target="#test-{{ src.name }}" hx-swap="innerHTML">Test</button>
                     {% if src.enabled %}
-                    <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 0.8rem;" hx-post="/sources/{{ src.name }}/disable" hx-swap="none" onclick="setTimeout(()=>location.reload(),500)">Disable</button>
+                    <button class="btn" style="padding: 4px 10px; font-size: 0.8rem;" hx-post="/sources/{{ src.name }}/disable" hx-swap="none" onclick="setTimeout(()=>location.reload(),500)">Disable</button>
                     {% else %}
-                    <button class="btn btn-success" style="padding: 4px 10px; font-size: 0.8rem;" hx-post="/sources/{{ src.name }}/enable" hx-swap="none" onclick="setTimeout(()=>location.reload(),500)">Enable</button>
+                    <button class="btn btn-primary" style="padding: 4px 10px; font-size: 0.8rem;" hx-post="/sources/{{ src.name }}/enable" hx-swap="none" onclick="setTimeout(()=>location.reload(),500)">Enable</button>
                     {% endif %}
                     <button class="btn btn-danger" style="padding: 4px 10px; font-size: 0.8rem;" hx-delete="/sources/{{ src.name }}" hx-confirm="Delete source '{{ src.name }}'?" hx-swap="none" onclick="setTimeout(()=>location.reload(),800)">Delete</button>
                     <div id="test-{{ src.name }}" style="font-size: 0.8rem; margin-top: 4px;"></div>
@@ -31,15 +33,16 @@
             {% endfor %}
         </tbody>
     </table>
+    </div>
     {% else %}
-    <p style="color: #94a3b8;">No sources yet. Add the first one.</p>
+    <p class="muted">No sources yet. Add the first one.</p>
     {% endif %}
 </div>
 
 <div class="modal" id="source-modal">
     <div class="modal-box">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-            <h3>Add source</h3>
+            <h3 style="margin: 0;">Add source</h3>
             <button style="background: none; border: none; font-size: 1.4rem; cursor: pointer;" onclick="document.getElementById('source-modal').classList.remove('active')">×</button>
         </div>
         <form hx-post="/sources" hx-swap="none" hx-on::after-request="if(event.detail.successful){document.getElementById('source-modal').classList.remove('active');location.reload()}">
@@ -57,7 +60,7 @@
                 <div style="margin-bottom: 10px;"><label>Max retries</label><input type="number" name="max_retries" value="3" min="0" max="10"></div>
             </div>
             <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px;">
-                <button type="button" class="btn btn-secondary" onclick="document.getElementById('source-modal').classList.remove('active')">Cancel</button>
+                <button type="button" class="btn" onclick="document.getElementById('source-modal').classList.remove('active')">Cancel</button>
                 <button type="submit" class="btn btn-primary">Save</button>
             </div>
         </form>

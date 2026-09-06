@@ -1,11 +1,11 @@
 <div class="card-title" style="margin-bottom: 12px;">Statistics</div>
-<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px;">
-    <div><div style="font-size: 1.8rem; font-weight: 700;">{{ stats.total_codes }}</div><div style="color: #64748b; font-size: 0.85rem;">Total codes</div></div>
-    <div><div style="font-size: 1.8rem; font-weight: 700; color: #16a34a;">{{ stats.successful }}</div><div style="color: #64748b; font-size: 0.85rem;">Redeemed</div></div>
-    <div><div style="font-size: 1.8rem; font-weight: 700; color: #dc2626;">{{ stats.failed }}</div><div style="color: #64748b; font-size: 0.85rem;">Pending</div></div>
+<div class="kpi-grid">
+    <div class="kpi"><div style="font-size: 1.8rem; font-weight: 700;">{{ stats.total_codes }}</div><div class="muted" style="font-size: 0.85rem;">Total codes</div></div>
+    <div class="kpi good"><div style="font-size: 1.8rem; font-weight: 700;">{{ stats.successful }}</div><div class="muted" style="font-size: 0.85rem;">Redeemed</div></div>
+    <div class="kpi bad"><div style="font-size: 1.8rem; font-weight: 700;">{{ stats.failed }}</div><div class="muted" style="font-size: 0.85rem;">Pending</div></div>
 </div>
 {% if stats.by_source %}
-<h4 style="margin: 16px 0 8px;">By source</h4>
+<h4 style="margin: 16px 0 8px; font-size: 0.9rem;">By source</h4>
 <table>
     <thead><tr><th>Source</th><th style="text-align: right;">Codes</th></tr></thead>
     <tbody>{% for source, count in stats.by_source.items() %}<tr><td>{{ source }}</td><td style="text-align: right;">{{ count }}</td></tr>{% endfor %}</tbody>

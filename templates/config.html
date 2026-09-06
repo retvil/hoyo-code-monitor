@@ -1,23 +1,24 @@
 {% extends "base.html" %}
 {% block title %}Config - Genshin Code Monitor{% endblock %}
+{% block page_title %}Config{% endblock %}
 {% block content %}
 <div class="card">
     <div class="card-title" style="margin-bottom: 14px;">Application config</div>
     <form hx-post="/config" hx-target="#config-result" hx-swap="innerHTML">
-        <h4 style="margin: 12px 0 8px;">Intervals</h4>
+        <h4 style="margin: 12px 0 8px; font-size: 0.9rem;">Intervals</h4>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px;">
             <div><label>Poll interval (sec)</label><input type="number" name="poll_interval_seconds" value="{{ config.poll_interval_seconds }}" min="60" max="86400"></div>
             <div><label>Source timeout (sec)</label><input type="number" name="source_timeout_seconds" value="{{ config.source_timeout_seconds }}" min="5" max="300"></div>
             <div><label>Min redeem gap (sec)</label><input type="number" name="redemption_min_gap_seconds" value="{{ config.redemption_min_gap_seconds }}" min="6" max="3600"></div>
             <div><label>Max retries</label><input type="number" name="max_retry_attempts" value="{{ config.max_retry_attempts }}" min="0" max="10"></div>
         </div>
-        <h4 style="margin: 16px 0 8px;">Redemption</h4>
+        <h4 style="margin: 16px 0 8px; font-size: 0.9rem;">Redemption</h4>
         <div><label><input type="checkbox" name="redemption_enabled" value="true" {% if config.redemption_enabled %}checked{% endif %} style="width: auto;"> Enable auto-redeem</label></div>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin-top: 8px;">
             <div><label>Game biz</label><input type="text" name="game_biz" value="{{ config.game_biz or 'hk4e_global' }}"></div>
             <div><label>Lang</label><input type="text" name="lang" value="{{ config.lang or 'en-us' }}"></div>
         </div>
-        <h4 style="margin: 16px 0 8px;">Storage / logging</h4>
+        <h4 style="margin: 16px 0 8px; font-size: 0.9rem;">Storage / logging</h4>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px;">
             <div><label>DB path</label><input type="text" name="db_path" value="{{ config.db_path }}"></div>
             <div><label>Log level</label>
@@ -38,6 +39,6 @@
 </div>
 <div class="card">
     <div class="card-title" style="margin-bottom: 8px;">Current config (JSON)</div>
-    <pre style="background: #f8fafc; padding: 12px; border-radius: 8px; overflow-x: auto; font-size: 0.8rem;">{{ config | tojson(indent=2) }}</pre>
+    <pre style="background: var(--bg); padding: 12px; border-radius: 8px; overflow-x: auto; font-size: 0.8rem;">{{ config | tojson(indent=2) }}</pre>
 </div>
 {% endblock %}
