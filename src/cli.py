@@ -200,8 +200,8 @@ def set_cookies(name, cookies):
         click.echo(f"Error parsing cookies JSON: {e}", err=True)
         sys.exit(1)
 
-    # Store cookies per account
-    storage.set_config(f"account_cookies_{name}", json.dumps(cookies_dict))
+    # Store cookies per account (encrypted via Fernet)
+    storage.store_account_cookies(name, cookies_dict)
     click.echo(f"Set cookies for account '{name}'.")
     sys.exit(0)
 
@@ -218,16 +218,19 @@ def show_cookies(name):
         click.echo(f"Error: Account '{name}' not found.", err=True)
         sys.exit(1)
 
-    cookies_json = storage.get_config(f"account_cookies_{name}")
-    if not cookies_json:
+    cookies = storage.load_account_cookies(name)
+    if not cookies:
         click.echo("No cookies set for this account.")
         sys.exit(0)
 
-    cookies = json.loads(cookies_json)
     masked = {}
     for key, value in cookies.items():
         if isinstance(value, str) and value:
-            masked[key] = '*' * len(value) if len(value) <= 4 else value[:4] + '*' * (len(value) - 4)
+            masked[key] = (
+                "*" * len(value)
+                if len(value) <= MASK_VISIBLE_CHARS
+                else value[:MASK_VISIBLE_CHARS] + "*" * (len(value) - MASK_VISIBLE_CHARS)
+            )
         else:
             masked[key] = value
     click.echo(json.dumps(masked, indent=2))

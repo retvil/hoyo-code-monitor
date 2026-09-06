@@ -14,6 +14,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from src.config import ConfigManager
+from src.constants import MASK_VISIBLE_CHARS
 from src.scheduler import create_scheduler_from_storage
 from src.sources import SOURCE_PRESETS, SourceConfig, SourceFetcher, list_presets
 from src.storage import Storage
@@ -274,7 +275,7 @@ async def set_account_cookies(name: str, cookies: dict = Form(...)):
     if not existing:
         raise HTTPException(status_code=404, detail="Account not found")
 
-    storage.set_config(f"account_cookies_{name}", json.dumps(cookies))
+    storage.store_account_cookies(name, cookies)
     return {"success": True, "message": f"Cookies set for account '{name}'"}
 
 
@@ -286,15 +287,18 @@ async def get_account_cookies(name: str):
     if not existing:
         raise HTTPException(status_code=404, detail="Account not found")
 
-    cookies_json = storage.get_config(f"account_cookies_{name}")
-    if not cookies_json:
+    cookies = storage.load_account_cookies(name)
+    if not cookies:
         return {"cookies": {}}
 
-    cookies = json.loads(cookies_json)
     masked = {}
     for key, value in cookies.items():
         if isinstance(value, str) and value:
-            masked[key] = '*' * len(value) if len(value) <= 4 else value[:4] + '*' * (len(value) - 4)
+            masked[key] = (
+                "*" * len(value)
+                if len(value) <= MASK_VISIBLE_CHARS
+                else value[:MASK_VISIBLE_CHARS] + "*" * (len(value) - MASK_VISIBLE_CHARS)
+            )
         else:
             masked[key] = value
     return {"cookies": masked}
