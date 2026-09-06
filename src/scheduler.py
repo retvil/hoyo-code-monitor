@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 from src.config import Config, load_config_from_storage
+from src.exceptions import ConfigError
 from src.redeemer import Redeemer
 from src.sources import SourceConfig, SourceFetcher, seed_default_sources
 from src.storage import Storage
@@ -319,7 +320,7 @@ class Scheduler:
             if not self.config.cookies.get("ltoken"):
                 missing.append("ltoken cookie")
             if missing:
-                raise ValueError(
+                raise ConfigError(  # noqa: TRY003 -- validation message needs interpolation
                     f"Redemption enabled but missing required configuration: {', '.join(missing)}. "
                     f"Run 'genshin-code-monitor config set redemption_enabled false' to disable, "
                     f"or configure the missing values."

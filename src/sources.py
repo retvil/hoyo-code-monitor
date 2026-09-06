@@ -16,6 +16,7 @@ import aiohttp
 from bs4 import BeautifulSoup
 from lxml import html as lxml_html
 
+from src.exceptions import SourceValidationError
 from src.storage import Storage
 
 logger = logging.getLogger(__name__)
@@ -72,15 +73,18 @@ class JSONExtractor:
         data = json.loads(content)
         target: Any = data
         if selector:
-            try:
-                for part in selector.split("."):
-                    if isinstance(target, dict) and part in target:
-                        target = target[part]
-                    else:
-                        raise KeyError(part)
-            except KeyError:
+            node: Any = data
+            missing = False
+            for part in selector.split("."):
+                if isinstance(node, dict) and part in node:
+                    node = node[part]
+                else:
+                    missing = True
+                    break
+            if missing:
                 logger.warning("JSON selector %r not found, scanning whole document", selector)
-                target = data
+            else:
+                target = node
         codes: list[str] = []
 
         def find_codes(obj: Any) -> None:
@@ -140,19 +144,19 @@ class SourceConfig:
     def validate(self) -> None:
         """Validate source configuration."""
         if self.selector_type not in EXTRACTORS:
-            raise ValueError(f"Unknown selector_type: {self.selector_type}")
+            raise SourceValidationError(f"Unknown selector_type: {self.selector_type}")  # noqa: TRY003 -- validation message needs interpolation
         if not self.url:
-            raise ValueError("url is required")
+            raise SourceValidationError("url is required")  # noqa: TRY003 -- validation message needs interpolation
         if not self.selector and self.selector_type != "json":
-            raise ValueError("selector is required")
+            raise SourceValidationError("selector is required")  # noqa: TRY003 -- validation message needs interpolation
         if self.timeout_seconds <= 0:
-            raise ValueError("timeout_seconds must be positive")
+            raise SourceValidationError("timeout_seconds must be positive")  # noqa: TRY003 -- validation message needs interpolation
         if self.rate_limit_seconds < 0:
-            raise ValueError("rate_limit_seconds must be non-negative")
+            raise SourceValidationError("rate_limit_seconds must be non-negative")  # noqa: TRY003 -- validation message needs interpolation
         if self.max_retries < 0:
-            raise ValueError("max_retries must be non-negative")
+            raise SourceValidationError("max_retries must be non-negative")  # noqa: TRY003 -- validation message needs interpolation
         if self.retry_base_delay <= 0:
-            raise ValueError("retry_base_delay must be positive")
+            raise SourceValidationError("retry_base_delay must be positive")  # noqa: TRY003 -- validation message needs interpolation
 
 
 class SourceFetcher:
@@ -205,7 +209,7 @@ class SourceFetcher:
     async def _fetch_with_aiohttp(self, source: SourceConfig) -> list[str]:
         """Fetch using aiohttp with exponential backoff retry."""
         if not self._session:
-            raise RuntimeError("Session not initialized. Use async context manager.")
+            raise RuntimeError("Session not initialized. Use async context manager.")  # noqa: TRY003 -- validation message needs interpolation
 
         headers = {"User-Agent": self.user_agent}
         headers.update(source.headers)

@@ -9,6 +9,8 @@ from typing import Any, Self
 
 import aiohttp
 
+from src.exceptions import RedeemerError
+
 logger = logging.getLogger(__name__)
 
 
@@ -233,7 +235,7 @@ class Redeemer:
         required_cookies = ["ltuid", "ltoken"]
         missing = [c for c in required_cookies if not cookies.get(c)]
         if missing:
-            raise ValueError(f"Missing required cookies: {missing}")
+            raise RedeemerError(f"Missing required cookies: {missing}")  # noqa: TRY003 -- validation message needs interpolation
 
         session = await self._get_session()
         headers = self._build_headers(cookies)

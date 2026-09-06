@@ -14,6 +14,7 @@ from types import SimpleNamespace
 from typing import Any, ClassVar
 
 from src.constants import MIN_REDEMPTION_GAP
+from src.exceptions import ConfigError
 
 try:
     import tomllib  # Python 3.11+
@@ -121,7 +122,7 @@ class ConfigManager:
             if not self._loaded:
                 self.load()
             if key not in self.DEFAULTS.to_dict():
-                raise ValueError(f"Unknown configuration key: {key}")
+                raise ConfigError(f"Unknown configuration key: {key}")  # noqa: TRY003 -- validation message needs interpolation
             self._validate_value(key, value)
             if key == "log_level":
                 value = value.upper()
@@ -148,42 +149,42 @@ class ConfigManager:
     def _validate_value(self, key: str, value: Any) -> None:
         if key == "poll_interval_seconds":
             if not isinstance(value, int) or value <= 0:
-                raise ValueError(f"poll_interval_seconds must be a positive integer, got: {value}")
+                raise ConfigError(f"poll_interval_seconds must be a positive integer, got: {value}")  # noqa: TRY003 -- validation message needs interpolation
         elif key == "source_timeout_seconds":
             if not isinstance(value, int) or value <= 0:
-                raise ValueError(f"source_timeout_seconds must be a positive integer, got: {value}")
+                raise ConfigError(f"source_timeout_seconds must be a positive integer, got: {value}")  # noqa: TRY003 -- validation message needs interpolation
         elif key == "redemption_enabled":
             if not isinstance(value, bool):
-                raise ValueError(f"redemption_enabled must be a boolean, got: {value}")
+                raise ConfigError(f"redemption_enabled must be a boolean, got: {value}")  # noqa: TRY003 -- validation message needs interpolation
         elif key == "redemption_min_gap_seconds":
             if not isinstance(value, int) or value < MIN_REDEMPTION_GAP:
-                raise ValueError(f"redemption_min_gap_seconds must be >= {MIN_REDEMPTION_GAP}, got: {value}")
+                raise ConfigError(f"redemption_min_gap_seconds must be >= {MIN_REDEMPTION_GAP}, got: {value}")  # noqa: TRY003 -- validation message needs interpolation
         elif key == "max_retry_attempts":
             if not isinstance(value, int) or value < 0:
-                raise ValueError(f"max_retry_attempts must be a non-negative integer, got: {value}")
+                raise ConfigError(f"max_retry_attempts must be a non-negative integer, got: {value}")  # noqa: TRY003 -- validation message needs interpolation
         elif key == "retry_backoff_seconds":
             if not isinstance(value, list) or not all(isinstance(x, int) and x > 0 for x in value):
-                raise ValueError(f"retry_backoff_seconds must be a list of positive integers, got: {value}")
+                raise ConfigError(f"retry_backoff_seconds must be a list of positive integers, got: {value}")  # noqa: TRY003 -- validation message needs interpolation
         elif key == "heartbeat_seconds":
             if not isinstance(value, int) or value <= 0:
-                raise ValueError(f"heartbeat_seconds must be a positive integer, got: {value}")
+                raise ConfigError(f"heartbeat_seconds must be a positive integer, got: {value}")  # noqa: TRY003 -- validation message needs interpolation
         elif key == "heartbeat_timeout_seconds":
             if not isinstance(value, int) or value <= 0:
-                raise ValueError(f"heartbeat_timeout_seconds must be a positive integer, got: {value}")
+                raise ConfigError(f"heartbeat_timeout_seconds must be a positive integer, got: {value}")  # noqa: TRY003 -- validation message needs interpolation
         elif key == "db_path":
             if not isinstance(value, str) or not value.strip():
-                raise ValueError(f"db_path must be a non-empty string, got: {value}")
+                raise ConfigError(f"db_path must be a non-empty string, got: {value}")  # noqa: TRY003 -- validation message needs interpolation
         elif key == "log_level":
             if not isinstance(value, str) or value.upper() not in self.VALID_LOG_LEVELS:
-                raise ValueError(f"log_level must be one of {self.VALID_LOG_LEVELS}, got: {value}")
+                raise ConfigError(f"log_level must be one of {self.VALID_LOG_LEVELS}, got: {value}")  # noqa: TRY003 -- validation message needs interpolation
         elif key == "log_file":
             if not isinstance(value, str) or not value.strip():
-                raise ValueError(f"log_file must be a non-empty string, got: {value}")
+                raise ConfigError(f"log_file must be a non-empty string, got: {value}")  # noqa: TRY003 -- validation message needs interpolation
         elif key == "max_log_size":
             if not isinstance(value, int) or value <= 0:
-                raise ValueError(f"max_log_size must be a positive integer, got: {value}")
+                raise ConfigError(f"max_log_size must be a positive integer, got: {value}")  # noqa: TRY003 -- validation message needs interpolation
         elif key == "backup_count" and (not isinstance(value, int) or value < 0):
-            raise ValueError(f"backup_count must be a non-negative integer, got: {value}")
+            raise ConfigError(f"backup_count must be a non-negative integer, got: {value}")  # noqa: TRY003 -- validation message needs interpolation
 
     def reset_to_defaults(self) -> None:
         with self._lock:

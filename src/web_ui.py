@@ -15,6 +15,7 @@ from pydantic import BaseModel
 
 from src.config import ConfigManager
 from src.constants import MASK_VISIBLE_CHARS
+from src.exceptions import StorageError
 from src.scheduler import create_scheduler_from_storage
 from src.sources import SOURCE_PRESETS, SourceConfig, SourceFetcher, list_presets
 from src.storage import Storage
@@ -166,11 +167,12 @@ async def enable_source(name: str):
     """Enable a source."""
     storage = Storage()
     try:
-        if not storage.update_source(name, enabled=True):
-            raise ValueError(f"Source '{name}' not found")
-        return {"success": True}
+        updated = storage.update_source(name, enabled=True)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    if not updated:
+        raise HTTPException(status_code=404, detail=f"Source '{name}' not found")
+    return {"success": True}
 
 
 @app.post("/sources/{name}/disable")
@@ -178,11 +180,12 @@ async def disable_source(name: str):
     """Disable a source."""
     storage = Storage()
     try:
-        if not storage.update_source(name, enabled=False):
-            raise ValueError(f"Source '{name}' not found")
-        return {"success": True}
+        updated = storage.update_source(name, enabled=False)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    if not updated:
+        raise HTTPException(status_code=404, detail=f"Source '{name}' not found")
+    return {"success": True}
 
 
 @app.delete("/sources/{name}")
@@ -190,11 +193,12 @@ async def delete_source(name: str):
     """Delete a source."""
     storage = Storage()
     try:
-        if not storage.delete_source(name):
-            raise ValueError(f"Source '{name}' not found")
-        return {"success": True}
+        deleted = storage.delete_source(name)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f"Source '{name}' not found")
+    return {"success": True}
 
 
 @app.post("/sources/{name}/test")
