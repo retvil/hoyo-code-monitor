@@ -218,14 +218,23 @@ class Scheduler:
                                         lang=acc.get("lang", "en-us"),
                                         s_lang_key=acc.get("s_lang_key", "en-us"),
                                     )
+                                    claimed = res.success or res.raw_response.get("retcode") in (
+                                        -2017,
+                                        -2018,
+                                    )
+                                    self.storage.update_code_redemption(
+                                        code=code,
+                                        redeemed=claimed,
+                                        reward=res.reward if res.success else None,
+                                    )
                                     self.storage.add_redemption_log(
                                         code=code,
                                         account_id=acc["id"],
-                                        status="success" if res.success else "failed",
+                                        status="success" if claimed else "failed",
                                         reward=res.reward if res.success else None,
-                                        error_message=res.message if not res.success else None,
+                                        error_message=None if claimed else res.message,
                                     )
-                                    if res.success:
+                                    if claimed:
                                         codes_redeemed += 1
                                 except Exception as e:
                                     logger.error(
