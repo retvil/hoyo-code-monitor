@@ -358,19 +358,20 @@ async def get_account_cookies(name: str):
 
     cookies = storage.load_account_cookies(name)
     if not cookies:
-        return {"cookies": {}}
+        return HTMLResponse("<span class='muted'>No cookies saved.</span>")
 
-    masked = {}
-    for key, value in cookies.items():
+    parts = []
+    for key, value in sorted(cookies.items()):
         if isinstance(value, str) and value:
-            masked[key] = (
+            shown = (
                 "*" * len(value)
                 if len(value) <= MASK_VISIBLE_CHARS
                 else value[:MASK_VISIBLE_CHARS] + "*" * (len(value) - MASK_VISIBLE_CHARS)
             )
         else:
-            masked[key] = value
-    return {"cookies": masked}
+            shown = value
+        parts.append(f"<span class='badge badge-info'>{key}</span> <span class='mono'>{shown}</span>")
+    return HTMLResponse("<br>".join(parts))
 
 
 @app.delete("/accounts/{name}")
