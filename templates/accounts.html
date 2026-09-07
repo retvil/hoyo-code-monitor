@@ -21,7 +21,7 @@
                 <td>{{ acc.lang }}</td>
                 <td style="white-space: nowrap;">
                     <button class="btn" style="padding: 4px 10px; font-size: 0.8rem;" onclick="openCookies('{{ acc.name }}')">Cookies</button>
-                    <button class="btn btn-primary" style="padding: 4px 10px; font-size: 0.8rem;" hx-post="/accounts/{{ acc.name }}/login" hx-target="#login-{{ acc.name }}" hx-swap="innerHTML">Auto-login</button>
+                    <button class="btn btn-primary" style="padding: 4px 10px; font-size: 0.8rem;" hx-post="/accounts/{{ acc.name }}/login" hx-target="#login-{{ acc.name }}" hx-swap="innerHTML" hx-indicator="#login-spin-{{ acc.name }}" hx-on::response-error="document.getElementById('login-{{ acc.name }}').innerHTML='Error: '+event.detail.xhr.responseText">Auto-login <span id="login-spin-{{ acc.name }}" class="spinner htmx-indicator" aria-hidden="true"></span></button>
                     <span id="login-{{ acc.name }}" style="font-size: 0.8rem;"></span>
                     <button class="btn btn-danger" style="padding: 4px 10px; font-size: 0.8rem;" hx-delete="/accounts/{{ acc.name }}" hx-confirm="Delete account '{{ acc.name }}'?" hx-swap="none" onclick="setTimeout(()=>location.reload(),800)">Delete</button>
                 </td>
