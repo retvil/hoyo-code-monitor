@@ -210,6 +210,34 @@ def set_cookies(name, cookies):
 
 @accounts.command()
 @click.argument("name")
+@click.option("--timeout", type=int, default=300, help="Seconds to wait for login.")
+def login(name, timeout):
+    """Auto-capture cookies: opens browser, you log in to HoYoLAB, cookies are saved encrypted."""
+    from src.cookies_login import capture_cookies_sync
+
+    storage = Storage()
+    existing = storage.get_account(name)
+    if not existing:
+        click.echo(f"Error: Account '{name}' not found. Create it first: accounts add <name> <uid> <region>", err=True)
+        sys.exit(1)
+
+    click.echo("Opening HoYoLAB in browser - log in, cookies will be saved automatically...")
+    try:
+        cookies = capture_cookies_sync(timeout_seconds=timeout)
+    except TimeoutError:
+        click.echo("Login timed out, no cookies saved.", err=True)
+        sys.exit(1)
+    except RuntimeError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+    storage.store_account_cookies(name, cookies)
+    click.echo(f"Cookies saved for account '{name}' (keys: {', '.join(sorted(cookies))}).")
+    sys.exit(0)
+
+
+@accounts.command()
+@click.argument("name")
 def show_cookies(name):
     """Show cookies for an account <name> (masked)."""
     import json

@@ -328,6 +328,26 @@ async def set_account_cookies(name: str, cookies: str = Form(...)):
     return {"success": True, "message": f"Cookies set for account '{name}'"}
 
 
+@app.post("/accounts/{name}/login")
+async def login_account(name: str, timeout: int = 300):
+    """Auto-capture cookies via browser login (opens browser on this PC)."""
+    from src.cookies_login import capture_cookies
+
+    storage = Storage()
+    existing = storage.get_account(name)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    try:
+        cookies = await capture_cookies(timeout_seconds=timeout)
+    except TimeoutError as e:
+        raise HTTPException(status_code=408, detail=str(e)) from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+    storage.store_account_cookies(name, cookies)
+    return {"success": True, "message": f"Cookies saved for '{name}'", "keys": sorted(cookies)}
+
+
 @app.get("/accounts/{name}/cookies")
 async def get_account_cookies(name: str):
     """Get cookies for an account (masked)."""
