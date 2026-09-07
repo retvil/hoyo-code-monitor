@@ -40,7 +40,7 @@ class Redeemer:
         default_form_data: Default form data parameters for redemption.
     """
 
-    DEFAULT_ENDPOINT = "https://sg-hk4e-api.hoyolab.com/common/apicdkey/api/webExchangeCdkey"
+    DEFAULT_ENDPOINT = "https://sg-hk4e-api.hoyoverse.com/common/apicdkey/api/webExchangeCdkey"
     DEFAULT_USER_AGENT = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -118,11 +118,10 @@ class Redeemer:
         """
         return {
             "Cookie": self._build_cookie_header(cookies),
-            "Referer": self.referer,
             "User-Agent": self.user_agent,
-            "Content-Type": "application/x-www-form-urlencoded",
             "Accept": "application/json, text/plain, */*",
-            "Origin": "https://webstatic-sea.mihoyo.com",
+            "x-rpc-app_version": "2.34.1",
+            "x-rpc-client_type": "4",
         }
 
     def _build_form_data(
@@ -183,13 +182,30 @@ class Redeemer:
         reward = ""
 
         if success and response_data:
-            # Extract reward description from data
-            reward = response_data.get("award", "")
+            # Extract reward description from data (shapes vary: dict/list)
+            reward = ""
+            if isinstance(response_data, dict):
+                reward = str(response_data.get("award") or response_data.get("name") or "")
+                if not reward:
+                    parts = []
+                    for k, v in response_data.items():
+                        if isinstance(v, (int, float)) and k not in ("id",):
+                            parts.append(f"{k} x{v}")
+                        elif isinstance(v, str) and v:
+                            parts.append(v)
+                    reward = ", ".join(parts[:5])
+            elif isinstance(response_data, list):
+                parts = []
+                for item in response_data[:5]:
+                    if isinstance(item, dict):
+                        name = item.get("name", "")
+                        cnt = item.get("cnt", item.get("count", item.get("amount", "")))
+                        parts.append(f"{name} x{cnt}".strip() if name else str(item))
+                    else:
+                        parts.append(str(item))
+                reward = ", ".join(parts)
             if not reward:
-                # Try alternative fields
-                reward = response_data.get("name", "")
-            if not reward:
-                reward = "Unknown reward"
+                reward = message if message and message != "OK" else "Redeemed"
 
         return RedemptionResult(
             success=success,
@@ -246,8 +262,10 @@ class Redeemer:
 
         logger.info("Attempting to redeem code: %s", code[:4] + "****")
 
+        # Hoyolab webExchangeCdkey accepts GET with query params (POST -> 405)
+        params = dict(form_data)
         try:
-            async with session.post(self.endpoint, headers=headers, data=form_data) as response:
+            async with session.get(self.endpoint, headers=headers, params=params) as response:
                 response.raise_for_status()
                 json_data = await response.json()
 

@@ -146,18 +146,18 @@ class Scheduler:
             and self.config.cookies.get("ltoken")
         )
 
-        # Resolve accounts for redemption (multi-account)
+        # Resolve accounts for redemption (per-account flags)
         redeem_accounts: list[dict[str, Any]] = []
         if can_redeem:
             accounts = self.storage.list_accounts()
-            if accounts:
-                redeem_accounts = accounts
-                acc0 = accounts[0]
+            redeem_accounts = [a for a in accounts if self.storage.is_account_redeem_enabled(a["name"])]
+            if redeem_accounts:
+                acc0 = redeem_accounts[0]
                 ac = self.storage.load_account_cookies(acc0["name"])
                 if ac:
                     self.config.cookies = ac
             else:
-                logger.warning("Redemption enabled but no accounts configured")
+                logger.warning("Redemption enabled but no accounts have auto-redeem on")
                 can_redeem = False
 
         if getattr(self.config, "redemption_enabled", False) and not can_redeem:

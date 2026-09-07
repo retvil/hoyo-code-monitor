@@ -150,14 +150,13 @@ class TestRedeemerHeaders:
         assert "ltoken=" not in header
 
     def test_build_headers(self, redeemer: Redeemer, valid_cookies: dict) -> None:
-        """Test building complete headers dict."""
+        """Test building complete headers dict (GET-based, x-rpc)."""
         headers = redeemer._build_headers(valid_cookies)
         assert "Cookie" in headers
-        assert "Referer" in headers
         assert "User-Agent" in headers
-        assert "Content-Type" in headers
-        assert headers["Content-Type"] == "application/x-www-form-urlencoded"
-        assert headers["Referer"] == redeemer.referer
+        assert "x-rpc-app_version" in headers
+        assert "x-rpc-client_type" in headers
+        assert "Content-Type" not in headers  # GET has no body
         assert headers["User-Agent"] == redeemer.user_agent
 
 
@@ -257,7 +256,7 @@ class TestRedeemerRedeemCode:
         mock_response.raise_for_status = MagicMock()
 
         mock_session = AsyncMock()
-        mock_session.post = MagicMock(return_value=mock_async_context_manager(mock_response))
+        mock_session.get = MagicMock(return_value=mock_async_context_manager(mock_response))
         mock_session.closed = False
 
         with patch.object(redeemer, "_get_session", return_value=mock_session):
@@ -271,7 +270,7 @@ class TestRedeemerRedeemCode:
         assert result.success is True
         assert result.reward == "Primogem x100"
         assert result.message == "OK"
-        mock_session.post.assert_called_once()
+        mock_session.get.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_redeem_code_failure(
@@ -286,7 +285,7 @@ class TestRedeemerRedeemCode:
         mock_response.raise_for_status = MagicMock()
 
         mock_session = AsyncMock()
-        mock_session.post = MagicMock(return_value=mock_async_context_manager(mock_response))
+        mock_session.get = MagicMock(return_value=mock_async_context_manager(mock_response))
         mock_session.closed = False
 
         with patch.object(redeemer, "_get_session", return_value=mock_session):
@@ -314,7 +313,7 @@ class TestRedeemerRedeemCode:
         mock_response.raise_for_status = MagicMock()
 
         mock_session = AsyncMock()
-        mock_session.post = MagicMock(return_value=mock_async_context_manager(mock_response))
+        mock_session.get = MagicMock(return_value=mock_async_context_manager(mock_response))
         mock_session.closed = False
 
         with patch.object(redeemer, "_get_session", return_value=mock_session):
@@ -376,7 +375,7 @@ class TestRedeemerRedeemCode:
         )
 
         mock_session = AsyncMock()
-        mock_session.post = MagicMock(return_value=mock_async_context_manager(mock_response))
+        mock_session.get = MagicMock(return_value=mock_async_context_manager(mock_response))
         mock_session.closed = False
 
         with patch.object(redeemer, "_get_session", return_value=mock_session):
@@ -398,7 +397,7 @@ class TestRedeemerRedeemCode:
         import aiohttp
 
         mock_session = AsyncMock()
-        mock_session.post = MagicMock(
+        mock_session.get = MagicMock(
             side_effect=aiohttp.ClientError("Connection refused")
         )
         mock_session.closed = False
@@ -427,7 +426,7 @@ class TestRedeemerRedeemCode:
         mock_response.raise_for_status = MagicMock()
 
         mock_session = AsyncMock()
-        mock_session.post = MagicMock(return_value=mock_async_context_manager(mock_response))
+        mock_session.get = MagicMock(return_value=mock_async_context_manager(mock_response))
         mock_session.closed = False
 
         with patch.object(redeemer, "_get_session", return_value=mock_session):
@@ -441,13 +440,13 @@ class TestRedeemerRedeemCode:
                 s_lang_key="zh-cn",
             )
 
-        # Verify form data was passed correctly
-        call_args = mock_session.post.call_args
-        form_data = call_args.kwargs["data"]
-        assert form_data["region"] == "os_asia"
-        assert form_data["game_biz"] == "hk4e_cn"
-        assert form_data["lang"] == "zh-cn"
-        assert form_data["sLangKey"] == "zh-cn"
+        # Verify query params were passed correctly (GET-based API)
+        call_args = mock_session.get.call_args
+        params = call_args.kwargs["params"]
+        assert params["region"] == "os_asia"
+        assert params["game_biz"] == "hk4e_cn"
+        assert params["lang"] == "zh-cn"
+        assert params["sLangKey"] == "zh-cn"
 
 
 class TestRedeemerContextManager:
@@ -495,7 +494,7 @@ class TestRedeemerLogging:
         mock_response.raise_for_status = MagicMock()
 
         mock_session = AsyncMock()
-        mock_session.post = AsyncMock(return_value=mock_response)
+        mock_session.get = AsyncMock(return_value=mock_async_context_manager(mock_response))
         mock_session.closed = False
 
         with patch.object(redeemer, "_get_session", return_value=mock_session):

@@ -10,15 +10,14 @@
     {% if accounts %}
     <div class="table-scroll">
     <table>
-        <thead><tr><th>Name</th><th>UID</th><th>Region</th><th>Game</th><th>Lang</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Name</th><th>UID</th><th>Region</th><th>Auto-redeem</th><th>Actions</th></tr></thead>
         <tbody>
             {% for acc in accounts %}
             <tr>
                 <td><strong>{{ acc.name }}</strong></td>
                 <td class="mono">{{ acc.uid }}</td>
                 <td>{{ acc.region }}</td>
-                <td>{{ acc.game_biz }}</td>
-                <td>{{ acc.lang }}</td>
+                <td><span hx-get="/accounts/{{ acc.name }}/redeem-state" hx-trigger="load" hx-swap="innerHTML"></span></td>
                 <td style="white-space: nowrap;">
                     <button class="btn" style="padding: 4px 10px; font-size: 0.8rem;" onclick="openCookies('{{ acc.name }}')">Set cookies</button>
                     <button class="btn" style="padding: 4px 10px; font-size: 0.8rem;" hx-get="/accounts/{{ acc.name }}/cookies" hx-target="#view-{{ acc.name }}" hx-swap="innerHTML">View</button>

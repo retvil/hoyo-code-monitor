@@ -843,6 +843,17 @@ class Storage:
             return {}
         return self._decrypt_maybe(val)
 
+    def is_account_redeem_enabled(self, account_name: str) -> bool:
+        """Check per-account auto-redeem flag (falls back to global flag)."""
+        val = self.get_config(f"account_redeem_{account_name}")
+        if val is None:
+            return self.get_config("redemption_enabled", "false").lower() == "true"
+        return val.lower() == "true"
+
+    def set_account_redeem(self, account_name: str, enabled: bool) -> None:
+        """Set per-account auto-redeem flag."""
+        self.set_config(f"account_redeem_{account_name}", "true" if enabled else "false")
+
 
 if __name__ == "__main__":
     # Quick test
