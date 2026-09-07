@@ -50,7 +50,7 @@
         <button class="btn btn-primary" hx-post="/scheduler/start" hx-target="#scheduler-status" hx-swap="innerHTML" {% if scheduler and scheduler.running %}disabled{% endif %}>Start</button>
         <button class="btn btn-danger" hx-post="/scheduler/stop" hx-target="#scheduler-status" hx-swap="innerHTML" {% if not scheduler or not scheduler.running %}disabled{% endif %}>Stop</button>
         <button class="btn btn-primary" hx-post="/scheduler/run-once" hx-target="#run-once-result" hx-swap="innerHTML" hx-indicator="#run-spinner">Run check now <span id="run-spinner" class="spinner htmx-indicator" aria-hidden="true"></span></button>
-        <button class="btn" hx-get="/health" hx-target="#health-result" hx-swap="innerHTML">Health check</button>
+        <button class="btn" hx-get="/partials/health" hx-target="#health-result" hx-swap="innerHTML">Health check</button>
     </div>
     <div id="scheduler-status"></div>
     <div id="run-once-result" style="margin-top: 10px;"></div>

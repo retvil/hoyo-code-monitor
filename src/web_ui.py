@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import time
 from contextlib import asynccontextmanager
@@ -144,26 +145,46 @@ async def sources_page(request: Request):
 
 
 @app.post("/sources")
-async def create_source(source: SourceCreate):
-    """Create a new source."""
+async def create_source(
+    name: str = Form(...),
+    url: str = Form(...),
+    selector_type: str = Form("css"),
+    selector: str = Form(...),
+    enabled: bool = Form(True),
+    headers: str = Form("{}"),
+    timeout_seconds: int = Form(30),
+    rate_limit_seconds: float = Form(1.0),
+    requires_browser: bool = Form(False),
+    browser_wait_selector: str | None = Form(None),
+    browser_wait_seconds: int = Form(5),
+    max_retries: int = Form(3),
+    retry_base_delay: float = Form(1.0),
+):
+    """Create a new source (accepts form-data from HTMX modal)."""
     storage = Storage()
     try:
+        try:
+            headers_dict = json.loads(headers) if headers else {}
+        except json.JSONDecodeError as e:
+            raise HTTPException(status_code=400, detail=f"Invalid headers JSON: {e}") from e
         storage.add_source(
-            name=source.name,
-            url=source.url,
-            selector_type=source.selector_type,
-            selector=source.selector,
-            enabled=source.enabled,
-            headers=source.headers,
-            timeout_seconds=source.timeout_seconds,
-            rate_limit_seconds=source.rate_limit_seconds,
-            requires_browser=source.requires_browser,
-            browser_wait_selector=source.browser_wait_selector,
-            browser_wait_seconds=source.browser_wait_seconds,
-            max_retries=source.max_retries,
-            retry_base_delay=source.retry_base_delay,
+            name=name,
+            url=url,
+            selector_type=selector_type,
+            selector=selector,
+            enabled=enabled,
+            headers=headers_dict,
+            timeout_seconds=timeout_seconds,
+            rate_limit_seconds=rate_limit_seconds,
+            requires_browser=requires_browser,
+            browser_wait_selector=browser_wait_selector or None,
+            browser_wait_seconds=browser_wait_seconds,
+            max_retries=max_retries,
+            retry_base_delay=retry_base_delay,
         )
-        return {"success": True, "message": f"Source '{source.name}' created"}
+        return {"success": True, "message": f"Source '{name}' created"}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
@@ -267,32 +288,43 @@ async def accounts_page(request: Request):
 
 
 @app.post("/accounts")
-async def create_account(account: AccountCreate):
-    """Create a new account."""
+async def create_account(
+    name: str = Form(...),
+    uid: str = Form(...),
+    region: str = Form(...),
+    game_biz: str = Form("hk4e_global"),
+    lang: str = Form("en-us"),
+    s_lang_key: str = Form("en-us"),
+):
+    """Create a new account (accepts form-data from HTMX modal)."""
     storage = Storage()
     try:
         storage.add_account(
-            name=account.name,
-            uid=account.uid,
-            region=account.region,
-            game_biz=account.game_biz,
-            lang=account.lang,
-            s_lang_key=account.s_lang_key,
+            name=name,
+            uid=uid,
+            region=region,
+            game_biz=game_biz,
+            lang=lang,
+            s_lang_key=s_lang_key,
         )
-        return {"success": True, "message": f"Account '{account.name}' created"}
+        return {"success": True, "message": f"Account '{name}' created"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @app.post("/accounts/{name}/cookies")
-async def set_account_cookies(name: str, cookies: dict = Form(...)):
-    """Set cookies for an account."""
+async def set_account_cookies(name: str, cookies: str = Form(...)):
+    """Set cookies for an account (cookies as JSON string)."""
     storage = Storage()
     existing = storage.get_account(name)
     if not existing:
         raise HTTPException(status_code=404, detail="Account not found")
 
-    storage.store_account_cookies(name, cookies)
+    try:
+        cookies_dict = json.loads(cookies) if isinstance(cookies, str) else dict(cookies)
+    except (json.JSONDecodeError, TypeError, ValueError) as e:
+        raise HTTPException(status_code=400, detail=f"Invalid cookies JSON: {e}") from e
+    storage.store_account_cookies(name, cookies_dict)
     return {"success": True, "message": f"Cookies set for account '{name}'"}
 
 
@@ -437,6 +469,22 @@ async def health_check():
         return {"status": "healthy", "database": "ok"}
     except Exception as e:
         return {"status": "unhealthy", "error": str(e)}
+
+
+@app.get("/partials/health", response_class=HTMLResponse)
+async def partial_health():
+    """HTMX partial: pretty health badge (machine JSON stays at /health)."""
+    storage = Storage()
+    try:
+        with storage._connection() as conn:
+            conn.execute("SELECT 1").fetchone()
+        sources = storage.list_sources(enabled_only=True)
+        return (
+            '<span class="badge badge-ok">Healthy</span> '
+            f'<span class="muted">DB ok · {len(sources)} active sources</span>'
+        )
+    except Exception as e:
+        return f'<span class="badge badge-bad">Unhealthy</span> <span class="muted">{e}</span>'
 
 
 @app.get("/metrics")
