@@ -8,6 +8,7 @@
         <button class="btn btn-primary" onclick="document.getElementById('account-modal').classList.add('active')">Add account</button>
     </div>
     {% if accounts %}
+    <div class="table-scroll">
     <table>
         <thead><tr><th>Name</th><th>UID</th><th>Region</th><th>Game</th><th>Lang</th><th>Actions</th></tr></thead>
         <tbody>
@@ -26,6 +27,7 @@
             {% endfor %}
         </tbody>
     </table>
+    </div>
     {% else %}
     <p class="muted">No accounts yet. Add one to enable auto-redeem. Cookies are stored encrypted (Fernet).</p>
     {% endif %}

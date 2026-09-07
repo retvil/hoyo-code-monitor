@@ -9,6 +9,7 @@
     </div>
     {% if sources %}
     <div style="overflow-x: auto;">
+    <div class="table-scroll">
     <table>
         <thead><tr><th>Name</th><th>URL</th><th>Type</th><th>Selector</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody>
@@ -33,6 +34,7 @@
             {% endfor %}
         </tbody>
     </table>
+    </div>
     </div>
     {% else %}
     <p class="muted">No sources yet. Add the first one.</p>
