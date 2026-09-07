@@ -508,6 +508,38 @@ async def partial_health():
         return f'<span class="badge badge-bad">Unhealthy</span> <span class="muted">{e}</span>'
 
 
+@app.get("/redemption/toggle-state", response_class=HTMLResponse)
+async def redemption_state():
+    """Current auto-redeem switch HTML (for initial load)."""
+    storage = Storage()
+    enabled = storage.get_config("redemption_enabled", "false").lower() == "true"
+    return _redemption_switch_html(enabled)
+
+
+@app.post("/redemption/toggle", response_class=HTMLResponse)
+async def toggle_redemption():
+    """Toggle auto-redeem on/off, returns switch HTML."""
+    storage = Storage()
+    current = storage.get_config("redemption_enabled", "false").lower() == "true"
+    new_value = not current
+    storage.set_config("redemption_enabled", "true" if new_value else "false")
+    return _redemption_switch_html(new_value)
+
+
+def _redemption_switch_html(enabled: bool) -> str:
+    """Render auto-redeem toggle switch (full span for outerHTML swap)."""
+    checked = "checked" if enabled else ""
+    label = "ON" if enabled else "OFF"
+    cls = "badge-ok" if enabled else "badge-bad"
+    return (
+        f"<span id='redeem-toggle'>"
+        f"<label style='display: flex; align-items: center; gap: 10px; cursor: pointer;'>"
+        f"<input type='checkbox' {checked} style='width: 20px; height: 20px;' "
+        f"hx-post='/redemption/toggle' hx-target='#redeem-toggle' hx-swap='outerHTML'>"
+        f"<span class='badge {cls}'>Auto-redeem {label}</span></label></span>"
+    )
+
+
 @app.get("/metrics")
 async def metrics():
     """Prometheus metrics endpoint."""
