@@ -813,18 +813,48 @@ async def partial_stats(request: Request):
     )
 
 
+PAGE_SIZE = 20
+
+
 @app.get("/partials/recent-codes")
-async def partial_recent_codes(request: Request):
-    """HTMX partial for recent codes."""
+async def partial_recent_codes(
+    request: Request,
+    page: int = 1,
+    source: str = "",
+    status: str = "all",
+    q: str = "",
+):
+    """HTMX partial for codes table with filters + pagination."""
     storage = Storage()
-    codes = storage.list_codes(limit=20, only_unredeemed=False)
+    page = max(1, page)
+    src = source or None
+    st = status or "all"
+    query = q.strip() or None
+    total = storage.count_codes(source=src, search=query, status=st)
+    pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+    page = min(page, pages)
+    codes = storage.list_codes(
+        limit=PAGE_SIZE, offset=(page - 1) * PAGE_SIZE, source=src, search=query, status=st
+    )
+    sources = [s["name"] for s in storage.list_sources()]
     return templates.TemplateResponse(
         request,
         "partials/recent_codes.html",
-        {
-            "request": request,
-            "codes": codes,
-        },
+        page_ctx(
+            storage,
+            {
+                "request": request,
+                "codes": codes,
+                "page": page,
+                "pages": pages,
+                "total": total,
+                "page_size": PAGE_SIZE,
+                "f_source": source,
+                "f_status": st,
+                "f_q": q,
+                "all_sources": sources,
+            },
+        ),
     )
 
 

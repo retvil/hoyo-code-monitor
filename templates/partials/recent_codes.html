@@ -1,22 +1,52 @@
-<div class="card-title" style="margin-bottom: 12px;">Recent codes</div>
+<div class="card" id="codes-table">
+<div class="card-title" style="margin-bottom: 12px;">{{ t('recent_codes') }} ({{ total }})</div>
+<form hx-get="/partials/recent-codes" hx-target="#codes-table" hx-swap="outerHTML" hx-trigger="change, keyup delay:400ms from:input" style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;" onsubmit="return false;">
+    <select name="source" style="width: auto; min-width: 160px;">
+        <option value="">{{ t('sources') }}: all</option>
+        {% for s in all_sources %}
+        <option value="{{ s }}" {% if s == f_source %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+    </select>
+    <select name="status" style="width: auto;">
+        <option value="all" {% if f_status == 'all' %}selected{% endif %}>Status: all</option>
+        <option value="pending" {% if f_status == 'pending' %}selected{% endif %}>{{ t('pending') }}</option>
+        <option value="done" {% if f_status == 'done' %}selected{% endif %}>{{ t('done') }}</option>
+        <option value="expired" {% if f_status == 'expired' %}selected{% endif %}>{{ t('expired') }}</option>
+        <option value="invalid" {% if f_status == 'invalid' %}selected{% endif %}>{{ t('invalid') }}</option>
+        <option value="failed" {% if f_status == 'failed' %}selected{% endif %}>{{ t('failed') }}</option>
+    </select>
+    <input type="search" name="q" value="{{ f_q }}" placeholder="Search code..." style="width: auto; min-width: 160px;">
+    <input type="hidden" name="page" value="1">
+</form>
+<div style="margin-bottom: 12px;">
+    <button class="btn btn-primary" style="padding: 6px 14px; font-size: 0.82rem;" hx-post="/redeem/all" hx-target="#redeem-all-result" hx-swap="innerHTML" hx-indicator="#redeem-all-spin">{{ t('redeem_all') }} <span id="redeem-all-spin" class="spinner htmx-indicator" aria-hidden="true"></span></button>
+    <span id="redeem-all-result" style="font-size: 0.85rem; margin-left: 8px;"></span>
+</div>
 {% if codes %}
 <div class="table-scroll">
 <table>
-    <thead><tr><th>Code</th><th>Sources</th><th>Status</th><th>Reward</th><th>Found</th><th>Expires</th></tr></thead>
+    <thead><tr><th>{{ t('code') }}</th><th>{{ t('sources') }}</th><th>{{ t('status') }}</th><th>{{ t('reward') }}</th><th>{{ t('found') }}</th><th>{{ t('expires') }}</th><th></th></tr></thead>
     <tbody>
         {% for code in codes %}
         <tr>
             <td class="mono">{{ code.code }}</td>
             <td>{% for src in code.sources %}<span class="badge badge-info">{{ src }}</span> {% endfor %}</td>
-            <td>{% if code.display_status == 'done' %}<span class="badge badge-ok">Done</span>{% elif code.display_status == 'expired' %}<span class="badge" style="background: #fef3c7; color: #92400e;">Expired</span>{% elif code.display_status == 'invalid' %}<span class="badge" style="background: #ede9fe; color: #5b21b6;">Invalid</span>{% elif code.display_status == 'failed' %}<span class="badge badge-bad">Failed</span>{% else %}<span class="badge badge-bad">Pending</span>{% endif %}</td>
+            <td>{% if code.display_status == 'done' %}<span class="badge badge-ok">{{ t('done') }}</span>{% elif code.display_status == 'expired' %}<span class="badge" style="background: #fef3c7; color: #92400e;">{{ t('expired') }}</span>{% elif code.display_status == 'invalid' %}<span class="badge" style="background: #ede9fe; color: #5b21b6;">{{ t('invalid') }}</span>{% elif code.display_status == 'failed' %}<span class="badge badge-bad">{{ t('failed') }}</span>{% else %}<span class="badge badge-bad">{{ t('pending') }}</span>{% endif %}</td>
             <td>{{ code.reward or '-' }}</td>
-            <td>{{ code.attempted_at[:19] if code.attempted_at else '-' }}</td>
-            <td>{{ code.expires_at[:19] if code.expires_at else '-' }}</td>
+            <td class="muted">{{ code.attempted_at[:19] if code.attempted_at else '-' }}</td>
+            <td class="muted">{{ code.expires_at[:19] if code.expires_at else '-' }}</td>
+            <td>{% if code.display_status in ('pending', 'failed') %}<button class="btn" style="padding: 4px 10px; font-size: 0.78rem;" hx-post="/codes/{{ code.code }}/redeem" hx-target="#redeem-{{ code.code }}" hx-swap="innerHTML">{{ t('redeem') }}</button><span id="redeem-{{ code.code }}" style="font-size: 0.78rem;"></span>{% endif %}</td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
 </div>
+<div style="display: flex; gap: 8px; align-items: center; margin-top: 12px; font-size: 0.85rem;">
+    <button class="btn" style="padding: 4px 12px;" hx-get="/partials/recent-codes" hx-vals='{"page": {{ page - 1 }}, "source": "{{ f_source }}", "status": "{{ f_status }}", "q": "{{ f_q }}"}' hx-target="#codes-table" hx-swap="outerHTML" {% if page <= 1 %}disabled{% endif %}>←</button>
+    <span class="muted">Page {{ page }} / {{ pages }} · {{ total }}</span>
+    <button class="btn" style="padding: 4px 12px;" hx-get="/partials/recent-codes" hx-vals='{"page": {{ page + 1 }}, "source": "{{ f_source }}", "status": "{{ f_status }}", "q": "{{ f_q }}"}' hx-target="#codes-table" hx-swap="outerHTML" {% if page >= pages %}disabled{% endif %}>→</button>
+</div>
 {% else %}
-<p class="muted">No codes yet.</p>
+<p class="muted">{{ t('no_codes') }}</p>
 {% endif %}
+</div>

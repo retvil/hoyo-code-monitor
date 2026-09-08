@@ -82,34 +82,9 @@
     {% endif %}
 </div>
 
-<div class="card" hx-get="/partials/recent-codes" hx-trigger="every 10s" hx-swap="outerHTML">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-        <div class="card-title">{{ t('recent_codes') }}</div>
-        <button class="btn btn-primary" style="padding: 6px 14px; font-size: 0.82rem;" hx-post="/redeem/all" hx-target="#redeem-all-result" hx-swap="innerHTML" hx-indicator="#redeem-all-spin">{{ t('redeem_all') }} <span id="redeem-all-spin" class="spinner htmx-indicator" aria-hidden="true"></span></button>
-    </div>
-    <div id="redeem-all-result" style="margin-bottom: 10px; font-size: 0.85rem;"></div>
-    {% if codes %}
-    <div class="table-scroll">
-    <table>
-        <thead><tr><th>{{ t('code') }}</th><th>{{ t('sources') }}</th><th>{{ t('status') }}</th><th>{{ t('reward') }}</th><th>{{ t('found') }}</th><th>{{ t('expires') }}</th><th></th></tr></thead>
-        <tbody>
-            {% for code in codes %}
-            <tr>
-                <td class="mono">{{ code.code }}</td>
-                <td>{% for src in code.sources %}<span class="badge badge-info">{{ src }}</span> {% endfor %}</td>
-                <td>{% if code.display_status == 'done' %}<span class="badge badge-ok">{{ t('done') }}</span>{% elif code.display_status == 'expired' %}<span class="badge" style="background: #fef3c7; color: #92400e;">{{ t('expired') }}</span>{% elif code.display_status == 'invalid' %}<span class="badge" style="background: #ede9fe; color: #5b21b6;">{{ t('invalid') }}</span>{% elif code.display_status == 'failed' %}<span class="badge badge-bad">{{ t('failed') }}</span>{% else %}<span class="badge badge-bad">{{ t('pending') }}</span>{% endif %}</td>
-                <td>{{ code.reward or '-' }}</td>
-                <td class="muted">{{ code.attempted_at[:19] if code.attempted_at else '-' }}</td>
-                <td class="muted">{{ code.expires_at[:19] if code.expires_at else '-' }}</td>
-                <td>{% if code.display_status in ('pending', 'failed') %}<button class="btn" style="padding: 4px 10px; font-size: 0.78rem;" hx-post="/codes/{{ code.code }}/redeem" hx-target="#redeem-{{ code.code }}" hx-swap="innerHTML">{{ t('redeem') }}</button><span id="redeem-{{ code.code }}" style="font-size: 0.78rem;"></span>{% endif %}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    </div>
-    {% else %}
-    <p class="muted">{{ t('no_codes') }}</p>
-    {% endif %}
+<div class="card" id="codes-table" hx-get="/partials/recent-codes" hx-trigger="load" hx-swap="outerHTML">
+    <div class="card-title" style="margin-bottom: 12px;">{{ t('recent_codes') }}</div>
+    <p class="muted">Loading...</p>
 </div>
 
 <div class="card" hx-get="/partials/recent-logs" hx-trigger="every 10s" hx-swap="outerHTML">

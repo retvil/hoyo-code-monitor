@@ -312,56 +312,126 @@ class Storage:
         limit: int = 100,
         offset: int = 0,
         only_unredeemed: bool = False,
+        source: str | None = None,
+        search: str | None = None,
+        status: str | None = None,
     ) -> list[dict[str, Any]]:
-        """List codes with pagination.
+        """List codes with pagination and filters.
 
         Args:
             limit: Maximum number of codes to return.
             offset: Number of codes to skip.
             only_unredeemed: If True, only return codes not yet redeemed.
+            source: Filter by source name (exact match).
+            search: Case-insensitive substring filter on code/reward.
+            status: One of done/expired/invalid/failed/pending (computed).
 
         Returns:
             List of code dictionaries with sources.
         """
         query = "SELECT * FROM codes"
+        conds: list[str] = []
         params: list[Any] = []
 
         if only_unredeemed:
-            query += " WHERE redeemed = 0"
+            conds.append("redeemed = 0")
+        if source:
+            conds.append(
+                "id IN (SELECT code_id FROM code_sources WHERE source = ?)"
+            )
+            params.append(source)
+        if search:
+            conds.append("(code LIKE ? ESCAPE '\\' OR reward LIKE ? ESCAPE '\\')")
+            like = f"%{search.replace('%', '').replace('_', '')}%"
+            params.extend([like, like])
+
+        if conds:
+            query += " WHERE " + " AND ".join(conds)
+
+        # Fetch extra for status filtering in Python (local-scale DBs)
+        fetch_limit = limit + offset
+        need_status_filter = status and status != "all"
+        if need_status_filter:
+            fetch_limit = 5000
 
         query += " ORDER BY attempted_at DESC LIMIT ? OFFSET ?"
+        if need_status_filter:
+            rows_query = query.replace("LIMIT ? OFFSET ?", "LIMIT ?")
+            with self._connection() as conn:
+                rows = conn.execute(rows_query, [*params, fetch_limit]).fetchall()
+                if not rows:
+                    return []
+                result = self._attach_sources_and_status(conn, rows)
+            filtered = [d for d in result if d.get("display_status") == status]
+            return filtered[offset : offset + limit]
+
         params.extend([limit, offset])
 
         with self._connection() as conn:
             rows = conn.execute(query, params).fetchall()
             if not rows:
                 return []
-            result: list[dict[str, Any]] = [dict(r) for r in rows]
-            ids = [r["id"] for r in result]
-            placeholders = ",".join("?" for _ in ids)
-            src_rows = conn.execute(
-                f"SELECT code_id, source FROM code_sources WHERE code_id IN ({placeholders})",
-                ids,
-            ).fetchall()
-            mapping: dict[int, list[str]] = {i: [] for i in ids}
-            for cid, src in src_rows:
-                mapping[cid].append(src)
-            codes = [r["code"] for r in result]
-            cph = ",".join("?" for _ in codes)
-            log_rows = conn.execute(
-                f"""SELECT code, status, error_message FROM redemption_log
-                WHERE id IN (SELECT MAX(id) FROM redemption_log GROUP BY code)
-                AND code IN ({cph})""",
-                codes,
-            ).fetchall()
-            last = {r[0]: (r[1], r[2] or "") for r in log_rows}
-            for d in result:
-                d["sources"] = mapping.get(d["id"], [])
-                st, err = last.get(d["code"], (None, ""))
-                d["last_status"] = st
-                d["last_error"] = err
-                d["display_status"] = self.display_status(d)
-            return result
+            return self._attach_sources_and_status(conn, rows)
+
+    def _attach_sources_and_status(
+        self, conn: sqlite3.Connection, rows: list[sqlite3.Row]
+    ) -> list[dict[str, Any]]:
+        """Attach sources + last log status to code rows (batch, no N+1)."""
+        result: list[dict[str, Any]] = [dict(r) for r in rows]
+        ids = [r["id"] for r in result]
+        placeholders = ",".join("?" for _ in ids)
+        src_rows = conn.execute(
+            f"SELECT code_id, source FROM code_sources WHERE code_id IN ({placeholders})",
+            ids,
+        ).fetchall()
+        mapping: dict[int, list[str]] = {i: [] for i in ids}
+        for cid, src in src_rows:
+            mapping[cid].append(src)
+        codes = [r["code"] for r in result]
+        cph = ",".join("?" for _ in codes)
+        log_rows = conn.execute(
+            f"""SELECT code, status, error_message FROM redemption_log
+            WHERE id IN (SELECT MAX(id) FROM redemption_log GROUP BY code)
+            AND code IN ({cph})""",
+            codes,
+        ).fetchall()
+        last = {r[0]: (r[1], r[2] or "") for r in log_rows}
+        for d in result:
+            d["sources"] = mapping.get(d["id"], [])
+            st, err = last.get(d["code"], (None, ""))
+            d["last_status"] = st
+            d["last_error"] = err
+            d["display_status"] = self.display_status(d)
+        return result
+
+    def count_codes(
+        self,
+        only_unredeemed: bool = False,
+        source: str | None = None,
+        search: str | None = None,
+        status: str | None = None,
+    ) -> int:
+        """Count codes matching filters (for pagination)."""
+        query = "SELECT id, code, redeemed FROM codes"
+        conds: list[str] = []
+        params: list[Any] = []
+        if only_unredeemed:
+            conds.append("redeemed = 0")
+        if source:
+            conds.append("id IN (SELECT code_id FROM code_sources WHERE source = ?)")
+            params.append(source)
+        if search:
+            conds.append("(code LIKE ? ESCAPE '\\' OR reward LIKE ? ESCAPE '\\')")
+            like = f"%{search.replace('%', '').replace('_', '')}%"
+            params.extend([like, like])
+        if conds:
+            query += " WHERE " + " AND ".join(conds)
+        with self._connection() as conn:
+            rows = conn.execute(query, params).fetchall()
+            if not status or status == "all":
+                return len(rows)
+            full = self._attach_sources_and_status(conn, rows)
+            return sum(1 for d in full if d.get("display_status") == status)
 
     def get_stats(self) -> dict[str, Any]:
         """Get redemption statistics.
