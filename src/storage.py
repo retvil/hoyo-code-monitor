@@ -229,6 +229,20 @@ class Storage:
             conn.commit()
             return cursor.rowcount > 0
 
+    @staticmethod
+    def display_status(code_row: dict[str, Any]) -> str:
+        """Human status for UI: done / expired / invalid / failed / pending."""
+        if code_row.get("redeemed"):
+            return "done"
+        err = str(code_row.get("last_error") or "")
+        if "retcode -2001" in err:
+            return "expired"
+        if "retcode -2003" in err:
+            return "invalid"
+        if code_row.get("last_status") == "failed":
+            return "failed"
+        return "pending"
+
     def get_code(self, code: str) -> dict[str, Any] | None:
         """Retrieve a code by its code string.
 
@@ -247,6 +261,17 @@ class Storage:
                 "SELECT source FROM code_sources WHERE code_id = ?", (data["id"],)
             ).fetchall()
             data["sources"] = [r[0] for r in src_rows]
+            log = conn.execute(
+                "SELECT status, error_message FROM redemption_log WHERE code = ? ORDER BY id DESC LIMIT 1",
+                (code,),
+            ).fetchone()
+            if log:
+                data["last_status"] = log[0]
+                data["last_error"] = log[1] or ""
+            else:
+                data["last_status"] = None
+                data["last_error"] = ""
+            data["display_status"] = self.display_status(data)
             return data
 
     def update_code_redemption(
@@ -321,8 +346,21 @@ class Storage:
             mapping: dict[int, list[str]] = {i: [] for i in ids}
             for cid, src in src_rows:
                 mapping[cid].append(src)
+            codes = [r["code"] for r in result]
+            cph = ",".join("?" for _ in codes)
+            log_rows = conn.execute(
+                f"""SELECT code, status, error_message FROM redemption_log
+                WHERE id IN (SELECT MAX(id) FROM redemption_log GROUP BY code)
+                AND code IN ({cph})""",
+                codes,
+            ).fetchall()
+            last = {r[0]: (r[1], r[2] or "") for r in log_rows}
             for d in result:
                 d["sources"] = mapping.get(d["id"], [])
+                st, err = last.get(d["code"], (None, ""))
+                d["last_status"] = st
+                d["last_error"] = err
+                d["display_status"] = self.display_status(d)
             return result
 
     def get_stats(self) -> dict[str, Any]:

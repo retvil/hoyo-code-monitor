@@ -637,6 +637,92 @@ def _account_redeem_switch_html(name: str, enabled: bool) -> str:
     )
 
 
+@app.post("/codes/{code}/redeem")
+async def redeem_single_code(code: str):
+    """Redeem one code for all accounts with auto-redeem ON."""
+    import asyncio
+
+    from src.redeemer import Redeemer
+
+    storage = Storage()
+    row = storage.get_code(code.upper().strip())
+    if not row:
+        raise HTTPException(status_code=404, detail="Code not found")
+    accounts = [a for a in storage.list_accounts() if storage.is_account_redeem_enabled(a["name"])]
+    if not accounts:
+        raise HTTPException(status_code=400, detail="No accounts with auto-redeem enabled")
+    gap = int(storage.get_config("redemption_min_gap_seconds", "8") or 8)
+    results = []
+    redeemer = Redeemer()
+    async with redeemer:
+        for acc in accounts:
+            cookies = storage.load_account_cookies(acc["name"])
+            try:
+                res = await redeemer.redeem_code(
+                    code=row["code"], cookies=cookies, uid=acc["uid"], region=acc["region"],
+                    game_biz=acc.get("game_biz", "hk4e_global"),
+                    lang=acc.get("lang", "en-us"), s_lang_key=acc.get("s_lang_key", "en-us"),
+                )
+                claimed = res.success or res.raw_response.get("retcode") in (-2017, -2018)
+                storage.update_code_redemption(row["code"], claimed, res.reward if res.success else None)
+                storage.add_redemption_log(
+                    code=row["code"], account_id=acc["id"],
+                    status="success" if claimed else "failed",
+                    reward=res.reward if res.success else None,
+                    error_message=None if claimed else f"{res.message} (retcode {res.raw_response.get('retcode')})",
+                )
+                results.append(f"{acc['name']}: {'OK' if claimed else res.message}")
+            except Exception as e:
+                results.append(f"{acc['name']}: error {e}")
+            await asyncio.sleep(gap)
+    return {"success": True, "result": "; ".join(results)}
+
+
+@app.post("/redeem/all")
+async def redeem_all_codes():
+    """Redeem all unredeemed, non-expired codes for accounts with auto-redeem ON."""
+    import asyncio
+
+    from src.redeemer import Redeemer
+
+    storage = Storage()
+    accounts = [a for a in storage.list_accounts() if storage.is_account_redeem_enabled(a["name"])]
+    if not accounts:
+        raise HTTPException(status_code=400, detail="No accounts with auto-redeem enabled")
+    codes = [c for c in storage.list_codes(limit=500, only_unredeemed=True) if c.get("display_status") in ("pending", "failed")]
+    if not codes:
+        return {"success": True, "result": "Nothing to redeem"}
+    gap = int(storage.get_config("redemption_min_gap_seconds", "8") or 8)
+    done, failed = 0, 0
+    redeemer = Redeemer()
+    async with redeemer:
+        for row in codes:
+            for acc in accounts:
+                cookies = storage.load_account_cookies(acc["name"])
+                try:
+                    res = await redeemer.redeem_code(
+                        code=row["code"], cookies=cookies, uid=acc["uid"], region=acc["region"],
+                        game_biz=acc.get("game_biz", "hk4e_global"),
+                        lang=acc.get("lang", "en-us"), s_lang_key=acc.get("s_lang_key", "en-us"),
+                    )
+                    claimed = res.success or res.raw_response.get("retcode") in (-2017, -2018)
+                    storage.update_code_redemption(row["code"], claimed, res.reward if res.success else None)
+                    storage.add_redemption_log(
+                        code=row["code"], account_id=acc["id"],
+                        status="success" if claimed else "failed",
+                        reward=res.reward if res.success else None,
+                        error_message=None if claimed else f"{res.message} (retcode {res.raw_response.get('retcode')})",
+                    )
+                    if claimed:
+                        done += 1
+                    else:
+                        failed += 1
+                except Exception:
+                    failed += 1
+                await asyncio.sleep(gap)
+    return {"success": True, "result": f"Redeemed: {done}, failed: {failed}"}
+
+
 @app.get("/metrics")
 async def metrics():
     """Prometheus metrics endpoint."""

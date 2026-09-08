@@ -8,7 +8,7 @@
         <tr>
             <td class="mono">{{ code.code }}</td>
             <td>{% for src in code.sources %}<span class="badge badge-info">{{ src }}</span> {% endfor %}</td>
-            <td>{% if code.redeemed %}<span class="badge badge-ok">Done</span>{% else %}<span class="badge badge-bad">Pending</span>{% endif %}</td>
+            <td>{% if code.display_status == 'done' %}<span class="badge badge-ok">Done</span>{% elif code.display_status == 'expired' %}<span class="badge" style="background: #fef3c7; color: #92400e;">Expired</span>{% elif code.display_status == 'invalid' %}<span class="badge" style="background: #ede9fe; color: #5b21b6;">Invalid</span>{% elif code.display_status == 'failed' %}<span class="badge badge-bad">Failed</span>{% else %}<span class="badge badge-bad">Pending</span>{% endif %}</td>
             <td>{{ code.reward or '-' }}</td>
             <td>{{ code.attempted_at[:19] if code.attempted_at else '-' }}</td>
             <td>{{ code.expires_at[:19] if code.expires_at else '-' }}</td>

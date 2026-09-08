@@ -83,21 +83,25 @@
 </div>
 
 <div class="card" hx-get="/partials/recent-codes" hx-trigger="every 10s" hx-swap="outerHTML">
-    <div class="card-title" style="margin-bottom: 12px;">{{ t('recent_codes') }}</div>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <div class="card-title">{{ t('recent_codes') }}</div>
+        <button class="btn btn-primary" style="padding: 6px 14px; font-size: 0.82rem;" hx-post="/redeem/all" hx-target="#redeem-all-result" hx-swap="innerHTML" hx-indicator="#redeem-all-spin">{{ t('redeem_all') }} <span id="redeem-all-spin" class="spinner htmx-indicator" aria-hidden="true"></span></button>
+    </div>
+    <div id="redeem-all-result" style="margin-bottom: 10px; font-size: 0.85rem;"></div>
     {% if codes %}
     <div class="table-scroll">
     <table>
-        <thead><tr><th>{{ t('code') }}</th><th>{{ t('sources') }}</th><th>{{ t('status') }}</th><th>{{ t('reward') }}</th><th>{{ t('found') }}</th><th>{{ t('published') }}</th><th>{{ t('expires') }}</th></tr></thead>
+        <thead><tr><th>{{ t('code') }}</th><th>{{ t('sources') }}</th><th>{{ t('status') }}</th><th>{{ t('reward') }}</th><th>{{ t('found') }}</th><th>{{ t('expires') }}</th><th></th></tr></thead>
         <tbody>
             {% for code in codes %}
             <tr>
                 <td class="mono">{{ code.code }}</td>
                 <td>{% for src in code.sources %}<span class="badge badge-info">{{ src }}</span> {% endfor %}</td>
-                <td>{% if code.redeemed %}<span class="badge badge-ok">{{ t('done') }}</span>{% else %}<span class="badge badge-bad">{{ t('pending') }}</span>{% endif %}</td>
+                <td>{% if code.display_status == 'done' %}<span class="badge badge-ok">{{ t('done') }}</span>{% elif code.display_status == 'expired' %}<span class="badge" style="background: #fef3c7; color: #92400e;">{{ t('expired') }}</span>{% elif code.display_status == 'invalid' %}<span class="badge" style="background: #ede9fe; color: #5b21b6;">{{ t('invalid') }}</span>{% elif code.display_status == 'failed' %}<span class="badge badge-bad">{{ t('failed') }}</span>{% else %}<span class="badge badge-bad">{{ t('pending') }}</span>{% endif %}</td>
                 <td>{{ code.reward or '-' }}</td>
                 <td class="muted">{{ code.attempted_at[:19] if code.attempted_at else '-' }}</td>
-                <td class="muted">{{ code.published_at[:19] if code.published_at else '-' }}</td>
                 <td class="muted">{{ code.expires_at[:19] if code.expires_at else '-' }}</td>
+                <td>{% if code.display_status in ('pending', 'failed') %}<button class="btn" style="padding: 4px 10px; font-size: 0.78rem;" hx-post="/codes/{{ code.code }}/redeem" hx-target="#redeem-{{ code.code }}" hx-swap="innerHTML">{{ t('redeem') }}</button><span id="redeem-{{ code.code }}" style="font-size: 0.78rem;"></span>{% endif %}</td>
             </tr>
             {% endfor %}
         </tbody>
@@ -105,6 +109,43 @@
     </div>
     {% else %}
     <p class="muted">{{ t('no_codes') }}</p>
+    {% endif %}
+</div>
+
+<div class="card" id="author">
+    <div class="card-title" style="margin-bottom: 8px;">{{ t('about_author') }}{% if author_name %} — {{ author_name }}{% endif %}</div>
+    <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px;">
+        {% if author_telegram %}<a class="btn" style="padding: 4px 12px; font-size: 0.8rem;" href="https://t.me/{{ author_telegram | replace('@', '') }}">Telegram</a>{% endif %}
+        {% if author_email %}<a class="btn" style="padding: 4px 12px; font-size: 0.8rem;" href="mailto:{{ author_email }}">Email</a>{% endif %}
+        {% if author_github %}<a class="btn" style="padding: 4px 12px; font-size: 0.8rem;" href="{{ author_github }}">GitHub</a>{% endif %}
+        {% if support_patreon %}<a class="btn btn-primary" style="padding: 4px 12px; font-size: 0.8rem;" href="{{ support_patreon }}">Patreon</a>{% endif %}
+        {% if support_boosty %}<a class="btn btn-primary" style="padding: 4px 12px; font-size: 0.8rem;" href="{{ support_boosty }}">Boosty</a>{% endif %}
+        {% if support_kofi %}<a class="btn btn-primary" style="padding: 4px 12px; font-size: 0.8rem;" href="{{ support_kofi }}">Ko-fi</a>{% endif %}
+        {% if support_donationalerts %}<a class="btn btn-primary" style="padding: 4px 12px; font-size: 0.8rem;" href="{{ support_donationalerts }}">DonationAlerts</a>{% endif %}
+        {% if support_cloudtips %}<a class="btn btn-primary" style="padding: 4px 12px; font-size: 0.8rem;" href="{{ support_cloudtips }}">CloudTips</a>{% endif %}
+        {% if support_donatepay %}<a class="btn btn-primary" style="padding: 4px 12px; font-size: 0.8rem;" href="{{ support_donatepay }}">DonatePay</a>{% endif %}
+        {% if support_url %}<a class="btn btn-primary" style="padding: 4px 12px; font-size: 0.8rem;" href="{{ support_url }}">{{ t('support_author') }}</a>{% endif %}
+    </div>
+    {% if support_bitcoin %}
+    <div class="mono" style="font-size: 0.8rem; background: var(--bg); padding: 8px 12px; border-radius: 6px; word-break: break-all; margin-bottom: 8px;">
+        BTC {{ support_bitcoin }}
+        <button class="btn" style="padding: 2px 10px; font-size: 0.75rem; margin-left: 8px;" onclick="navigator.clipboard.writeText('{{ support_bitcoin }}');this.textContent='{{ t('copied') }}'">{{ t('copy') }}</button>
+        <img src="/author/qr?kind=bitcoin" alt="BTC QR" style="display: block; margin-top: 8px; width: 140px; height: 140px; background: #fff; padding: 6px; border-radius: 8px;">
+    </div>
+    {% endif %}
+    {% if support_ton %}
+    <div class="mono" style="font-size: 0.8rem; background: var(--bg); padding: 8px 12px; border-radius: 6px; word-break: break-all; margin-bottom: 8px;">
+        TON {{ support_ton }}
+        <button class="btn" style="padding: 2px 10px; font-size: 0.75rem; margin-left: 8px;" onclick="navigator.clipboard.writeText('{{ support_ton }}');this.textContent='{{ t('copied') }}'">{{ t('copy') }}</button>
+        <img src="/author/qr?kind=ton" alt="TON QR" style="display: block; margin-top: 8px; width: 140px; height: 140px; background: #fff; padding: 6px; border-radius: 8px;">
+    </div>
+    {% endif %}
+    {% if support_usdt_trc20 %}
+    <div class="mono" style="font-size: 0.8rem; background: var(--bg); padding: 8px 12px; border-radius: 6px; word-break: break-all;">
+        USDT (TRC-20) {{ support_usdt_trc20 }}
+        <button class="btn" style="padding: 2px 10px; font-size: 0.75rem; margin-left: 8px;" onclick="navigator.clipboard.writeText('{{ support_usdt_trc20 }}');this.textContent='{{ t('copied') }}'">{{ t('copy') }}</button>
+        <img src="/author/qr?kind=usdt" alt="USDT QR" style="display: block; margin-top: 8px; width: 140px; height: 140px; background: #fff; padding: 6px; border-radius: 8px;">
+    </div>
     {% endif %}
 </div>
 
