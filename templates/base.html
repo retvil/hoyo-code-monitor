@@ -86,7 +86,7 @@
 </head>
 <body>
 <aside class="sidebar">
-    <div class="brand"><span class="brand-mark" aria-hidden="true"></span><span>{{ t('app_name') }}<small>{{ t('app_tag') }}</small></span></div>
+    <div class="brand"><span class="brand-mark" aria-hidden="true"></span><span>{{ t('app_name') }}<small>v{{ app_version }} · by {{ app_author }}</small></span></div>
     <nav class="nav">
         <div class="group-label">{{ t('nav_monitor') }}</div>
         <a href="/" class="{% if request.path == '/' %}active{% endif %}">{{ t('nav_dashboard') }}</a>

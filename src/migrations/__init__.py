@@ -265,9 +265,36 @@ MIGRATIONS: list[Migration] = [
         UPDATE schema_version SET version = 8;
         """,
     ),
+    (
+        10,
+        """
+        -- Migration v10: track known publish/expiry dates per code
+        ALTER TABLE codes ADD COLUMN published_at TIMESTAMP;
+        ALTER TABLE codes ADD COLUMN expires_at TIMESTAMP;
+        UPDATE schema_version SET version = 10;
+        """,
+        """
+        -- Rollback v10: recreate codes without date columns (keeps code_sources)
+        CREATE TABLE codes_old (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT NOT NULL,
+            attempted_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            redeemed BOOLEAN NOT NULL DEFAULT 0,
+            reward TEXT,
+            redeemed_at TIMESTAMP
+        );
+        INSERT INTO codes_old (id, code, attempted_at, redeemed, reward, redeemed_at)
+        SELECT id, code, attempted_at, redeemed, reward, redeemed_at FROM codes;
+        DROP TABLE codes;
+        ALTER TABLE codes_old RENAME TO codes;
+        CREATE INDEX IF NOT EXISTS idx_codes_redeemed ON codes(redeemed);
+        CREATE INDEX IF NOT EXISTS idx_codes_attempted_at ON codes(attempted_at);
+        UPDATE schema_version SET version = 9;
+        """,
+    ),
 ]
 
-CURRENT_VERSION = 9
+CURRENT_VERSION = 10
 
 
 def get_db_version(conn: sqlite3.Connection) -> int:

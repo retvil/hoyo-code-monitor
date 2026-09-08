@@ -1,7 +1,8 @@
 <div class="card-title" style="margin-bottom: 12px;">Recent codes</div>
 {% if codes %}
+<div class="table-scroll">
 <table>
-    <thead><tr><th>Code</th><th>Sources</th><th>Status</th><th>Reward</th><th>Attempted</th></tr></thead>
+    <thead><tr><th>Code</th><th>Sources</th><th>Status</th><th>Reward</th><th>Found</th><th>Expires</th></tr></thead>
     <tbody>
         {% for code in codes %}
         <tr>
@@ -9,11 +10,13 @@
             <td>{% for src in code.sources %}<span class="badge badge-info">{{ src }}</span> {% endfor %}</td>
             <td>{% if code.redeemed %}<span class="badge badge-ok">Done</span>{% else %}<span class="badge badge-bad">Pending</span>{% endif %}</td>
             <td>{{ code.reward or '-' }}</td>
-            <td class="muted">{{ code.attempted_at[:19] if code.attempted_at else '-' }}</td>
+            <td>{{ code.attempted_at[:19] if code.attempted_at else '-' }}</td>
+            <td>{{ code.expires_at[:19] if code.expires_at else '-' }}</td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
+</div>
 {% else %}
 <p class="muted">No codes yet.</p>
 {% endif %}

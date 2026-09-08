@@ -143,6 +143,8 @@ class Storage:
         code: str,
         source: str,
         attempted_at: datetime | None = None,
+        published_at: datetime | str | None = None,
+        expires_at: datetime | str | None = None,
     ) -> int:
         """Add a new code to the database.
 
@@ -159,6 +161,11 @@ class Storage:
         """
         if attempted_at is None:
             attempted_at = datetime.now()
+
+        def _ts(v: datetime | str | None) -> str | None:
+            if v is None:
+                return None
+            return v.isoformat() if isinstance(v, datetime) else str(v)
 
         with self._connection() as conn:
             # Check if code already exists
@@ -186,10 +193,10 @@ class Storage:
             # Insert new code
             cursor = conn.execute(
                 """
-                INSERT INTO codes (code, attempted_at)
-                VALUES (?, ?)
+                INSERT INTO codes (code, attempted_at, published_at, expires_at)
+                VALUES (?, ?, ?, ?)
                 """,
-                (code, attempted_at.isoformat()),
+                (code, attempted_at.isoformat(), _ts(published_at), _ts(expires_at)),
             )
             code_id = cursor.lastrowid
 
@@ -200,6 +207,27 @@ class Storage:
             )
             conn.commit()
             return code_id
+
+    def set_code_dates(
+        self,
+        code: str,
+        published_at: datetime | str | None = None,
+        expires_at: datetime | str | None = None,
+    ) -> bool:
+        """Set known publish/expiry dates for a code (when source provides them)."""
+
+        def _ts(v: datetime | str | None) -> str | None:
+            if v is None:
+                return None
+            return v.isoformat() if isinstance(v, datetime) else str(v)
+
+        with self._connection() as conn:
+            cursor = conn.execute(
+                "UPDATE codes SET published_at = ?, expires_at = ? WHERE code = ?",
+                (_ts(published_at), _ts(expires_at), code),
+            )
+            conn.commit()
+            return cursor.rowcount > 0
 
     def get_code(self, code: str) -> dict[str, Any] | None:
         """Retrieve a code by its code string.

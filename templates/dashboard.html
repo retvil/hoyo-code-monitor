@@ -30,17 +30,19 @@
         <div class="kpi bad"><div class="v">{{ stats.failed }}</div><div class="l">{{ t('pending') }}</div></div>
     </div>
     {% if stats.by_source %}
-    <h4 style="margin: 16px 0 8px;">{{ t('by_source') }}</h4>
-    <div class="table-scroll">
-    <table>
-        <thead><tr><th>{{ t('source') }}</th><th style="text-align: right;">{{ t('codes') }}</th></tr></thead>
-        <tbody>
-            {% for source, count in stats.by_source.items() %}
-            <tr><td>{{ source }}</td><td style="text-align: right;">{{ count }}</td></tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    </div>
+    <details style="margin-top: 16px;">
+        <summary style="cursor: pointer; font-weight: 600; font-size: 0.9rem;">{{ t('by_source') }} ({{ stats.by_source | length }})</summary>
+        <div class="table-scroll" style="margin-top: 8px;">
+        <table>
+            <thead><tr><th>{{ t('source') }}</th><th style="text-align: right;">{{ t('codes') }}</th></tr></thead>
+            <tbody>
+                {% for source, count in stats.by_source.items() %}
+                <tr><td>{{ source }}</td><td style="text-align: right;">{{ count }}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+    </details>
     {% endif %}
 </div>
 
@@ -85,7 +87,7 @@
     {% if codes %}
     <div class="table-scroll">
     <table>
-        <thead><tr><th>{{ t('code') }}</th><th>{{ t('sources') }}</th><th>{{ t('status') }}</th><th>{{ t('reward') }}</th><th>{{ t('attempted') }}</th></tr></thead>
+        <thead><tr><th>{{ t('code') }}</th><th>{{ t('sources') }}</th><th>{{ t('status') }}</th><th>{{ t('reward') }}</th><th>{{ t('found') }}</th><th>{{ t('published') }}</th><th>{{ t('expires') }}</th></tr></thead>
         <tbody>
             {% for code in codes %}
             <tr>
@@ -94,6 +96,8 @@
                 <td>{% if code.redeemed %}<span class="badge badge-ok">{{ t('done') }}</span>{% else %}<span class="badge badge-bad">{{ t('pending') }}</span>{% endif %}</td>
                 <td>{{ code.reward or '-' }}</td>
                 <td class="muted">{{ code.attempted_at[:19] if code.attempted_at else '-' }}</td>
+                <td class="muted">{{ code.published_at[:19] if code.published_at else '-' }}</td>
+                <td class="muted">{{ code.expires_at[:19] if code.expires_at else '-' }}</td>
             </tr>
             {% endfor %}
         </tbody>

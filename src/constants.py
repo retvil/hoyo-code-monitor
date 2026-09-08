@@ -57,6 +57,10 @@ MIN_REDEMPTION_GAP: int = 6
 WEB_HOST: str = "127.0.0.1"
 WEB_PORT: int = 8000
 
+# --- App identity ---
+APP_VERSION: str = "0.1.0"
+APP_AUTHOR: str = "Nod33Eset"
+
 # --- CLI / Display ---
 MAX_DISPLAY_CODES: int = 5
 MAX_DISPLAY_SOURCES: int = 10

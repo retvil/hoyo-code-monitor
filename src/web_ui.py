@@ -14,7 +14,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from src.config import ConfigManager
-from src.constants import MASK_VISIBLE_CHARS
+from src.constants import APP_AUTHOR, APP_VERSION, MASK_VISIBLE_CHARS
 from src.exceptions import StorageError
 from src.i18n import SUPPORTED, get_lang, make_t
 from src.scheduler import create_scheduler_from_storage
@@ -113,6 +113,8 @@ def page_ctx(storage: Storage, extra: dict | None = None) -> dict:
         "t": make_t(lang),
         "lang": lang,
         "langs": SUPPORTED,
+        "app_version": APP_VERSION,
+        "app_author": APP_AUTHOR,
     }
     for key in AUTHOR_KEYS:
         ctx[key] = storage.get_config(key, "") or ""

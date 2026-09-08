@@ -5,9 +5,13 @@
     <div class="kpi bad"><div style="font-size: 1.8rem; font-weight: 700;">{{ stats.failed }}</div><div class="muted" style="font-size: 0.85rem;">Pending</div></div>
 </div>
 {% if stats.by_source %}
-<h4 style="margin: 16px 0 8px; font-size: 0.9rem;">By source</h4>
-<table>
-    <thead><tr><th>Source</th><th style="text-align: right;">Codes</th></tr></thead>
-    <tbody>{% for source, count in stats.by_source.items() %}<tr><td>{{ source }}</td><td style="text-align: right;">{{ count }}</td></tr>{% endfor %}</tbody>
-</table>
+<details style="margin-top: 16px;">
+    <summary style="cursor: pointer; font-weight: 600; font-size: 0.9rem;">By source ({{ stats.by_source | length }})</summary>
+    <div class="table-scroll" style="margin-top: 8px;">
+    <table>
+        <thead><tr><th>Source</th><th style="text-align: right;">Codes</th></tr></thead>
+        <tbody>{% for source, count in stats.by_source.items() %}<tr><td>{{ source }}</td><td style="text-align: right;">{{ count }}</td></tr>{% endfor %}</tbody>
+    </table>
+    </div>
+</details>
 {% endif %}
