@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
@@ -98,7 +98,11 @@ AUTHOR_KEYS = (
     "support_boosty",
     "support_kofi",
     "support_donationalerts",
+    "support_cloudtips",
+    "support_donatepay",
     "support_bitcoin",
+    "support_ton",
+    "support_usdt_trc20",
 )
 
 
@@ -507,6 +511,10 @@ async def update_author(
     support_bitcoin: str = Form(""),
     support_kofi: str = Form(""),
     support_donationalerts: str = Form(""),
+    support_cloudtips: str = Form(""),
+    support_donatepay: str = Form(""),
+    support_ton: str = Form(""),
+    support_usdt_trc20: str = Form(""),
 ):
     """Update author info (stored in local DB)."""
     storage = Storage()
@@ -519,12 +527,36 @@ async def update_author(
         "author_github": author_github,
         "support_patreon": support_patreon,
         "support_boosty": support_boosty,
-        "support_bitcoin": support_bitcoin,
         "support_kofi": support_kofi,
         "support_donationalerts": support_donationalerts,
+        "support_cloudtips": support_cloudtips,
+        "support_donatepay": support_donatepay,
+        "support_bitcoin": support_bitcoin,
+        "support_ton": support_ton,
+        "support_usdt_trc20": support_usdt_trc20,
     }.items():
         storage.set_config(key, value.strip())
     return {"success": True, "message": "Author info saved"}
+
+
+@app.get("/author/qr")
+async def author_qr(kind: str = "bitcoin"):
+    """QR code PNG for a crypto address (generated locally, no external calls)."""
+    import io
+
+    storage = Storage()
+    key = {"bitcoin": "support_bitcoin", "ton": "support_ton", "usdt": "support_usdt_trc20"}.get(kind, "support_bitcoin")
+    address = storage.get_config(key, "") or ""
+    if not address:
+        raise HTTPException(status_code=404, detail="Address not set")
+    try:
+        import qrcode
+    except ImportError as e:
+        raise HTTPException(status_code=503, detail="qrcode lib not installed") from e
+    img = qrcode.make(address)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return Response(content=buf.getvalue(), media_type="image/png")
 
 
 @app.post("/scheduler/start")
