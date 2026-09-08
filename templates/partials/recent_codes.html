@@ -5,7 +5,7 @@
     <tbody>
         {% for code in codes %}
         <tr>
-            <td class="mono">{{ code.code[:4] }}****</td>
+            <td class="mono">{{ code.code }}</td>
             <td>{% for src in code.sources %}<span class="badge badge-info">{{ src }}</span> {% endfor %}</td>
             <td>{% if code.redeemed %}<span class="badge badge-ok">Done</span>{% else %}<span class="badge badge-bad">Pending</span>{% endif %}</td>
             <td>{{ code.reward or '-' }}</td>

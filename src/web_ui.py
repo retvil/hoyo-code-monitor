@@ -99,6 +99,10 @@ async def dashboard(request: Request):
     # Get recent codes
     codes = storage.list_codes(limit=20, only_unredeemed=False)
 
+    # Get redeemed codes (all, newest first by redemption time)
+    redeemed_codes = [c for c in storage.list_codes(limit=200) if c.get("redeemed")]
+    redeemed_codes.sort(key=lambda c: c.get("redeemed_at") or "", reverse=True)
+
     # Get sources
     sources = storage.list_sources()
 
@@ -118,12 +122,13 @@ async def dashboard(request: Request):
             "request": request,
             "stats": stats,
             "codes": codes,
+            "redeemed_codes": redeemed_codes,
             "sources": sources,
             "accounts": accounts,
             "logs": logs,
             "config": config,
             "scheduler": sched_status,
-            "source_presets": list_presets(),
+            "source_presets": {k: v.__dict__ for k, v in SOURCE_PRESETS.items()},
         },
     )
 

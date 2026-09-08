@@ -57,6 +57,29 @@
     <div id="health-result" style="margin-top: 10px;"></div>
 </div>
 
+<div class="card">
+    <div class="card-title" style="margin-bottom: 12px;">Redeemed codes</div>
+    {% if redeemed_codes %}
+    <div class="table-scroll">
+    <table>
+        <thead><tr><th>Code</th><th>Sources</th><th>Reward</th><th>Redeemed at</th></tr></thead>
+        <tbody>
+            {% for code in redeemed_codes %}
+            <tr>
+                <td class="mono"><strong>{{ code.code }}</strong></td>
+                <td>{% for src in code.sources %}<span class="badge badge-info">{{ src }}</span> {% endfor %}</td>
+                <td>{{ code.reward or '-' }}</td>
+                <td class="muted">{{ code.redeemed_at[:19] if code.redeemed_at else '-' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% else %}
+    <p class="muted">Nothing redeemed yet.</p>
+    {% endif %}
+</div>
+
 <div class="card" hx-get="/partials/recent-codes" hx-trigger="every 10s" hx-swap="outerHTML">
     <div class="card-title" style="margin-bottom: 12px;">Recent codes</div>
     {% if codes %}
@@ -66,7 +89,7 @@
         <tbody>
             {% for code in codes %}
             <tr>
-                <td class="mono">{{ code.code[:4] }}****</td>
+                <td class="mono">{{ code.code }}</td>
                 <td>{% for src in code.sources %}<span class="badge badge-info">{{ src }}</span> {% endfor %}</td>
                 <td>{% if code.redeemed %}<span class="badge badge-ok">Done</span>{% else %}<span class="badge badge-bad">Pending</span>{% endif %}</td>
                 <td>{{ code.reward or '-' }}</td>
