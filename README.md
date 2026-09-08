@@ -1,134 +1,75 @@
 # Genshin Code Monitor
 
-A local Python application that monitors Genshin Impact code sources (websites, forums), automatically redeems valid codes via Hoyolab API using user-provided cookies, and logs redemption statistics.
+Local Windows app that monitors Genshin Impact promo-code sources and auto-redeems new codes via the Hoyolab API. Everything stays on your PC: SQLite database, encrypted cookies, no telemetry, no cloud.
+
+> Read this in: [Русский](README.ru.md) · [Deutsch](README.de.md) · [Français](README.fr.md) · [日本語](README.ja.md) · [中文](README.zh.md)
 
 ## Features
 
-- **Multi-source code scraping**: Monitors Genshin Impact Wiki, Reddit, and other forums for new codes
-- **Automatic redemption**: Redeems codes via official Hoyolab API using user-provided cookies
-- **Statistics tracking**: Logs which codes were redeemed, when, and what rewards they gave
-- **CLI interface**: Full command-line interface for managing sources, config, and monitoring
-- **Local-only**: All data stays on your machine; no external telemetry
-- **Graceful shutdown**: Handles SIGINT/SIGTERM for clean shutdown
-- **Rotating logs**: Size-based log rotation with sensitive data filtering
+- **Background monitoring** — checks sources every N minutes (configurable, default 15)
+- **Auto-redeem** — redeems new codes via Hoyolab `webExchangeCdkey` API (opt-in, per account)
+- **Multi-source** — Wiki, Wiki API, community JSON APIs, guide sites (16 presets, see table)
+- **Multi-account** — each account has its own encrypted cookies and redeem toggle
+- **Statistics** — total / redeemed / pending, per-source breakdown, redemption log
+- **Web UI** — local dashboard at `http://127.0.0.1:8000` in 6 languages
+- **System tray** — icon with enable/disable, scan-interval submenu, one-click settings
+- **Encrypted cookies** — Fernet (AES-128), key in env / OS keyring / local file
+- **Autostart** — optional Windows login autostart
 
-## Installation
+## Sources (verified live)
 
-```bash
-# Clone the repository
-git clone <repository-url>
-cd GIPromoCode
+| Source | Type | Status |
+|---|---|---|
+| Genshin Wiki (Fandom) | CSS | May return 403 (Fandom protection) |
+| Genshin Wiki API | JSON | Working |
+| `hoyo-codes.seria.moe` | JSON API | Working |
+| `api.ennead.cc` (x2 endpoints) | JSON API | Working |
+| Pocket Tactics, TheClick, Eurogamer, MMO Culture, Playnforge | CSS guides | Working |
 
-# Create virtual environment
-python -m venv .venv
-.venv\Scripts\activate  # Windows
+## Install
 
-# Install dependencies
-pip install -r requirements.txt
+Requires Python 3.11+.
+
+```powershell
+pip install -e .
+# Playwright browser for JS-rendered sources (optional)
+python -m playwright install chromium
 ```
-
-## Configuration
-
-On first run, a default `config.toml` is created in the project directory:
-
-```toml
-interval = 1800          # Check interval in seconds (default: 30 minutes)
-redemption_enabled = false  # Auto-redeem codes (requires cookies)
-db_path = "data/monitor.db"
-log_level = "INFO"
-log_file = "logs/app.log"
-max_log_size = 10485760  # 10 MB
-backup_count = 5
-```
-
-### Enabling Auto-Redemption
-
-1. Set `redemption_enabled = true` in config.toml
-2. Provide your Hoyolab cookies (ltuid, ltoken, cookie_token_v2) via environment variables or config
-3. The application will automatically attempt to redeem new codes
 
 ## Usage
 
-```bash
-# Start the monitor (daemon mode)
-genshin-code-monitor start
+```powershell
+# Add account + auto-capture cookies (browser opens, you log in once)
+genshin-code-monitor accounts add main <UID> <REGION>   # region: os_usa / os_euro / os_asia / os_cht
+genshin-code-monitor accounts login main
 
-# Stop the monitor
-genshin-code-monitor stop
-
-# Check status
-genshin-code-monitor status
-
-# Show redemption statistics
-genshin-code-monitor stats
-
-# Run a single check cycle immediately
-genshin-code-monitor run-once
-
-# Manage sources
-genshin-code-monitor sources list
-genshin-code-monitor sources add "wiki" "https://genshin-impact.fandom.com/wiki/Promotional_Code" --selector-type css --selector "table.wikitable"
-genshin-code-monitor sources remove "wiki"
-genshin-code-monitor sources enable "wiki"
-genshin-code-monitor sources disable "wiki"
-
-# Manage configuration
-genshin-code-monitor config show
-genshin-code-monitor config set interval 3600
+# Enable auto-redeem (or toggle per account in Web UI)
 genshin-code-monitor config set redemption_enabled true
+
+# Run in tray (recommended) / one-shot check / Web UI
+genshin-code-monitor tray
+genshin-code-monitor run-once
+python -m uvicorn src.web_ui:app --host 127.0.0.1 --port 8000
 ```
 
-## Project Structure
+Web UI: `http://127.0.0.1:8000` — Dashboard, Sources, Accounts, Config (EN/RU/DE/FR/JA/ZH switcher in sidebar).
 
-```
-src/
-├── cli.py              # CLI entry point
-├── config.py           # Configuration management (TOML)
-├── storage.py          # SQLite storage layer
-├── scheduler.py        # APScheduler-based job scheduler
-├── logging_setup.py    # Logging with rotation & sensitive data filtering
-├── signals.py          # Graceful shutdown signal handling
-├── scrapers/
-│   ├── base.py         # Abstract base scraper
-│   └── wiki.py         # Genshin Impact Wiki scraper
-├── redeemer.py         # Hoyolab API redemption client
-tests/                  # Unit tests (180+ tests)
-```
+## How redemption works
 
-## Requirements
+1. Scheduler fetches enabled sources, extracts codes (`[A-Z0-9]{8,14}`), stores new ones.
+2. For each account with auto-redeem ON: `GET webExchangeCdkey` with account cookies, 8s gap.
+3. Result recorded: `success` → Done + reward; `-2017/-2018` → already claimed (counts as Done); `-2001` expired, `-2003` invalid/CN-only.
 
-- Python 3.11+
-- Dependencies listed in `requirements.txt`:
-  - aiohttp
-  - beautifulsoup4
-  - click
-  - apscheduler
-  - toml
-  - colorlog (optional, for colored console output)
+## FAQ
 
-## Security Notes
+- **Code shows Pending?** Check cookies (they expire), `redemption_enabled`, per-account toggle, and the error in Redemption log.
+- **`-1071 "Please log in"`?** Re-run `accounts login` — the cookie set was incomplete.
+- **Data location?** `data/monitor.db`, `config.toml`, `logs/`, `data/.key`. Copy `data/` for backup.
 
-- **Cookies are never stored in plaintext** - they are encrypted or prompted each session
-- **No external telemetry** - all data stays local
-- **Auto-redeem is opt-in** - disabled by default
-- **Sensitive data filtering** - logs automatically mask cookies, tokens, and passwords
+## Author & support
 
-## Testing
-
-```bash
-# Run all tests
-pytest tests/ -v
-
-# Run specific test module
-pytest tests/test_cli.py -v
-pytest tests/test_storage.py -v
-pytest tests/test_scraper_wiki.py -v
-```
+See the About block in the app dashboard (contacts, donation links and crypto addresses are configured there).
 
 ## License
 
-MIT License - see LICENSE file for details.
-
-## Disclaimer
-
-This tool is for personal use only. Use at your own risk. The authors are not responsible for any account issues resulting from use of this tool. Always follow Genshin Impact's Terms of Service.
+MIT
