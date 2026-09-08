@@ -433,6 +433,30 @@ class Storage:
             full = self._attach_sources_and_status(conn, rows)
             return sum(1 for d in full if d.get("display_status") == status)
 
+    def delete_code(self, code: str) -> bool:
+        """Delete a code and its source associations (logs are kept)."""
+        with self._connection() as conn:
+            row = conn.execute("SELECT id FROM codes WHERE code = ?", (code,)).fetchone()
+            if not row:
+                return False
+            conn.execute("DELETE FROM code_sources WHERE code_id = ?", (row[0],))
+            conn.execute("DELETE FROM codes WHERE id = ?", (row[0],))
+            conn.commit()
+            return True
+
+    def cleanup_dead_codes(self) -> int:
+        """Delete unredeemed codes proven dead by API (expired/invalid)."""
+        doomed = [
+            c["code"]
+            for c in self.list_codes(limit=5000)
+            if not c.get("redeemed") and c.get("display_status") in ("expired", "invalid")
+        ]
+        count = 0
+        for code in doomed:
+            if self.delete_code(code):
+                count += 1
+        return count
+
     def get_stats(self) -> dict[str, Any]:
         """Get redemption statistics.
 

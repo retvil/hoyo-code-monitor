@@ -716,6 +716,23 @@ async def redeem_single_code(code: str):
     return {"success": True, "result": "; ".join(results)}
 
 
+@app.delete("/codes/{code}")
+async def delete_single_code(code: str):
+    """Delete a code (logs are kept for history)."""
+    storage = Storage()
+    if not storage.delete_code(code.upper().strip()):
+        raise HTTPException(status_code=404, detail="Code not found")
+    return {"success": True}
+
+
+@app.post("/codes/cleanup")
+async def cleanup_dead():
+    """Delete unredeemed codes proven dead by API (expired/invalid)."""
+    storage = Storage()
+    count = storage.cleanup_dead_codes()
+    return {"success": True, "result": f"Removed {count} dead codes"}
+
+
 @app.post("/redeem/all")
 async def redeem_all_codes():
     """Redeem all unredeemed, non-expired codes for accounts with auto-redeem ON."""

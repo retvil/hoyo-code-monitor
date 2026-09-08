@@ -18,9 +18,10 @@
     <input type="search" name="q" value="{{ f_q }}" placeholder="Search code..." style="width: auto; min-width: 160px;">
     <input type="hidden" name="page" value="1">
 </form>
-<div style="margin-bottom: 12px;">
+<div style="margin-bottom: 12px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
     <button class="btn btn-primary" style="padding: 6px 14px; font-size: 0.82rem;" hx-post="/redeem/all" hx-target="#redeem-all-result" hx-swap="innerHTML" hx-indicator="#redeem-all-spin">{{ t('redeem_all') }} <span id="redeem-all-spin" class="spinner htmx-indicator" aria-hidden="true"></span></button>
-    <span id="redeem-all-result" style="font-size: 0.85rem; margin-left: 8px;"></span>
+    <button class="btn btn-danger" style="padding: 6px 14px; font-size: 0.82rem;" hx-post="/codes/cleanup" hx-target="#redeem-all-result" hx-swap="innerHTML" hx-confirm="Delete all expired/invalid codes?">{{ t('cleanup_dead') }}</button>
+    <span id="redeem-all-result" style="font-size: 0.85rem;"></span>
 </div>
 {% if codes %}
 <div class="table-scroll">
@@ -35,7 +36,7 @@
             <td>{{ code.reward or '-' }}</td>
             <td class="muted">{{ code.attempted_at[:19] if code.attempted_at else '-' }}</td>
             <td class="muted">{{ code.expires_at[:19] if code.expires_at else '-' }}</td>
-            <td>{% if code.display_status in ('pending', 'failed') %}<button class="btn" style="padding: 4px 10px; font-size: 0.78rem;" hx-post="/codes/{{ code.code }}/redeem" hx-target="#redeem-{{ code.code }}" hx-swap="innerHTML">{{ t('redeem') }}</button><span id="redeem-{{ code.code }}" style="font-size: 0.78rem;"></span>{% endif %}</td>
+            <td style="white-space: nowrap;">{% if code.display_status in ('pending', 'failed') %}<button class="btn" style="padding: 4px 10px; font-size: 0.78rem;" hx-post="/codes/{{ code.code }}/redeem" hx-target="#redeem-{{ code.code }}" hx-swap="innerHTML">{{ t('redeem') }}</button><span id="redeem-{{ code.code }}" style="font-size: 0.78rem;"></span>{% endif %}<button class="btn btn-danger" style="padding: 4px 10px; font-size: 0.78rem; margin-left: 4px;" hx-delete="/codes/{{ code.code }}" hx-confirm="Delete {{ code.code }}?" hx-swap="none" onclick="setTimeout(()=>location.reload(),600)">{{ t('delete') }}</button></td>
         </tr>
         {% endfor %}
     </tbody>
