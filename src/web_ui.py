@@ -87,27 +87,10 @@ class ConfigUpdate(BaseModel):
     value: Any
 
 
-AUTHOR_KEYS = (
-    "author_name",
-    "author_url",
-    "author_telegram",
-    "author_email",
-    "author_github",
-    "support_url",
-    "support_patreon",
-    "support_boosty",
-    "support_kofi",
-    "support_donationalerts",
-    "support_cloudtips",
-    "support_donatepay",
-    "support_bitcoin",
-    "support_ton",
-    "support_usdt_trc20",
-)
-
-
 def page_ctx(storage: Storage, extra: dict | None = None) -> dict:
-    """Build template context with i18n + author info (local single-user UI)."""
+    """Build template context with i18n + hardcoded author info (release build)."""
+    from src import author as author_module
+
     lang = get_lang(storage)
     ctx: dict = {
         "t": make_t(lang),
@@ -116,8 +99,7 @@ def page_ctx(storage: Storage, extra: dict | None = None) -> dict:
         "app_version": APP_VERSION,
         "app_author": APP_AUTHOR,
     }
-    for key in AUTHOR_KEYS:
-        ctx[key] = storage.get_config(key, "") or ""
+    ctx.update(author_module.as_dict())
     if extra:
         ctx.update(extra)
     return ctx
@@ -500,61 +482,24 @@ async def update_config(
         raise HTTPException(status_code=400, detail=str(e)) from e
 
 
-@app.post("/author")
-async def update_author(
-    author_name: str = Form(""),
-    author_url: str = Form(""),
-    support_url: str = Form(""),
-    author_telegram: str = Form(""),
-    author_email: str = Form(""),
-    author_github: str = Form(""),
-    support_patreon: str = Form(""),
-    support_boosty: str = Form(""),
-    support_bitcoin: str = Form(""),
-    support_kofi: str = Form(""),
-    support_donationalerts: str = Form(""),
-    support_cloudtips: str = Form(""),
-    support_donatepay: str = Form(""),
-    support_ton: str = Form(""),
-    support_usdt_trc20: str = Form(""),
-):
-    """Update author info (stored in local DB)."""
-    storage = Storage()
-    for key, value in {
-        "author_name": author_name,
-        "author_url": author_url,
-        "support_url": support_url,
-        "author_telegram": author_telegram,
-        "author_email": author_email,
-        "author_github": author_github,
-        "support_patreon": support_patreon,
-        "support_boosty": support_boosty,
-        "support_kofi": support_kofi,
-        "support_donationalerts": support_donationalerts,
-        "support_cloudtips": support_cloudtips,
-        "support_donatepay": support_donatepay,
-        "support_bitcoin": support_bitcoin,
-        "support_ton": support_ton,
-        "support_usdt_trc20": support_usdt_trc20,
-    }.items():
-        storage.set_config(key, value.strip())
-    return {"success": True, "message": "Author info saved"}
-
-
 @app.get("/author/qr")
 async def author_qr(kind: str = "bitcoin"):
     """QR code PNG for a crypto address (generated locally, no external calls)."""
-    import io
+    from src import author as author_module
 
-    storage = Storage()
-    key = {"bitcoin": "support_bitcoin", "ton": "support_ton", "usdt": "support_usdt_trc20"}.get(kind, "support_bitcoin")
-    address = storage.get_config(key, "") or ""
+    data = author_module.as_dict()
+    key = {"bitcoin": "support_bitcoin", "ton": "support_ton", "usdt": "support_usdt_trc20"}.get(
+        kind, "support_bitcoin"
+    )
+    address = data.get(key, "") or ""
     if not address:
         raise HTTPException(status_code=404, detail="Address not set")
     try:
         import qrcode
     except ImportError as e:
         raise HTTPException(status_code=503, detail="qrcode lib not installed") from e
+    import io
+
     img = qrcode.make(address)
     buf = io.BytesIO()
     img.save(buf, format="PNG")
