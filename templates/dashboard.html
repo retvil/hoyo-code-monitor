@@ -1,39 +1,39 @@
 {% extends "base.html" %}
-{% block title %}Dashboard - Genshin Code Monitor{% endblock %}
-{% block page_title %}Dashboard{% endblock %}
+{% block title %}{{ t('nav_dashboard') }} - {{ t('app_name') }}{% endblock %}
+{% block page_title %}{{ t('nav_dashboard') }}{% endblock %}
 {% block content %}
 <div class="card" hx-get="/partials/scheduler-status" hx-trigger="every 5s" hx-swap="outerHTML">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
-        <div class="card-title">Scheduler</div>
+        <div class="card-title">{{ t('scheduler') }}</div>
         {% if scheduler and scheduler.running %}
-        <span class="badge badge-ok">Running</span>
+        <span class="badge badge-ok">{{ t('running') }}</span>
         {% else %}
-        <span class="badge badge-bad">Stopped</span>
+        <span class="badge badge-bad">{{ t('stopped') }}</span>
         {% endif %}
     </div>
     <div class="kpi-grid">
-        <div class="kpi accent"><div class="v">{{ scheduler.last_run_codes_found if scheduler else 0 }}</div><div class="l">Codes found (last run)</div></div>
-        <div class="kpi good"><div class="v">{{ scheduler.last_run_codes_redeemed if scheduler else 0 }}</div><div class="l">Redeemed (last run)</div></div>
-        <div class="kpi"><div class="v" style="font-size: 1rem;">{{ scheduler.next_run if scheduler else '-' }}</div><div class="l">Next run</div></div>
-        <div class="kpi"><div class="v" style="font-size: 1rem;">{{ scheduler.last_run if scheduler else '-' }}</div><div class="l">Last run</div></div>
+        <div class="kpi accent"><div class="v">{{ scheduler.last_run_codes_found if scheduler else 0 }}</div><div class="l">{{ t('codes_found_last') }}</div></div>
+        <div class="kpi good"><div class="v">{{ scheduler.last_run_codes_redeemed if scheduler else 0 }}</div><div class="l">{{ t('redeemed_last') }}</div></div>
+        <div class="kpi"><div class="v" style="font-size: 1rem;">{{ scheduler.next_run if scheduler else '-' }}</div><div class="l">{{ t('next_run') }}</div></div>
+        <div class="kpi"><div class="v" style="font-size: 1rem;">{{ scheduler.last_run if scheduler else '-' }}</div><div class="l">{{ t('last_run') }}</div></div>
     </div>
     {% if scheduler and scheduler.error_message %}
-    <div style="margin-top: 12px; background: var(--bad-soft); color: var(--bad); padding: 10px 14px; border-radius: 8px;">Error: {{ scheduler.error_message }}</div>
+    <div style="margin-top: 12px; background: var(--bad-soft); color: var(--bad); padding: 10px 14px; border-radius: 8px;">{{ t('error') }}: {{ scheduler.error_message }}</div>
     {% endif %}
 </div>
 
 <div class="card" hx-get="/partials/stats" hx-trigger="every 10s" hx-swap="outerHTML">
-    <div class="card-title" style="margin-bottom: 12px;">Statistics</div>
+    <div class="card-title" style="margin-bottom: 12px;">{{ t('statistics') }}</div>
     <div class="kpi-grid">
-        <div class="kpi"><div class="v">{{ stats.total_codes }}</div><div class="l">Total codes</div></div>
-        <div class="kpi good"><div class="v">{{ stats.successful }}</div><div class="l">Redeemed</div></div>
-        <div class="kpi bad"><div class="v">{{ stats.failed }}</div><div class="l">Pending</div></div>
+        <div class="kpi"><div class="v">{{ stats.total_codes }}</div><div class="l">{{ t('total_codes') }}</div></div>
+        <div class="kpi good"><div class="v">{{ stats.successful }}</div><div class="l">{{ t('redeemed') }}</div></div>
+        <div class="kpi bad"><div class="v">{{ stats.failed }}</div><div class="l">{{ t('pending') }}</div></div>
     </div>
     {% if stats.by_source %}
-    <h4 style="margin: 16px 0 8px;">By source</h4>
+    <h4 style="margin: 16px 0 8px;">{{ t('by_source') }}</h4>
     <div class="table-scroll">
     <table>
-        <thead><tr><th>Source</th><th style="text-align: right;">Codes</th></tr></thead>
+        <thead><tr><th>{{ t('source') }}</th><th style="text-align: right;">{{ t('codes') }}</th></tr></thead>
         <tbody>
             {% for source, count in stats.by_source.items() %}
             <tr><td>{{ source }}</td><td style="text-align: right;">{{ count }}</td></tr>
@@ -45,12 +45,12 @@
 </div>
 
 <div class="card">
-    <div class="card-title" style="margin-bottom: 12px;">Controls</div>
+    <div class="card-title" style="margin-bottom: 12px;">{{ t('controls') }}</div>
     <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-        <button class="btn btn-primary" hx-post="/scheduler/start" hx-target="#scheduler-status" hx-swap="innerHTML" {% if scheduler and scheduler.running %}disabled{% endif %}>Start</button>
-        <button class="btn btn-danger" hx-post="/scheduler/stop" hx-target="#scheduler-status" hx-swap="innerHTML" {% if not scheduler or not scheduler.running %}disabled{% endif %}>Stop</button>
-        <button class="btn btn-primary" hx-post="/scheduler/run-once" hx-target="#run-once-result" hx-swap="innerHTML" hx-indicator="#run-spinner">Run check now <span id="run-spinner" class="spinner htmx-indicator" aria-hidden="true"></span></button>
-        <button class="btn" hx-get="/partials/health" hx-target="#health-result" hx-swap="innerHTML">Health check</button>
+        <button class="btn btn-primary" hx-post="/scheduler/start" hx-target="#scheduler-status" hx-swap="innerHTML" {% if scheduler and scheduler.running %}disabled{% endif %}>{{ t('start') }}</button>
+        <button class="btn btn-danger" hx-post="/scheduler/stop" hx-target="#scheduler-status" hx-swap="innerHTML" {% if not scheduler or not scheduler.running %}disabled{% endif %}>{{ t('stop') }}</button>
+        <button class="btn" hx-post="/scheduler/run-once" hx-target="#run-once-result" hx-swap="innerHTML" hx-indicator="#run-spinner">{{ t('run_check') }} <span id="run-spinner" class="spinner htmx-indicator" aria-hidden="true"></span></button>
+        <button class="btn" hx-get="/partials/health" hx-target="#health-result" hx-swap="innerHTML">{{ t('health_check') }}</button>
     </div>
     <div id="scheduler-status"></div>
     <div id="run-once-result" style="margin-top: 10px;"></div>
@@ -58,11 +58,11 @@
 </div>
 
 <div class="card">
-    <div class="card-title" style="margin-bottom: 12px;">Redeemed codes</div>
+    <div class="card-title" style="margin-bottom: 12px;">{{ t('redeemed_codes') }}</div>
     {% if redeemed_codes %}
     <div class="table-scroll">
     <table>
-        <thead><tr><th>Code</th><th>Sources</th><th>Reward</th><th>Redeemed at</th></tr></thead>
+        <thead><tr><th>{{ t('code') }}</th><th>{{ t('sources') }}</th><th>{{ t('reward') }}</th><th>{{ t('redeemed_at') }}</th></tr></thead>
         <tbody>
             {% for code in redeemed_codes %}
             <tr>
@@ -76,22 +76,22 @@
     </table>
     </div>
     {% else %}
-    <p class="muted">Nothing redeemed yet.</p>
+    <p class="muted">{{ t('no_redeemed') }}</p>
     {% endif %}
 </div>
 
 <div class="card" hx-get="/partials/recent-codes" hx-trigger="every 10s" hx-swap="outerHTML">
-    <div class="card-title" style="margin-bottom: 12px;">Recent codes</div>
+    <div class="card-title" style="margin-bottom: 12px;">{{ t('recent_codes') }}</div>
     {% if codes %}
     <div class="table-scroll">
     <table>
-        <thead><tr><th>Code</th><th>Sources</th><th>Status</th><th>Reward</th><th>Attempted</th></tr></thead>
+        <thead><tr><th>{{ t('code') }}</th><th>{{ t('sources') }}</th><th>{{ t('status') }}</th><th>{{ t('reward') }}</th><th>{{ t('attempted') }}</th></tr></thead>
         <tbody>
             {% for code in codes %}
             <tr>
                 <td class="mono">{{ code.code }}</td>
                 <td>{% for src in code.sources %}<span class="badge badge-info">{{ src }}</span> {% endfor %}</td>
-                <td>{% if code.redeemed %}<span class="badge badge-ok">Done</span>{% else %}<span class="badge badge-bad">Pending</span>{% endif %}</td>
+                <td>{% if code.redeemed %}<span class="badge badge-ok">{{ t('done') }}</span>{% else %}<span class="badge badge-bad">{{ t('pending') }}</span>{% endif %}</td>
                 <td>{{ code.reward or '-' }}</td>
                 <td class="muted">{{ code.attempted_at[:19] if code.attempted_at else '-' }}</td>
             </tr>
@@ -100,22 +100,34 @@
     </table>
     </div>
     {% else %}
-    <p class="muted">No codes yet. Run a check or wait for the next cycle.</p>
+    <p class="muted">{{ t('no_codes') }}</p>
     {% endif %}
 </div>
 
 <div class="card" hx-get="/partials/recent-logs" hx-trigger="every 10s" hx-swap="outerHTML">
-    <div class="card-title" style="margin-bottom: 12px;">Redemption log</div>
+    <div class="card-title" style="margin-bottom: 12px;">{{ t('redemption_log') }}</div>
     {% if logs %}
     <div style="max-height: 300px; overflow-y: auto;">
         {% for log in logs %}
         <div class="mono" style="font-size: 0.85rem; padding: 6px 10px; background: var(--bg); border-radius: 6px; margin-bottom: 4px;">
-            <strong>{{ log.code[:4] }}****</strong> | {{ log.status | upper }} | {{ log.reward or '-' }} | {{ log.attempted_at[:19] }}{% if log.error_message %} | {{ log.error_message }}{% endif %}
+            <strong>{{ log.code }}</strong> | {{ log.status | upper }} | {{ log.reward or '-' }} | {{ log.attempted_at[:19] }}{% if log.error_message %} | {{ log.error_message }}{% endif %}
         </div>
         {% endfor %}
     </div>
     {% else %}
-    <p class="muted">No redemption logs yet.</p>
+    <p class="muted">{{ t('no_logs') }}</p>
     {% endif %}
 </div>
+
+{% if author_name or support_url %}
+<div class="card">
+    <div class="card-title" style="margin-bottom: 8px;">{{ t('about_author') }}</div>
+    {% if author_name %}
+    <p>{% if author_url %}<a href="{{ author_url }}">{{ author_name }}</a>{% else %}{{ author_name }}{% endif %}</p>
+    {% endif %}
+    {% if support_url %}
+    <a href="{{ support_url }}" class="btn btn-primary">{{ t('support_author') }}</a>
+    {% endif %}
+</div>
+{% endif %}
 {% endblock %}

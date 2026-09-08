@@ -1,16 +1,16 @@
 {% extends "base.html" %}
-{% block title %}Accounts - Genshin Code Monitor{% endblock %}
-{% block page_title %}Accounts{% endblock %}
+{% block title %}{{ t('nav_accounts') }} - {{ t('app_name') }}{% endblock %}
+{% block page_title %}{{ t('nav_accounts') }}{% endblock %}
 {% block content %}
 <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
-        <div class="card-title">HoYoLAB accounts</div>
-        <button class="btn btn-primary" onclick="document.getElementById('account-modal').classList.add('active')">Add account</button>
+        <div class="card-title">{{ t('nav_accounts') }}</div>
+        <button class="btn btn-primary" onclick="document.getElementById('account-modal').classList.add('active')">{{ t('add_account') }}</button>
     </div>
     {% if accounts %}
     <div class="table-scroll">
     <table>
-        <thead><tr><th>Name</th><th>UID</th><th>Region</th><th>Auto-redeem</th><th>Actions</th></tr></thead>
+        <thead><tr><th>{{ t('name') }}</th><th>{{ t('uid') }}</th><th>{{ t('region') }}</th><th>{{ t('auto_redeem') }}</th><th>{{ t('actions') }}</th></tr></thead>
         <tbody>
             {% for acc in accounts %}
             <tr>
@@ -19,12 +19,12 @@
                 <td>{{ acc.region }}</td>
                 <td><span hx-get="/accounts/{{ acc.name }}/redeem-state" hx-trigger="load" hx-swap="innerHTML"></span></td>
                 <td style="white-space: nowrap;">
-                    <button class="btn" style="padding: 4px 10px; font-size: 0.8rem;" onclick="openCookies('{{ acc.name }}')">Set cookies</button>
-                    <button class="btn" style="padding: 4px 10px; font-size: 0.8rem;" hx-get="/accounts/{{ acc.name }}/cookies" hx-target="#view-{{ acc.name }}" hx-swap="innerHTML">View</button>
-                    <span id="view-{{ acc.name }}" class="mono" style="font-size: 0.8rem;"></span>
-                    <button class="btn btn-primary" style="padding: 4px 10px; font-size: 0.8rem;" hx-post="/accounts/{{ acc.name }}/login" hx-target="#login-{{ acc.name }}" hx-swap="innerHTML" hx-indicator="#login-spin-{{ acc.name }}" hx-on::response-error="document.getElementById('login-{{ acc.name }}').innerHTML='Error: '+event.detail.xhr.responseText">Auto-login <span id="login-spin-{{ acc.name }}" class="spinner htmx-indicator" aria-hidden="true"></span></button>
+                    <button class="btn" style="padding: 4px 10px; font-size: 0.8rem;" onclick="openCookies('{{ acc.name }}')">{{ t('set_cookies') }}</button>
+                    <button class="btn" style="padding: 4px 10px; font-size: 0.8rem;" hx-get="/accounts/{{ acc.name }}/cookies" hx-target="#view-{{ acc.name }}" hx-swap="innerHTML">{{ t('view') }}</button>
+                    <button class="btn btn-primary" style="padding: 4px 10px; font-size: 0.8rem;" hx-post="/accounts/{{ acc.name }}/login" hx-target="#login-{{ acc.name }}" hx-swap="innerHTML" hx-indicator="#login-spin-{{ acc.name }}" hx-on::response-error="document.getElementById('login-{{ acc.name }}').innerHTML='Error: '+event.detail.xhr.responseText">{{ t('auto_login') }} <span id="login-spin-{{ acc.name }}" class="spinner htmx-indicator" aria-hidden="true"></span></button>
+                    <button class="btn btn-danger" style="padding: 4px 10px; font-size: 0.8rem;" hx-delete="/accounts/{{ acc.name }}" hx-confirm="Delete account '{{ acc.name }}'?" hx-swap="none" onclick="setTimeout(()=>location.reload(),800)">{{ t('delete') }}</button>
                     <span id="login-{{ acc.name }}" style="font-size: 0.8rem;"></span>
-                    <button class="btn btn-danger" style="padding: 4px 10px; font-size: 0.8rem;" hx-delete="/accounts/{{ acc.name }}" hx-confirm="Delete account '{{ acc.name }}'?" hx-swap="none" onclick="setTimeout(()=>location.reload(),800)">Delete</button>
+                    <div id="view-{{ acc.name }}" style="font-size: 0.8rem; margin-top: 4px;"></div>
                 </td>
             </tr>
             {% endfor %}
@@ -32,27 +32,27 @@
     </table>
     </div>
     {% else %}
-    <p class="muted">No accounts yet. Add one to enable auto-redeem. Cookies are stored encrypted (Fernet).</p>
+    <p class="muted">{{ t('no_accounts') }}</p>
     {% endif %}
 </div>
 
 <div class="modal" id="account-modal">
     <div class="modal-box">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-            <h3 style="margin: 0;">Add account</h3>
+            <h3 style="margin: 0;">{{ t('add_account') }}</h3>
             <button style="background: none; border: none; font-size: 1.4rem; cursor: pointer;" onclick="document.getElementById('account-modal').classList.remove('active')">×</button>
         </div>
         <form hx-post="/accounts" hx-swap="none" hx-on::after-request="if(event.detail.successful){document.getElementById('account-modal').classList.remove('active');location.reload()}">
-            <div style="margin-bottom: 10px;"><label>Name</label><input type="text" name="name" required placeholder="main"></div>
+            <div style="margin-bottom: 10px;"><label>{{ t('name') }}</label><input type="text" name="name" required placeholder="main"></div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                <div style="margin-bottom: 10px;"><label>UID</label><input type="text" name="uid" required placeholder="123456789"></div>
-                <div style="margin-bottom: 10px;"><label>Region</label>
+                <div style="margin-bottom: 10px;"><label>{{ t('uid') }}</label><input type="text" name="uid" required placeholder="123456789"></div>
+                <div style="margin-bottom: 10px;"><label>{{ t('region') }}</label>
                     <select name="region"><option value="os_usa">os_usa (America)</option><option value="os_euro">os_euro (Europe)</option><option value="os_asia">os_asia (Asia)</option><option value="os_cht">os_cht (TW/HK/MO)</option></select>
                 </div>
             </div>
             <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px;">
-                <button type="button" class="btn" onclick="document.getElementById('account-modal').classList.remove('active')">Cancel</button>
-                <button type="submit" class="btn btn-primary">Save</button>
+                <button type="button" class="btn" onclick="document.getElementById('account-modal').classList.remove('active')">{{ t('cancel') }}</button>
+                <button type="submit" class="btn btn-primary">{{ t('save') }}</button>
             </div>
         </form>
     </div>
@@ -61,16 +61,16 @@
 <div class="modal" id="cookies-modal">
     <div class="modal-box">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-            <h3 style="margin: 0;" id="cookies-title">Cookies</h3>
+            <h3 style="margin: 0;" id="cookies-title">{{ t('cookies') }}</h3>
             <button style="background: none; border: none; font-size: 1.4rem; cursor: pointer;" onclick="document.getElementById('cookies-modal').classList.remove('active')">×</button>
         </div>
         <form id="cookies-form" method="post" hx-swap="none" hx-on::after-request="if(event.detail.successful){document.getElementById('cookies-modal').classList.remove('active')}">
-            <div style="margin-bottom: 10px;"><label>Cookies JSON (ltuid, ltoken)</label>
+            <div style="margin-bottom: 10px;"><label>{{ t('cookies_json_hint') }}</label>
             <textarea id="cookies-json" name="cookies" rows="6" required placeholder='{"ltuid": "...", "ltoken": "..."}'></textarea></div>
             <div id="cookies-result" style="margin-top: 8px; font-size: 0.85rem;"></div>
             <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px;">
-                <button type="button" class="btn" onclick="document.getElementById('cookies-modal').classList.remove('active')">Cancel</button>
-                <button type="submit" class="btn btn-primary">Save cookies</button>
+                <button type="button" class="btn" onclick="document.getElementById('cookies-modal').classList.remove('active')">{{ t('cancel') }}</button>
+                <button type="submit" class="btn btn-primary">{{ t('save_cookies') }}</button>
             </div>
         </form>
     </div>
@@ -79,7 +79,7 @@
 {% block extra_js %}
 <script>
 function openCookies(name) {
-    document.getElementById('cookies-title').textContent = 'Cookies: ' + name;
+    document.getElementById('cookies-title').textContent = '{{ t('cookies') }}: ' + name;
     document.getElementById('cookies-form').setAttribute('hx-post', '/accounts/' + name + '/cookies');
     if (window.htmx) { htmx.process(document.getElementById('cookies-form')); }
     document.getElementById('cookies-modal').classList.add('active');

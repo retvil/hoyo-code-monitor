@@ -15,6 +15,8 @@ from pydantic import BaseModel
 
 from src.config import ConfigManager
 from src.constants import MASK_VISIBLE_CHARS
+from src.exceptions import StorageError
+from src.i18n import SUPPORTED, get_lang, make_t
 from src.scheduler import create_scheduler_from_storage
 from src.sources import SOURCE_PRESETS, SourceConfig, SourceFetcher, list_presets
 from src.storage import Storage
@@ -85,6 +87,35 @@ class ConfigUpdate(BaseModel):
     value: Any
 
 
+def page_ctx(storage: Storage, extra: dict | None = None) -> dict:
+    """Build template context with i18n + author info (local single-user UI)."""
+    lang = get_lang(storage)
+    ctx: dict = {
+        "t": make_t(lang),
+        "lang": lang,
+        "langs": SUPPORTED,
+        "author_name": storage.get_config("author_name", "") or "",
+        "author_url": storage.get_config("author_url", "") or "",
+        "support_url": storage.get_config("support_url", "") or "",
+    }
+    if extra:
+        ctx.update(extra)
+    return ctx
+
+
+@app.post("/language")
+async def set_language(language: str = Form(...)):
+    """Set UI language (en, ru, de, fr, ja, zh)."""
+    from src.i18n import set_lang
+
+    storage = Storage()
+    try:
+        set_lang(storage, language)
+        return {"success": True, "language": language}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
 # Routes
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
@@ -118,18 +149,21 @@ async def dashboard(request: Request):
     return templates.TemplateResponse(
         request,
         "dashboard.html",
-        {
-            "request": request,
-            "stats": stats,
-            "codes": codes,
-            "redeemed_codes": redeemed_codes,
-            "sources": sources,
-            "accounts": accounts,
-            "logs": logs,
-            "config": config,
-            "scheduler": sched_status,
-            "source_presets": {k: v.__dict__ for k, v in SOURCE_PRESETS.items()},
-        },
+        page_ctx(
+            storage,
+            {
+                "request": request,
+                "stats": stats,
+                "codes": codes,
+                "redeemed_codes": redeemed_codes,
+                "sources": sources,
+                "accounts": accounts,
+                "logs": logs,
+                "config": config,
+                "scheduler": sched_status,
+                "source_presets": {k: v.__dict__ for k, v in SOURCE_PRESETS.items()},
+            },
+        ),
     )
 
 
@@ -141,11 +175,14 @@ async def sources_page(request: Request):
     return templates.TemplateResponse(
         request,
         "sources.html",
-        {
-            "request": request,
-            "sources": sources,
-            "source_presets": {k: v.__dict__ for k, v in SOURCE_PRESETS.items()},
-        },
+        page_ctx(
+            storage,
+            {
+                "request": request,
+                "sources": sources,
+                "source_presets": {k: v.__dict__ for k, v in SOURCE_PRESETS.items()},
+            },
+        ),
     )
 
 
@@ -285,10 +322,13 @@ async def accounts_page(request: Request):
     return templates.TemplateResponse(
         request,
         "accounts.html",
-        {
-            "request": request,
-            "accounts": accounts,
-        },
+        page_ctx(
+            storage,
+            {
+                "request": request,
+                "accounts": accounts,
+            },
+        ),
     )
 
 
@@ -393,27 +433,65 @@ async def delete_account(name: str):
 @app.get("/config", response_class=HTMLResponse)
 async def config_page(request: Request):
     """Configuration page."""
+    storage = Storage()
     config_manager = ConfigManager()
     config = config_manager.get_all()
     return templates.TemplateResponse(
         request,
         "config.html",
-        {
-            "request": request,
-            "config": config,
-        },
+        page_ctx(
+            storage,
+            {
+                "request": request,
+                "config": config,
+            },
+        ),
     )
 
 
 @app.post("/config")
-async def update_config(update: ConfigUpdate):
-    """Update a configuration value."""
+async def update_config(
+    poll_interval_seconds: int = Form(900),
+    source_timeout_seconds: int = Form(30),
+    redemption_min_gap_seconds: int = Form(8),
+    max_retry_attempts: int = Form(3),
+    redemption_enabled: bool = Form(False),
+    db_path: str = Form("data/monitor.db"),
+    log_level: str = Form("INFO"),
+    log_file: str = Form("logs/app.log"),
+):
+    """Update configuration from settings form (form-data)."""
     config_manager = ConfigManager()
     try:
-        config_manager.set(update.key, update.value)
-        return {"success": True, "message": f"Set {update.key} = {update.value}"}
+        values = {
+            "poll_interval_seconds": poll_interval_seconds,
+            "source_timeout_seconds": source_timeout_seconds,
+            "redemption_min_gap_seconds": redemption_min_gap_seconds,
+            "max_retry_attempts": max_retry_attempts,
+            "redemption_enabled": redemption_enabled,
+            "db_path": db_path,
+            "log_level": log_level,
+            "log_file": log_file,
+        }
+        for key, value in values.items():
+            config_manager.set(key, value)
+        return {"success": True, "message": "Settings saved"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@app.post("/author")
+async def update_author(
+    author_name: str = Form(""),
+    author_url: str = Form(""),
+    support_url: str = Form(""),
+):
+    """Update author info (stored in local DB)."""
+    storage = Storage()
+    storage.set_config("author_name", author_name.strip())
+    storage.set_config("author_url", author_url.strip())
+    storage.set_config("support_url", support_url.strip())
+    return {"success": True, "message": "Author info saved"}
 
 
 @app.post("/scheduler/start")

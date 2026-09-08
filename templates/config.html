@@ -1,27 +1,23 @@
 {% extends "base.html" %}
-{% block title %}Config - Genshin Code Monitor{% endblock %}
-{% block page_title %}Config{% endblock %}
+{% block title %}{{ t('nav_config') }} - {{ t('app_name') }}{% endblock %}
+{% block page_title %}{{ t('nav_config') }}{% endblock %}
 {% block content %}
 <div class="card">
-    <div class="card-title" style="margin-bottom: 14px;">Application config</div>
+    <div class="card-title" style="margin-bottom: 14px;">{{ t('app_config') }}</div>
     <form hx-post="/config" hx-target="#config-result" hx-swap="innerHTML">
-        <h4 style="margin: 12px 0 8px; font-size: 0.9rem;">Intervals</h4>
+        <h4 style="margin: 12px 0 8px; font-size: 0.9rem;">{{ t('intervals') }}</h4>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px;">
-            <div><label>Poll interval (sec)</label><input type="number" name="poll_interval_seconds" value="{{ config.poll_interval_seconds }}" min="60" max="86400"></div>
-            <div><label>Source timeout (sec)</label><input type="number" name="source_timeout_seconds" value="{{ config.source_timeout_seconds }}" min="5" max="300"></div>
-            <div><label>Min redeem gap (sec)</label><input type="number" name="redemption_min_gap_seconds" value="{{ config.redemption_min_gap_seconds }}" min="6" max="3600"></div>
-            <div><label>Max retries</label><input type="number" name="max_retry_attempts" value="{{ config.max_retry_attempts }}" min="0" max="10"></div>
+            <div><label>{{ t('poll_interval') }}</label><input type="number" name="poll_interval_seconds" value="{{ config.poll_interval_seconds }}" min="60" max="86400"></div>
+            <div><label>{{ t('source_timeout') }}</label><input type="number" name="source_timeout_seconds" value="{{ config.source_timeout_seconds }}" min="5" max="300"></div>
+            <div><label>{{ t('min_gap') }}</label><input type="number" name="redemption_min_gap_seconds" value="{{ config.redemption_min_gap_seconds }}" min="6" max="3600"></div>
+            <div><label>{{ t('max_retries') }}</label><input type="number" name="max_retry_attempts" value="{{ config.max_retry_attempts }}" min="0" max="10"></div>
         </div>
-        <h4 style="margin: 16px 0 8px; font-size: 0.9rem;">Redemption</h4>
-        <div><label><input type="checkbox" name="redemption_enabled" value="true" {% if config.redemption_enabled %}checked{% endif %} style="width: auto;"> Enable auto-redeem</label></div>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin-top: 8px;">
-            <div><label>Game biz</label><input type="text" name="game_biz" value="{{ config.game_biz or 'hk4e_global' }}"></div>
-            <div><label>Lang</label><input type="text" name="lang" value="{{ config.lang or 'en-us' }}"></div>
-        </div>
-        <h4 style="margin: 16px 0 8px; font-size: 0.9rem;">Storage / logging</h4>
+        <h4 style="margin: 16px 0 8px; font-size: 0.9rem;">{{ t('redemption') }}</h4>
+        <div><label><input type="checkbox" name="redemption_enabled" value="true" {% if config.redemption_enabled %}checked{% endif %} style="width: auto;"> {{ t('enable_redeem') }}</label></div>
+        <h4 style="margin: 16px 0 8px; font-size: 0.9rem;">{{ t('storage_logging') }}</h4>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px;">
-            <div><label>DB path</label><input type="text" name="db_path" value="{{ config.db_path }}"></div>
-            <div><label>Log level</label>
+            <div><label>{{ t('db_path') }}</label><input type="text" name="db_path" value="{{ config.db_path }}"></div>
+            <div><label>{{ t('log_level') }}</label>
                 <select name="log_level">
                     <option value="DEBUG" {% if config.log_level == 'DEBUG' %}selected{% endif %}>DEBUG</option>
                     <option value="INFO" {% if config.log_level == 'INFO' %}selected{% endif %}>INFO</option>
@@ -29,16 +25,32 @@
                     <option value="ERROR" {% if config.log_level == 'ERROR' %}selected{% endif %}>ERROR</option>
                 </select>
             </div>
-            <div><label>Log file</label><input type="text" name="log_file" value="{{ config.log_file }}"></div>
+            <div><label>{{ t('log_file') }}</label><input type="text" name="log_file" value="{{ config.log_file }}"></div>
         </div>
         <div id="config-result" style="margin-top: 12px;"></div>
         <div style="display: flex; justify-content: flex-end; margin-top: 14px;">
-            <button type="submit" class="btn btn-primary">Save</button>
+            <button type="submit" class="btn btn-primary">{{ t('save') }}</button>
         </div>
     </form>
 </div>
+
 <div class="card">
-    <div class="card-title" style="margin-bottom: 8px;">Current config (JSON)</div>
+    <div class="card-title" style="margin-bottom: 14px;">{{ t('about_author') }}</div>
+    <form hx-post="/author" hx-target="#author-result" hx-swap="innerHTML">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px;">
+            <div><label>{{ t('name') }}</label><input type="text" name="author_name" value="{{ author_name or '' }}" placeholder="Your name"></div>
+            <div><label>URL</label><input type="url" name="author_url" value="{{ author_url or '' }}" placeholder="https://github.com/you"></div>
+            <div><label>{{ t('support_author') }} URL</label><input type="url" name="support_url" value="{{ support_url or '' }}" placeholder="https://boosty.to/you"></div>
+        </div>
+        <div id="author-result" style="margin-top: 12px;"></div>
+        <div style="display: flex; justify-content: flex-end; margin-top: 14px;">
+            <button type="submit" class="btn btn-primary">{{ t('save') }}</button>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <div class="card-title" style="margin-bottom: 8px;">{{ t('current_config') }}</div>
     <pre style="background: var(--bg); padding: 12px; border-radius: 8px; overflow-x: auto; font-size: 0.8rem;">{{ config | tojson(indent=2) }}</pre>
 </div>
 {% endblock %}
