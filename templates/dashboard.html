@@ -112,43 +112,6 @@
     {% endif %}
 </div>
 
-<div class="card" id="author">
-    <div class="card-title" style="margin-bottom: 8px;">{{ t('about_author') }}{% if author_name %} — {{ author_name }}{% endif %}</div>
-    <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px;">
-        {% if author_telegram %}<a class="btn" style="padding: 4px 12px; font-size: 0.8rem;" href="https://t.me/{{ author_telegram | replace('@', '') }}">Telegram</a>{% endif %}
-        {% if author_email %}<a class="btn" style="padding: 4px 12px; font-size: 0.8rem;" href="mailto:{{ author_email }}">Email</a>{% endif %}
-        {% if author_github %}<a class="btn" style="padding: 4px 12px; font-size: 0.8rem;" href="{{ author_github }}">GitHub</a>{% endif %}
-        {% if support_patreon %}<a class="btn btn-primary" style="padding: 4px 12px; font-size: 0.8rem;" href="{{ support_patreon }}">Patreon</a>{% endif %}
-        {% if support_boosty %}<a class="btn btn-primary" style="padding: 4px 12px; font-size: 0.8rem;" href="{{ support_boosty }}">Boosty</a>{% endif %}
-        {% if support_kofi %}<a class="btn btn-primary" style="padding: 4px 12px; font-size: 0.8rem;" href="{{ support_kofi }}">Ko-fi</a>{% endif %}
-        {% if support_donationalerts %}<a class="btn btn-primary" style="padding: 4px 12px; font-size: 0.8rem;" href="{{ support_donationalerts }}">DonationAlerts</a>{% endif %}
-        {% if support_cloudtips %}<a class="btn btn-primary" style="padding: 4px 12px; font-size: 0.8rem;" href="{{ support_cloudtips }}">CloudTips</a>{% endif %}
-        {% if support_donatepay %}<a class="btn btn-primary" style="padding: 4px 12px; font-size: 0.8rem;" href="{{ support_donatepay }}">DonatePay</a>{% endif %}
-        {% if support_url %}<a class="btn btn-primary" style="padding: 4px 12px; font-size: 0.8rem;" href="{{ support_url }}">{{ t('support_author') }}</a>{% endif %}
-    </div>
-    {% if support_bitcoin %}
-    <div class="mono" style="font-size: 0.8rem; background: var(--bg); padding: 8px 12px; border-radius: 6px; word-break: break-all; margin-bottom: 8px;">
-        BTC {{ support_bitcoin }}
-        <button class="btn" style="padding: 2px 10px; font-size: 0.75rem; margin-left: 8px;" onclick="navigator.clipboard.writeText('{{ support_bitcoin }}');this.textContent='{{ t('copied') }}'">{{ t('copy') }}</button>
-        <img src="/author/qr?kind=bitcoin" alt="BTC QR" style="display: block; margin-top: 8px; width: 140px; height: 140px; background: #fff; padding: 6px; border-radius: 8px;">
-    </div>
-    {% endif %}
-    {% if support_ton %}
-    <div class="mono" style="font-size: 0.8rem; background: var(--bg); padding: 8px 12px; border-radius: 6px; word-break: break-all; margin-bottom: 8px;">
-        TON {{ support_ton }}
-        <button class="btn" style="padding: 2px 10px; font-size: 0.75rem; margin-left: 8px;" onclick="navigator.clipboard.writeText('{{ support_ton }}');this.textContent='{{ t('copied') }}'">{{ t('copy') }}</button>
-        <img src="/author/qr?kind=ton" alt="TON QR" style="display: block; margin-top: 8px; width: 140px; height: 140px; background: #fff; padding: 6px; border-radius: 8px;">
-    </div>
-    {% endif %}
-    {% if support_usdt_trc20 %}
-    <div class="mono" style="font-size: 0.8rem; background: var(--bg); padding: 8px 12px; border-radius: 6px; word-break: break-all;">
-        USDT (TRC-20) {{ support_usdt_trc20 }}
-        <button class="btn" style="padding: 2px 10px; font-size: 0.75rem; margin-left: 8px;" onclick="navigator.clipboard.writeText('{{ support_usdt_trc20 }}');this.textContent='{{ t('copied') }}'">{{ t('copy') }}</button>
-        <img src="/author/qr?kind=usdt" alt="USDT QR" style="display: block; margin-top: 8px; width: 140px; height: 140px; background: #fff; padding: 6px; border-radius: 8px;">
-    </div>
-    {% endif %}
-</div>
-
 <div class="card" hx-get="/partials/recent-logs" hx-trigger="every 10s" hx-swap="outerHTML">
     <div class="card-title" style="margin-bottom: 12px;">{{ t('redemption_log') }}</div>
     {% if logs %}

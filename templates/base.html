@@ -105,9 +105,9 @@
     </div>
     {% if author_name or support_bitcoin or support_ton or support_boosty or support_patreon %}
     <div style="margin-top: 16px; padding: 12px 10px 4px; border-top: 1px solid var(--border); font-size: 0.8rem;">
-        <div class="muted" style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px;"><a href="/#author" style="color: inherit; text-decoration: none;">{{ t('about_author') }}</a></div>
+        <div class="muted" style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px;"><a href="/author" style="color: inherit; text-decoration: none;">{{ t('about_author') }}</a></div>
         {% if author_name %}
-        <div style="font-weight: 600; margin-bottom: 6px;"><a href="/#author" style="color: inherit;">{% if author_url %}{{ author_name }}{% else %}{{ author_name }}{% endif %}</a></div>
+        <div style="font-weight: 600; margin-bottom: 6px;"><a href="/author" style="color: inherit;">{{ author_name }}</a></div>
         {% endif %}
         <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px;">
             {% if author_telegram %}<a href="https://t.me/{{ author_telegram | replace('@', '') }}" style="font-size: 0.78rem;">Telegram</a>{% endif %}
@@ -126,7 +126,7 @@
         <h1>{% block page_title %}Dashboard{% endblock %}</h1>
         <div style="display: flex; gap: 8px; align-items: center;">
             {% if author_name or support_bitcoin or support_ton or support_boosty or support_patreon or support_url %}
-            <a href="/#author" class="btn btn-primary" style="padding: 6px 14px; font-size: 0.8rem;">{{ t('support_author') }}</a>
+            <a href="/author" class="btn btn-primary" style="padding: 6px 14px; font-size: 0.8rem;">{{ t('support_author') }}</a>
             {% endif %}
             {% if scheduler is defined and scheduler and scheduler.running %}
             <span class="badge badge-ok">{{ t('running') }}</span>

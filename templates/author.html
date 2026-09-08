@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}{{ t('about_author') }} - {{ t('app_name') }}{% endblock %}
+{% block page_title %}{{ t('about_author') }}{% endblock %}
+{% block content %}
+{% if author.name %}
+<div class="card">
+    <div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap;">
+        <div style="width: 56px; height: 56px; background: linear-gradient(135deg, var(--accent) 50%, #7c6cf0 50%); transform: rotate(45deg); border-radius: 12px; flex: none;"></div>
+        <div>
+            <div style="font-size: 1.3rem; font-weight: 700;">{% if author.url %}<a href="{{ author.url }}">{{ author.name }}</a>{% else %}{{ author.name }}{% endif %}</div>
+            <div class="muted">{{ t('app_name') }} v{{ app_version }}</div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if author.telegram or author.email or author.github %}
+<div class="card">
+    <div class="card-title" style="margin-bottom: 12px;">{{ t('contacts') }}</div>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        {% if author.telegram %}<a class="btn" href="https://t.me/{{ author.telegram | replace('@', '') }}">Telegram{% if author.telegram.startswith('@') %}: {{ author.telegram }}{% endif %}</a>{% endif %}
+        {% if author.email %}<a class="btn" href="mailto:{{ author.email }}">Email: {{ author.email }}</a>{% endif %}
+        {% if author.github %}<a class="btn" href="{{ author.github }}">GitHub</a>{% endif %}
+    </div>
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="card-title" style="margin-bottom: 4px;">{{ t('support_author') }}</div>
+    <p class="muted" style="margin-top: 0;">{{ t('donate_note') }}</p>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 6px;">
+        {% if author.patreon %}<a class="btn btn-primary" href="{{ author.patreon }}">Patreon</a>{% endif %}
+        {% if author.boosty %}<a class="btn btn-primary" href="{{ author.boosty }}">Boosty</a>{% endif %}
+        {% if author.kofi %}<a class="btn btn-primary" href="{{ author.kofi }}">Ko-fi</a>{% endif %}
+        {% if author.donationalerts %}<a class="btn btn-primary" href="{{ author.donationalerts }}">DonationAlerts</a>{% endif %}
+        {% if author.cloudtips %}<a class="btn btn-primary" href="{{ author.cloudtips }}">CloudTips</a>{% endif %}
+        {% if author.donatepay %}<a class="btn btn-primary" href="{{ author.donatepay }}">DonatePay</a>{% endif %}
+        {% if author.url_generic %}<a class="btn btn-primary" href="{{ author.url_generic }}">{{ t('support_author') }}</a>{% endif %}
+    </div>
+    {% if author.bitcoin %}
+    <div class="mono" style="font-size: 0.85rem; background: var(--bg); padding: 10px 14px; border-radius: 8px; word-break: break-all; margin-bottom: 8px;">
+        <strong>BTC</strong> {{ author.bitcoin }}
+        <button class="btn" style="padding: 2px 10px; font-size: 0.75rem; margin-left: 8px;" onclick="navigator.clipboard.writeText('{{ author.bitcoin }}');this.textContent='{{ t('copied') }}'">{{ t('copy') }}</button>
+        <img src="/author/qr?kind=bitcoin" alt="BTC QR" style="display: block; margin-top: 8px; width: 160px; height: 160px; background: #fff; padding: 6px; border-radius: 8px;">
+    </div>
+    {% endif %}
+    {% if author.ton %}
+    <div class="mono" style="font-size: 0.85rem; background: var(--bg); padding: 10px 14px; border-radius: 8px; word-break: break-all; margin-bottom: 8px;">
+        <strong>TON</strong> {{ author.ton }}
+        <button class="btn" style="padding: 2px 10px; font-size: 0.75rem; margin-left: 8px;" onclick="navigator.clipboard.writeText('{{ author.ton }}');this.textContent='{{ t('copied') }}'">{{ t('copy') }}</button>
+        <img src="/author/qr?kind=ton" alt="TON QR" style="display: block; margin-top: 8px; width: 160px; height: 160px; background: #fff; padding: 6px; border-radius: 8px;">
+    </div>
+    {% endif %}
+    {% if author.usdt %}
+    <div class="mono" style="font-size: 0.85rem; background: var(--bg); padding: 10px 14px; border-radius: 8px; word-break: break-all;">
+        <strong>USDT (TRC-20)</strong> {{ author.usdt }}
+        <button class="btn" style="padding: 2px 10px; font-size: 0.75rem; margin-left: 8px;" onclick="navigator.clipboard.writeText('{{ author.usdt }}');this.textContent='{{ t('copied') }}'">{{ t('copy') }}</button>
+        <img src="/author/qr?kind=usdt" alt="USDT QR" style="display: block; margin-top: 8px; width: 160px; height: 160px; background: #fff; padding: 6px; border-radius: 8px;">
+    </div>
+    {% endif %}
+    {% if not has_any %}
+    <p class="muted">{{ t('author_empty') }}</p>
+    {% endif %}
+</div>
+{% endblock %}

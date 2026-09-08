@@ -124,6 +124,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "donate": "Donate",
         "copy": "Copy",
         "copied": "Copied!",
+        "donate_note": "Your support keeps the monitor running.",
     },
     "ru": {
         "app_name": "Genshin Code Monitor",
@@ -231,6 +232,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "donate": "Донат",
         "copy": "Копировать",
         "copied": "Скопировано!",
+        "donate_note": "Ваша поддержка помогает развивать мониторинг.",
     },
     "de": {
         "app_name": "Genshin Code Monitor",
@@ -338,6 +340,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "donate": "Spenden",
         "copy": "Kopieren",
         "copied": "Kopiert!",
+        "donate_note": "Deine Unterstützung hält den Monitor am Laufen.",
     },
     "fr": {
         "app_name": "Genshin Code Monitor",
@@ -445,6 +448,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "donate": "Faire un don",
         "copy": "Copier",
         "copied": "Copié !",
+        "donate_note": "Votre soutien fait vivre le moniteur.",
     },
     "ja": {
         "app_name": "Genshin Code Monitor",
@@ -552,6 +556,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "donate": "寄付",
         "copy": "コピー",
         "copied": "コピーしました！",
+        "donate_note": "皆様のご支援が開発の励みになります。",
     },
     "zh": {
         "app_name": "Genshin Code Monitor",
@@ -659,6 +664,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "donate": "打赏",
         "copy": "复制",
         "copied": "已复制！",
+        "donate_note": "您的支持让监控持续运行。",
     },
 }
 

@@ -482,6 +482,44 @@ async def update_config(
         raise HTTPException(status_code=400, detail=str(e)) from e
 
 
+@app.get("/author", response_class=HTMLResponse)
+async def author_page(request: Request):
+    """Author page with contacts and support options."""
+    from src import author as author_module
+
+    storage = Storage()
+    raw = author_module.as_dict()
+    author = {
+        "name": raw.get("author_name", ""),
+        "url": raw.get("author_url", ""),
+        "telegram": raw.get("author_telegram", ""),
+        "email": raw.get("author_email", ""),
+        "github": raw.get("author_github", ""),
+        "url_generic": raw.get("support_url", ""),
+        "patreon": raw.get("support_patreon", ""),
+        "boosty": raw.get("support_boosty", ""),
+        "kofi": raw.get("support_kofi", ""),
+        "donationalerts": raw.get("support_donationalerts", ""),
+        "cloudtips": raw.get("support_cloudtips", ""),
+        "donatepay": raw.get("support_donatepay", ""),
+        "bitcoin": raw.get("support_bitcoin", ""),
+        "ton": raw.get("support_ton", ""),
+        "usdt": raw.get("support_usdt_trc20", ""),
+    }
+    return templates.TemplateResponse(
+        request,
+        "author.html",
+        page_ctx(
+            storage,
+            {
+                "request": request,
+                "author": author,
+                "has_any": author_module.has_any(),
+            },
+        ),
+    )
+
+
 @app.get("/author/qr")
 async def author_qr(kind: str = "bitcoin"):
     """QR code PNG for a crypto address (generated locally, no external calls)."""
