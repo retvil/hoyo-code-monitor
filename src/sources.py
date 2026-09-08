@@ -21,7 +21,25 @@ from src.storage import Storage
 
 logger = logging.getLogger(__name__)
 
-_CODE_RE = re.compile(r"\b[A-Z0-9]{8,14}\b")
+_CODE_RE = re.compile(r"\b[A-Za-z0-9]{8,24}\b")
+
+
+def is_plausible_code(text: str) -> bool:
+    """Heuristic: real promo codes have digits, are ALL-CAPS, or long MixedCase.
+
+    Rejects plain lowercase English words picked up from article text.
+    """
+    if not (8 <= len(text) <= 24):
+        return False
+    if any(ch.isdigit() for ch in text):
+        return True
+    if text == text.upper():
+        return True
+    return len(text) >= 10 and any(ch.isupper() for ch in text)
+
+
+def _dedup(items: list[str]) -> list[str]:
+    return list(dict.fromkeys(items))
 
 
 class Extractor(Protocol):
@@ -40,8 +58,10 @@ class CSSExtractor:
         elements = soup.select(selector)
         codes: list[str] = []
         for el in elements:
-            codes.extend(_CODE_RE.findall(el.get_text(strip=True).upper()))
-        return list(dict.fromkeys(codes))
+            for m in _CODE_RE.findall(el.get_text(strip=True)):
+                if is_plausible_code(m):
+                    codes.append(m)
+        return _dedup(codes)
 
 
 class XPathExtractor:
@@ -53,11 +73,16 @@ class XPathExtractor:
         codes: list[str] = []
         for el in elements:
             if isinstance(el, str):
-                text = el.upper()
+                text = el
             else:
-                text = el.text_content().upper() if hasattr(el, "text_content") else str(el).upper()
-            codes.extend(_CODE_RE.findall(text))
-        return list(dict.fromkeys(codes))
+                text = el.text_content() if hasattr(el, "text_content") else str(el)
+            for m in _CODE_RE.findall(text):
+                if is_plausible_code(m):
+                    codes.append(m)
+        return _dedup(codes)
+
+
+CODE_KEYS = ("code", "cdkey", "promo_code", "promocode", "redemption_code", "gift_code")
 
 
 class JSONExtractor:
@@ -65,6 +90,7 @@ class JSONExtractor:
 
     Selector examples: "" (whole document), "active", "data.list".
     Falls back to whole-document scan if path is missing.
+    Values of exact `code`-like keys are taken verbatim (case preserved).
     """
 
     def extract(self, content: str, selector: str) -> list[str]:
@@ -89,13 +115,18 @@ class JSONExtractor:
 
         def find_codes(obj: Any) -> None:
             if isinstance(obj, dict):
-                for v in obj.values():
-                    find_codes(v)
+                for k, v in obj.items():
+                    if isinstance(k, str) and k.lower() in CODE_KEYS and isinstance(v, str) and v.strip():
+                        codes.append(v.strip())
+                    else:
+                        find_codes(v)
             elif isinstance(obj, list):
                 for v in obj:
                     find_codes(v)
             elif isinstance(obj, str):
-                codes.extend(_CODE_RE.findall(obj.upper()))
+                for m in _CODE_RE.findall(obj):
+                    if is_plausible_code(m):
+                        codes.append(m)
 
         find_codes(target)
         return list(dict.fromkeys(codes))
