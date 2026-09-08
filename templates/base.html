@@ -119,9 +119,11 @@
     <footer class="muted" style="font-size: 0.78rem; padding: 16px 0;">
         {{ t('footer_note') }} · <a href="/health">health</a> · <a href="/metrics">metrics</a>
         {% if author_name %}
-        · {{ t('about_author') }}: {% if author_url %}<a href="{{ author_url }}">{{ author_name }}</a>{% else %}{{ author_name }}{% endif %}
+        · {% if author_url %}<a href="{{ author_url }}">{{ author_name }}</a>{% else %}{{ author_name }}{% endif %}
         {% endif %}
-        {% if support_url %}
+        {% if support_boosty %}
+        · <a href="{{ support_boosty }}" class="btn" style="padding: 4px 12px; font-size: 0.78rem;">Boosty</a>
+        {% elif support_url %}
         · <a href="{{ support_url }}" class="btn" style="padding: 4px 12px; font-size: 0.78rem;">{{ t('support_author') }}</a>
         {% endif %}
     </footer>

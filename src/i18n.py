@@ -112,6 +112,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "about_author": "About the author",
         "support_author": "Support the author",
         "author_empty": "Author info is not set. Fill it in Config to show it here.",
+        "contacts": "Contacts",
+        "donate": "Donate",
+        "copy": "Copy",
+        "copied": "Copied!",
     },
     "ru": {
         "app_name": "Genshin Code Monitor",
@@ -207,6 +211,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "about_author": "Об авторе",
         "support_author": "Поддержать автора",
         "author_empty": "Информация об авторе не задана. Заполните её в настройках.",
+        "contacts": "Контакты",
+        "donate": "Донат",
+        "copy": "Копировать",
+        "copied": "Скопировано!",
     },
     "de": {
         "app_name": "Genshin Code Monitor",
@@ -302,6 +310,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "about_author": "Über den Autor",
         "support_author": "Autor unterstützen",
         "author_empty": "Autoreninfo nicht gesetzt. In den Einstellungen ausfüllen.",
+        "contacts": "Kontakte",
+        "donate": "Spenden",
+        "copy": "Kopieren",
+        "copied": "Kopiert!",
     },
     "fr": {
         "app_name": "Genshin Code Monitor",
@@ -397,6 +409,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "about_author": "À propos de l'auteur",
         "support_author": "Soutenir l'auteur",
         "author_empty": "Infos auteur non définies. Remplissez-les dans la configuration.",
+        "contacts": "Contacts",
+        "donate": "Faire un don",
+        "copy": "Copier",
+        "copied": "Copié !",
     },
     "ja": {
         "app_name": "Genshin Code Monitor",
@@ -492,6 +508,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "about_author": "作者について",
         "support_author": "作者を支援する",
         "author_empty": "作者情報が未設定です。設定画面で入力してください。",
+        "contacts": "連絡先",
+        "donate": "寄付",
+        "copy": "コピー",
+        "copied": "コピーしました！",
     },
     "zh": {
         "app_name": "Genshin Code Monitor",
@@ -587,6 +607,10 @@ STRINGS: dict[str, dict[str, str]] = {
         "about_author": "关于作者",
         "support_author": "支持作者",
         "author_empty": "未设置作者信息。请在配置页填写。",
+        "contacts": "联系方式",
+        "donate": "打赏",
+        "copy": "复制",
+        "copied": "已复制！",
     },
 }
 

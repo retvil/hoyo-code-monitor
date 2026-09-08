@@ -39,8 +39,16 @@
     <form hx-post="/author" hx-target="#author-result" hx-swap="innerHTML">
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px;">
             <div><label>{{ t('name') }}</label><input type="text" name="author_name" value="{{ author_name or '' }}" placeholder="Your name"></div>
-            <div><label>URL</label><input type="url" name="author_url" value="{{ author_url or '' }}" placeholder="https://github.com/you"></div>
-            <div><label>{{ t('support_author') }} URL</label><input type="url" name="support_url" value="{{ support_url or '' }}" placeholder="https://boosty.to/you"></div>
+            <div><label>URL</label><input type="url" name="author_url" value="{{ author_url or '' }}" placeholder="https://example.com"></div>
+            <div><label>Telegram (@nick or link)</label><input type="text" name="author_telegram" value="{{ author_telegram or '' }}" placeholder="@nickname"></div>
+            <div><label>Email</label><input type="email" name="author_email" value="{{ author_email or '' }}" placeholder="you@example.com"></div>
+            <div><label>GitHub</label><input type="url" name="author_github" value="{{ author_github or '' }}" placeholder="https://github.com/you/project"></div>
+            <div><label>{{ t('support_author') }} URL</label><input type="url" name="support_url" value="{{ support_url or '' }}" placeholder="https://example.com/donate"></div>
+            <div><label>Patreon</label><input type="url" name="support_patreon" value="{{ support_patreon or '' }}" placeholder="https://patreon.com/you"></div>
+            <div><label>Boosty</label><input type="url" name="support_boosty" value="{{ support_boosty or '' }}" placeholder="https://boosty.to/you"></div>
+            <div><label>Ko-fi</label><input type="url" name="support_kofi" value="{{ support_kofi or '' }}" placeholder="https://ko-fi.com/you"></div>
+            <div><label>DonationAlerts</label><input type="url" name="support_donationalerts" value="{{ support_donationalerts or '' }}" placeholder="https://donationalerts.com/r/you"></div>
+            <div><label>Bitcoin (address)</label><input type="text" name="support_bitcoin" value="{{ support_bitcoin or '' }}" placeholder="bc1q..." style="font-family: Consolas, monospace; font-size: 0.8rem;"></div>
         </div>
         <div id="author-result" style="margin-top: 12px;"></div>
         <div style="display: flex; justify-content: flex-end; margin-top: 14px;">

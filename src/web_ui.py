@@ -87,6 +87,21 @@ class ConfigUpdate(BaseModel):
     value: Any
 
 
+AUTHOR_KEYS = (
+    "author_name",
+    "author_url",
+    "author_telegram",
+    "author_email",
+    "author_github",
+    "support_url",
+    "support_patreon",
+    "support_boosty",
+    "support_kofi",
+    "support_donationalerts",
+    "support_bitcoin",
+)
+
+
 def page_ctx(storage: Storage, extra: dict | None = None) -> dict:
     """Build template context with i18n + author info (local single-user UI)."""
     lang = get_lang(storage)
@@ -94,10 +109,9 @@ def page_ctx(storage: Storage, extra: dict | None = None) -> dict:
         "t": make_t(lang),
         "lang": lang,
         "langs": SUPPORTED,
-        "author_name": storage.get_config("author_name", "") or "",
-        "author_url": storage.get_config("author_url", "") or "",
-        "support_url": storage.get_config("support_url", "") or "",
     }
+    for key in AUTHOR_KEYS:
+        ctx[key] = storage.get_config(key, "") or ""
     if extra:
         ctx.update(extra)
     return ctx
@@ -485,12 +499,31 @@ async def update_author(
     author_name: str = Form(""),
     author_url: str = Form(""),
     support_url: str = Form(""),
+    author_telegram: str = Form(""),
+    author_email: str = Form(""),
+    author_github: str = Form(""),
+    support_patreon: str = Form(""),
+    support_boosty: str = Form(""),
+    support_bitcoin: str = Form(""),
+    support_kofi: str = Form(""),
+    support_donationalerts: str = Form(""),
 ):
     """Update author info (stored in local DB)."""
     storage = Storage()
-    storage.set_config("author_name", author_name.strip())
-    storage.set_config("author_url", author_url.strip())
-    storage.set_config("support_url", support_url.strip())
+    for key, value in {
+        "author_name": author_name,
+        "author_url": author_url,
+        "support_url": support_url,
+        "author_telegram": author_telegram,
+        "author_email": author_email,
+        "author_github": author_github,
+        "support_patreon": support_patreon,
+        "support_boosty": support_boosty,
+        "support_bitcoin": support_bitcoin,
+        "support_kofi": support_kofi,
+        "support_donationalerts": support_donationalerts,
+    }.items():
+        storage.set_config(key, value.strip())
     return {"success": True, "message": "Author info saved"}
 
 
