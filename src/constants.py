@@ -61,6 +61,14 @@ WEB_PORT: int = 8000
 APP_VERSION: str = "0.1.0"
 APP_AUTHOR: str = "Nod33Eset"
 
+# --- Redeem links ---
+GIFT_URL: str = "https://genshin.hoyoverse.com/en/gift?code={code}"
+
+
+def gift_url(code: str) -> str:
+    """Official web redemption link with pre-filled code."""
+    return GIFT_URL.format(code=code)
+
 # --- CLI / Display ---
 MAX_DISPLAY_CODES: int = 5
 MAX_DISPLAY_SOURCES: int = 10

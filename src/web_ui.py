@@ -778,6 +778,61 @@ async def redeem_all_codes():
     return {"success": True, "result": f"Redeemed: {done}, failed: {failed}"}
 
 
+@app.get("/export")
+async def export_data():
+    """Export codes + redemption state as JSON (backup / transfer)."""
+    storage = Storage()
+    codes = storage.list_codes(limit=10000)
+    return {
+        "app": "genshin-code-monitor",
+        "version": 1,
+        "codes": [
+            {
+                "code": c["code"],
+                "sources": c.get("sources", []),
+                "redeemed": bool(c.get("redeemed")),
+                "reward": c.get("reward"),
+                "attempted_at": c.get("attempted_at"),
+                "redeemed_at": c.get("redeemed_at"),
+            }
+            for c in codes
+        ],
+    }
+
+
+@app.post("/import")
+async def import_data(payload: str = Form(...)):
+    """Import codes JSON (merges, never overwrites redemption state)."""
+    storage = Storage()
+    try:
+        data = json.loads(payload)
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid JSON: {e}") from e
+    items = data.get("codes", []) if isinstance(data, dict) else []
+    added, skipped = 0, 0
+    for item in items:
+        code = str(item.get("code", "")).strip().upper()
+        if not code:
+            continue
+        existing = storage.get_code(code)
+        if existing:
+            skipped += 1
+            continue
+        try:
+            for src in item.get("sources", ["import"]) or ["import"]:
+                try:
+                    storage.add_code(code, str(src))
+                    break
+                except Exception:
+                    continue
+            if item.get("redeemed"):
+                storage.update_code_redemption(code, True, item.get("reward"))
+            added += 1
+        except Exception:
+            skipped += 1
+    return {"success": True, "result": f"Imported {added}, skipped {skipped}"}
+
+
 @app.get("/metrics")
 async def metrics():
     """Prometheus metrics endpoint."""

@@ -12,6 +12,16 @@
             --good: #2f7d4a; --good-soft: #dcfce7; --bad: #b53a2a; --bad-soft: #fee2e2;
             --radius: 10px;
         }
+        [data-theme="dark"] {
+            --bg: #14161a; --surface: #1e2126; --fg: #e8e6e3; --muted: #9a978f;
+            --border: #2e3238; --accent: #8b7cf6; --accent-soft: #2c2a4a;
+            --good: #4ade80; --good-soft: #14331f; --bad: #f87171; --bad-soft: #3f1d1d;
+        }
+        [data-theme="amoled"] {
+            --bg: #000000; --surface: #0a0a0a; --fg: #f0efec; --muted: #8a8782;
+            --border: #1f1f1f; --accent: #a78bfa; --accent-soft: #1c1533;
+            --good: #4ade80; --good-soft: #0d2818; --bad: #f87171; --bad-soft: #331111;
+        }
         * { box-sizing: border-box; }
         body { margin: 0; background: var(--bg); color: var(--fg);
                font: 14px/1.5 -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
@@ -85,6 +95,24 @@
     {% block extra_css %}{% endblock %}
 </head>
 <body>
+<script>
+try {
+    var th = localStorage.getItem('gcm-theme') || 'light';
+    if (th !== 'light') document.documentElement.setAttribute('data-theme', th);
+    else document.documentElement.removeAttribute('data-theme');
+} catch (e) {}
+function setTheme(th) {
+    try { localStorage.setItem('gcm-theme', th); } catch (e) {}
+    if (th === 'light') document.documentElement.removeAttribute('data-theme');
+    else document.documentElement.setAttribute('data-theme', th);
+}
+function copyText(txt, el) {
+    navigator.clipboard.writeText(txt).then(function() {
+        var old = el.textContent; el.textContent = 'OK';
+        setTimeout(function() { el.textContent = old; }, 1200);
+    });
+}
+</script>
 <aside class="sidebar">
     <div class="brand"><span class="brand-mark" aria-hidden="true"></span><span>{{ t('app_name') }}<small>v{{ app_version }} · by {{ app_author }}</small></span></div>
     <nav class="nav">
@@ -102,6 +130,34 @@
             <option value="{{ code }}" {% if code == lang %}selected{% endif %}>{{ name }}</option>
             {% endfor %}
         </select>
+    </div>
+    <div class="lang-switch">
+        <label class="muted" style="font-size: 0.75rem;">Theme</label>
+        <div style="display: flex; gap: 4px;">
+            <button class="btn" style="padding: 4px 10px; font-size: 0.75rem;" onclick="setTheme('light')">Light</button>
+            <button class="btn" style="padding: 4px 10px; font-size: 0.75rem;" onclick="setTheme('dark')">Dark</button>
+            <button class="btn" style="padding: 4px 10px; font-size: 0.75rem;" onclick="setTheme('amoled')">AMOLED</button>
+        </div>
+        <div style="margin-top: 8px; display: flex; gap: 4px;">
+            <button class="btn" style="padding: 4px 10px; font-size: 0.75rem;" onclick="location.href='/export'">Export</button>
+            <button class="btn" style="padding: 4px 10px; font-size: 0.75rem;" onclick="document.getElementById('import-modal').classList.add('active')">Import</button>
+        </div>
+    </div>
+    <div class="modal" id="import-modal">
+        <div class="modal-box">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h3 style="margin: 0;">Import</h3>
+                <button style="background: none; border: none; font-size: 1.4rem; cursor: pointer;" onclick="document.getElementById('import-modal').classList.remove('active')">×</button>
+            </div>
+            <form hx-post="/import" hx-target="#import-result" hx-swap="innerHTML">
+                <div style="margin-bottom: 10px;"><label>Paste exported JSON</label><textarea name="payload" rows="8" required placeholder='{"codes": [...], ...}'></textarea></div>
+                <div id="import-result" style="font-size: 0.85rem;"></div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 12px;">
+                    <button type="button" class="btn" onclick="document.getElementById('import-modal').classList.remove('active')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Import</button>
+                </div>
+            </form>
+        </div>
     </div>
     {% if author_name or support_bitcoin or support_ton or support_boosty or support_patreon %}
     <div style="margin-top: 16px; padding: 12px 10px 4px; border-top: 1px solid var(--border); font-size: 0.8rem;">
