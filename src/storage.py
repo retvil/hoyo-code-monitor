@@ -480,18 +480,29 @@ class Storage:
             ).fetchall()
             return [{"day": r[0], "count": r[1]} for r in rows]
 
-    def get_stats(self) -> dict[str, Any]:
+    def get_stats(self, game: str | None = None) -> dict[str, Any]:
         """Get redemption statistics.
 
         Returns:
             Dictionary with total_codes, successful, failed, and by_source counts.
         """
+        filt = " WHERE game = ?" if game else ""
+        params: list[Any] = [game] if game else []
         with self._connection() as conn:
-            total = conn.execute("SELECT COUNT(*) FROM codes").fetchone()[0]
-            successful = conn.execute("SELECT COUNT(*) FROM codes WHERE redeemed = 1").fetchone()[0]
-            failed = conn.execute("SELECT COUNT(*) FROM codes WHERE redeemed = 0").fetchone()[0]
+            total = conn.execute(f"SELECT COUNT(*) FROM codes{filt}", params).fetchone()[0]
+            successful = conn.execute(
+                f"SELECT COUNT(*) FROM codes{filt}{' AND' if filt else ' WHERE'} redeemed = 1",
+                params,
+            ).fetchone()[0]
+            failed = conn.execute(
+                f"SELECT COUNT(*) FROM codes{filt}{' AND' if filt else ' WHERE'} redeemed = 0",
+                params,
+            ).fetchone()[0]
             by_source_rows = conn.execute(
-                "SELECT cs.source, COUNT(*) FROM codes c JOIN code_sources cs ON c.id = cs.code_id GROUP BY cs.source"
+                "SELECT cs.source, COUNT(*) FROM codes c JOIN code_sources cs ON c.id = cs.code_id"
+                + (f" WHERE c.game = ?" if game else "")
+                + " GROUP BY cs.source",
+                params,
             ).fetchall()
             by_source = {row[0]: row[1] for row in by_source_rows}
             return {

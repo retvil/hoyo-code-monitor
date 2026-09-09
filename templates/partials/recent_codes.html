@@ -17,6 +17,7 @@
     </select>
     <input type="search" name="q" value="{{ f_q }}" placeholder="Search code..." style="width: auto; min-width: 160px;">
     <input type="hidden" name="page" value="1">
+    <input type="hidden" name="game" value="{{ f_game }}">
 </form>
 <div style="margin-bottom: 12px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
     <button class="btn btn-primary" style="padding: 6px 14px; font-size: 0.82rem;" hx-post="/redeem/all" hx-target="#redeem-all-result" hx-swap="innerHTML" hx-indicator="#redeem-all-spin">{{ t('redeem_all') }} <span id="redeem-all-spin" class="spinner htmx-indicator" aria-hidden="true"></span></button>
@@ -43,9 +44,9 @@
 </table>
 </div>
 <div style="display: flex; gap: 8px; align-items: center; margin-top: 12px; font-size: 0.85rem;">
-    <button class="btn" style="padding: 4px 12px;" hx-get="/partials/recent-codes" hx-vals='{"page": {{ page - 1 }}, "source": "{{ f_source }}", "status": "{{ f_status }}", "q": "{{ f_q }}"}' hx-target="#codes-table" hx-swap="outerHTML" {% if page <= 1 %}disabled{% endif %}>←</button>
+    <button class="btn" style="padding: 4px 12px;" hx-get="/partials/recent-codes" hx-vals='{"page": {{ page - 1 }}, "source": "{{ f_source }}", "status": "{{ f_status }}", "q": "{{ f_q }}", "game": "{{ f_game }}"}' hx-target="#codes-table" hx-swap="outerHTML" {% if page <= 1 %}disabled{% endif %}>←</button>
     <span class="muted">Page {{ page }} / {{ pages }} · {{ total }}</span>
-    <button class="btn" style="padding: 4px 12px;" hx-get="/partials/recent-codes" hx-vals='{"page": {{ page + 1 }}, "source": "{{ f_source }}", "status": "{{ f_status }}", "q": "{{ f_q }}"}' hx-target="#codes-table" hx-swap="outerHTML" {% if page >= pages %}disabled{% endif %}>→</button>
+    <button class="btn" style="padding: 4px 12px;" hx-get="/partials/recent-codes" hx-vals='{"page": {{ page + 1 }}, "source": "{{ f_source }}", "status": "{{ f_status }}", "q": "{{ f_q }}", "game": "{{ f_game }}"}' hx-target="#codes-table" hx-swap="outerHTML" {% if page >= pages %}disabled{% endif %}>→</button>
 </div>
 {% else %}
 <p class="muted">{{ t('no_codes') }}</p>

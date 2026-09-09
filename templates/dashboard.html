@@ -2,6 +2,25 @@
 {% block title %}{{ t('nav_dashboard') }} - {{ t('app_name') }}{% endblock %}
 {% block page_title %}{{ t('nav_dashboard') }}{% endblock %}
 {% block content %}
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px;">
+    <a href="/" style="text-decoration: none; color: inherit;">
+        <div class="card" style="margin-bottom: 0; border-left: 3px solid var(--border); {% if not current_game %}box-shadow: 0 4px 16px rgba(67,56,202,0.12);{% endif %}">
+            <div class="muted" style="font-size: 0.78rem;">All games</div>
+            <div style="font-size: 1.4rem; font-weight: 700;">{{ stats.total_codes }}</div>
+            <div class="muted" style="font-size: 0.78rem;">{{ stats.successful }} redeemed</div>
+        </div>
+    </a>
+    {% for g in game_cards %}
+    <a href="/?game={{ g.id }}" style="text-decoration: none; color: inherit;">
+        <div class="card" style="margin-bottom: 0; border-left: 3px solid {{ g.accent }}; {% if g.active %}box-shadow: 0 4px 16px rgba(67,56,202,0.12);{% endif %}">
+            <div class="muted" style="font-size: 0.78rem;">{{ g.name }}</div>
+            <div style="font-size: 1.4rem; font-weight: 700;">{{ g.total }}</div>
+            <div class="muted" style="font-size: 0.78rem;">{{ g.redeemed }} redeemed</div>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+
 <div class="card" hx-get="/partials/scheduler-status" hx-trigger="every 5s" hx-swap="outerHTML">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
         <div class="card-title">{{ t('scheduler') }}</div>
@@ -93,18 +112,22 @@
 </div>
 
 <div class="card" hx-get="/partials/recent-logs" hx-trigger="every 10s" hx-swap="outerHTML">
-    <div class="card-title" style="margin-bottom: 12px;">{{ t('redemption_log') }}</div>
-    {% if logs %}
-    <div style="max-height: 300px; overflow-y: auto;">
-        {% for log in logs %}
-        <div class="mono" style="font-size: 0.85rem; padding: 6px 10px; background: var(--bg); border-radius: 6px; margin-bottom: 4px;">
-            <strong>{{ log.code }}</strong> | {{ log.status | upper }} | {{ log.reward or '-' }} | {{ log.attempted_at[:19] }}{% if log.error_message %} | {{ log.error_message }}{% endif %}
+    <details>
+        <summary class="card-title" style="cursor: pointer;">{{ t('redemption_log') }} ({{ logs | length }})</summary>
+        <div style="margin-top: 12px;">
+        {% if logs %}
+        <div style="max-height: 300px; overflow-y: auto;">
+            {% for log in logs %}
+            <div class="mono" style="font-size: 0.85rem; padding: 6px 10px; background: var(--bg); border-radius: 6px; margin-bottom: 4px;">
+                <strong>{{ log.code }}</strong> | {{ log.status | upper }} | {{ log.reward or '-' }} | {{ log.attempted_at[:19] }}{% if log.error_message %} | {{ log.error_message }}{% endif %}
+            </div>
+            {% endfor %}
         </div>
-        {% endfor %}
-    </div>
-    {% else %}
-    <p class="muted">{{ t('no_logs') }}</p>
-    {% endif %}
+        {% else %}
+        <p class="muted">{{ t('no_logs') }}</p>
+        {% endif %}
+        </div>
+    </details>
 </div>
 
 {% endblock %}

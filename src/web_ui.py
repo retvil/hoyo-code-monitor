@@ -120,17 +120,35 @@ async def set_language(language: str = Form(...)):
 
 # Routes
 @app.get("/", response_class=HTMLResponse)
-async def dashboard(request: Request):
-    """Main dashboard."""
+async def dashboard(request: Request, game: str = ""):
+    """Main dashboard (variant C: game summary cards + filter)."""
+    from src.constants import GAME_CONF, GAMES
+
     storage = Storage()
     config_manager = ConfigManager()
     config = config_manager.get_all()
+    current_game = game if game in GAMES else ""
 
-    # Get stats
-    stats = storage.get_stats()
+    # Get stats (global or per game)
+    stats = storage.get_stats(game=current_game or None)
+
+    # Per-game summary cards (always show all games)
+    game_cards = []
+    for gid in GAMES:
+        gs = storage.get_stats(game=gid)
+        game_cards.append(
+            {
+                "id": gid,
+                "name": GAME_CONF[gid]["name"],
+                "accent": GAME_CONF[gid]["accent"],
+                "total": gs["total_codes"],
+                "redeemed": gs["successful"],
+                "active": gid == current_game,
+            }
+        )
 
     # Get recent codes
-    codes = storage.list_codes(limit=20, only_unredeemed=False)
+    codes = storage.list_codes(limit=20, only_unredeemed=False, game=current_game or None)
 
     # Get redeemed codes (all, newest first by redemption time)
     redeemed_codes = [c for c in storage.list_codes(limit=200) if c.get("redeemed")]
@@ -156,6 +174,8 @@ async def dashboard(request: Request):
             {
                 "request": request,
                 "stats": stats,
+                "game_cards": game_cards,
+                "current_game": current_game,
                 "codes": codes,
                 "redeemed_codes": redeemed_codes,
                 "sources": sources,
@@ -929,18 +949,22 @@ async def partial_recent_codes(
     source: str = "",
     status: str = "all",
     q: str = "",
+    game: str = "",
 ):
     """HTMX partial for codes table with filters + pagination."""
+    from src.constants import GAMES
+
     storage = Storage()
     page = max(1, page)
     src = source or None
     st = status or "all"
     query = q.strip() or None
-    total = storage.count_codes(source=src, search=query, status=st)
+    gm = game if game in GAMES else None
+    total = storage.count_codes(source=src, search=query, status=st, game=gm)
     pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
     page = min(page, pages)
     codes = storage.list_codes(
-        limit=PAGE_SIZE, offset=(page - 1) * PAGE_SIZE, source=src, search=query, status=st
+        limit=PAGE_SIZE, offset=(page - 1) * PAGE_SIZE, source=src, search=query, status=st, game=gm
     )
     sources = [s["name"] for s in storage.list_sources()]
     return templates.TemplateResponse(
@@ -958,6 +982,7 @@ async def partial_recent_codes(
                 "f_source": source,
                 "f_status": st,
                 "f_q": q,
+                "f_game": game,
                 "all_sources": sources,
             },
         ),
