@@ -6,7 +6,7 @@
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
         <div class="card-title">{{ t('scheduler') }}</div>
         {% if scheduler and scheduler.running %}
-        <span class="badge badge-ok">{{ t('running') }}</span>
+        <span class="badge badge-ok"><span class="pulse-dot" aria-hidden="true"></span>{{ t('running') }}</span>
         {% else %}
         <span class="badge badge-bad">{{ t('stopped') }}</span>
         {% endif %}
