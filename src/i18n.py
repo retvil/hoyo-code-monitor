@@ -17,6 +17,28 @@ SUPPORTED: dict[str, str] = {
 
 DEFAULT_LANG = "en"
 
+LOCALE_MAP = {
+    "ru": "ru",
+    "uk": "ru",
+    "be": "ru",
+    "de": "de",
+    "fr": "fr",
+    "ja": "ja",
+    "zh": "zh",
+}
+
+
+def system_lang() -> str:
+    """Detect OS language, mapped to supported codes (fallback: en)."""
+    try:
+        import locale
+
+        loc = (locale.getdefaultlocale()[0] or "").lower()
+        prefix = loc.split("_")[0]
+        return LOCALE_MAP.get(prefix, DEFAULT_LANG)
+    except Exception:
+        return DEFAULT_LANG
+
 STRINGS: dict[str, dict[str, str]] = {
     "en": {
         "app_name": "Genshin Code Monitor",
@@ -676,13 +698,15 @@ STRINGS: dict[str, dict[str, str]] = {
 
 
 def get_lang(storage=None) -> str:
-    """Get current UI language code."""
-    lang = DEFAULT_LANG
+    """Get current UI language code (stored value, else OS language)."""
+    lang = None
     if storage is not None:
         try:
-            lang = storage.get_config("language", DEFAULT_LANG) or DEFAULT_LANG
+            lang = storage.get_config("language", "") or None
         except Exception:
             pass
+    if not lang:
+        return system_lang()
     return lang if lang in SUPPORTED else DEFAULT_LANG
 
 
