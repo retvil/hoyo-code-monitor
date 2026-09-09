@@ -457,6 +457,20 @@ class Storage:
                 count += 1
         return count
 
+    def codes_per_day(self, days: int = 14) -> list[dict[str, Any]]:
+        """Codes found per day for the last N days (for sparkline)."""
+        with self._connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT substr(attempted_at, 1, 10) AS day, COUNT(*) AS n
+                FROM codes
+                WHERE attempted_at >= date('now', ?)
+                GROUP BY day ORDER BY day
+                """,
+                (f"-{int(days)} days",),
+            ).fetchall()
+            return [{"day": r[0], "count": r[1]} for r in rows]
+
     def get_stats(self) -> dict[str, Any]:
         """Get redemption statistics.
 

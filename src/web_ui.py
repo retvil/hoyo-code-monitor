@@ -870,6 +870,40 @@ async def partial_scheduler_status(request: Request):
     )
 
 
+@app.get("/partials/sparkline", response_class=HTMLResponse)
+async def partial_sparkline(request: Request):
+    """HTMX partial: SVG sparkline of codes found per day (last 14 days)."""
+    storage = Storage()
+    data = storage.codes_per_day(14)
+    maximum = max([d["count"] for d in data] + [1])
+    w, h, pad = 280, 64, 6
+    n = max(len(data), 1)
+    pts = []
+    for i, d in enumerate(data):
+        x = pad + (i * (w - 2 * pad) / max(n - 1, 1))
+        y = h - pad - (d["count"] / maximum) * (h - 2 * pad)
+        pts.append(f"{x:.1f},{y:.1f}")
+    polyline = " ".join(pts)
+    area = f"{pad},{h - pad} " + polyline + f" {w - pad},{h - pad}"
+    bars = "".join(
+        f"<circle cx='{x}' cy='{y}' r='2.5' fill='var(--accent)'><title>{d['day']}: {d['count']}</title></circle>"
+        for (x, y), d in zip((p.split(",") for p in pts), data)
+    )
+    svg = (
+        f"<svg viewBox='0 0 {w} {h}' style='width: 100%; height: auto;' role='img' "
+        f"aria-label='Codes per day'>"
+        f"<polygon points='{area}' fill='var(--accent-soft)'/>"
+        f"<polyline points='{polyline}' fill='none' stroke='var(--accent)' stroke-width='2' "
+        f"stroke-linejoin='round' stroke-linecap='round'/>{bars}</svg>"
+    )
+    total = sum(d["count"] for d in data)
+    return templates.TemplateResponse(
+        request,
+        "partials/sparkline.html",
+        page_ctx(storage, {"request": request, "svg": svg, "total": total}),
+    )
+
+
 @app.get("/partials/stats")
 async def partial_stats(request: Request):
     """HTMX partial for statistics."""

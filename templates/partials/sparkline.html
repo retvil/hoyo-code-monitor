@@ -1,0 +1,4 @@
+<div class="card" id="sparkline-card" hx-get="/partials/sparkline" hx-trigger="every 60s" hx-swap="outerHTML">
+<div class="card-title" style="margin-bottom: 4px;">Codes per day · 14 days ({{ total }})</div>
+{{ svg | safe }}
+</div>

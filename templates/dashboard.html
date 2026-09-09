@@ -46,6 +46,11 @@
     {% endif %}
 </div>
 
+<div class="card" id="sparkline-card" hx-get="/partials/sparkline" hx-trigger="load" hx-swap="outerHTML">
+    <div class="card-title" style="margin-bottom: 4px;">Codes per day · 14 days</div>
+    <p class="muted">Loading chart...</p>
+</div>
+
 <div class="card">
     <div class="card-title" style="margin-bottom: 12px;">{{ t('controls') }}</div>
     <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
