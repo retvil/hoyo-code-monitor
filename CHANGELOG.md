@@ -16,6 +16,11 @@
 - Single-instance guard (no duplicate schedulers)
 - Auto cookie capture via browser login (`accounts login`, persistent profile)
 - New sources: hoyo-codes API, ennead API (x2), Pocket Tactics, TheClick, Eurogamer, MMO Culture, Playnforge
+- Multi-game foundation (variant C): migration v11 `game` columns, `GAME_CONF` x5 with accents, per-game fetch/redeem endpoints (ZZZ Risk POST), game cards + filter on dashboard, HSR/ZZZ/HI3/ToT API presets
+- Rename to HoYo Code Monitor (package, CLI, docs, installer)
+- Game UI themes groundwork: per-game accent colors, starfield background, primogem brand mark
+- Dashboard themes (light/dark/AMOLED), export/import JSON, copy buttons, SVG sparkline, toast notifications, gift-page redeem links
+- Telegram notifications (new codes + redemptions)
 - Prometheus `/metrics`, `/health` endpoint, HTMX live partials
 - Docker support (Dockerfile, docker-compose)
 - READMEs in 6 languages
