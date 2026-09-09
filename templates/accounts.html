@@ -10,13 +10,14 @@
     {% if accounts %}
     <div class="table-scroll">
     <table>
-        <thead><tr><th>{{ t('name') }}</th><th>{{ t('uid') }}</th><th>{{ t('region') }}</th><th>{{ t('auto_redeem') }}</th><th>{{ t('actions') }}</th></tr></thead>
+        <thead><tr><th>{{ t('name') }}</th><th>{{ t('uid') }}</th><th>{{ t('region') }}</th><th>Game</th><th>{{ t('auto_redeem') }}</th><th>{{ t('actions') }}</th></tr></thead>
         <tbody>
             {% for acc in accounts %}
             <tr>
                 <td><strong>{{ acc.name }}</strong></td>
                 <td class="mono">{{ acc.uid }}</td>
                 <td>{{ acc.region }}</td>
+                <td>{% if acc.game in game_accents %}<span class="badge" style="background: {{ game_accents[acc.game].accent }}22; color: {{ game_accents[acc.game].accent }};">{{ game_accents[acc.game].short }}</span>{% else %}<span class="badge badge-info">{{ acc.game or 'genshin' }}</span>{% endif %}</td>
                 <td><span hx-get="/accounts/{{ acc.name }}/redeem-state" hx-trigger="load" hx-swap="innerHTML"></span></td>
                 <td style="white-space: nowrap;">
                     <button class="btn" style="padding: 4px 10px; font-size: 0.8rem;" onclick="openCookies('{{ acc.name }}')">{{ t('set_cookies') }}</button>

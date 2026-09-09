@@ -67,6 +67,7 @@ DEFAULT_GAME: str = "genshin"
 GAME_CONF: dict[str, dict[str, str]] = {
     "genshin": {
         "name": "Genshin Impact",
+        "short": "GI",
         "game_biz": "hk4e_global",
         "api_host": "sg-hk4e-api.hoyoverse.com",
         "accent": "#3ec6b8",
@@ -74,6 +75,7 @@ GAME_CONF: dict[str, dict[str, str]] = {
     },
     "hsr": {
         "name": "Honkai: Star Rail",
+        "short": "HSR",
         "game_biz": "hkrpg_global",
         "api_host": "sg-hkrpg-api.hoyoverse.com",
         "accent": "#e5484d",
@@ -81,6 +83,7 @@ GAME_CONF: dict[str, dict[str, str]] = {
     },
     "zzz": {
         "name": "Zenless Zone Zero",
+        "short": "ZZZ",
         "game_biz": "nap_global",
         "api_host": "public-operation-nap.hoyoverse.com",
         "accent": "#8b5cf6",
@@ -88,6 +91,7 @@ GAME_CONF: dict[str, dict[str, str]] = {
     },
     "hi3": {
         "name": "Honkai Impact 3rd",
+        "short": "HI3",
         "game_biz": "bh3_global",
         "api_host": "sg-bh3-api.hoyoverse.com",
         "accent": "#f5a623",
@@ -95,6 +99,7 @@ GAME_CONF: dict[str, dict[str, str]] = {
     },
     "tot": {
         "name": "Tears of Themis",
+        "short": "ToT",
         "game_biz": "nxx_global",
         "api_host": "sg-nxx-api.hoyoverse.com",
         "accent": "#ec4899",

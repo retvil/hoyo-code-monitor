@@ -120,7 +120,7 @@
     </style>
     {% block extra_css %}{% endblock %}
 </head>
-<body>
+<body{% if current_game and current_game in game_accents %} style="--game-accent: {{ game_accents[current_game].accent }};"{% endif %}>
 <script>
 try {
     var th = localStorage.getItem('gcm-theme') || 'light';
@@ -140,7 +140,7 @@ function copyText(txt, el) {
 }
 </script>
 <aside class="sidebar">
-    <div class="brand"><span class="brand-mark" aria-hidden="true"></span><span>{{ t('app_name') }}<small>v{{ app_version }} · by {{ app_author }}</small></span></div>
+    <div class="brand"><span class="brand-mark" aria-hidden="true">{% if current_game and current_game in game_accents %}<span style="display: block; transform: rotate(-45deg); font-size: 9px; font-weight: 700; color: #fff; text-align: center; line-height: 22px;">{{ game_accents[current_game].short }}</span>{% endif %}</span><span>{{ t('app_name') }}<small>v{{ app_version }} · by {{ app_author }}{% if current_game and current_game in game_accents %} · {{ game_accents[current_game].short }}{% endif %}</small></span></div>
     <nav class="nav">
         <div class="group-label">{{ t('nav_monitor') }}</div>
         <a href="/" class="{% if request.path == '/' %}active{% endif %}">{{ t('nav_dashboard') }}</a>
@@ -185,23 +185,10 @@ function copyText(txt, el) {
             </form>
         </div>
     </div>
-    {% if author_name or support_bitcoin or support_ton or support_boosty or support_patreon %}
     <div style="margin-top: 16px; padding: 12px 10px 4px; border-top: 1px solid var(--border); font-size: 0.8rem;">
         <div class="muted" style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px;"><a href="/author" style="color: inherit; text-decoration: none;">{{ t('about_author') }}</a></div>
-        {% if author_name %}
-        <div style="font-weight: 600; margin-bottom: 6px;"><a href="/author" style="color: inherit;">{{ author_name }}</a></div>
-        {% endif %}
-        <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px;">
-            {% if author_telegram %}<a href="https://t.me/{{ author_telegram | replace('@', '') }}" style="font-size: 0.78rem;">Telegram</a>{% endif %}
-            {% if author_email %}<a href="mailto:{{ author_email }}" style="font-size: 0.78rem;">Email</a>{% endif %}
-            {% if author_github %}<a href="{{ author_github }}" style="font-size: 0.78rem;">GitHub</a>{% endif %}
-        </div>
-        {% if support_boosty %}<div style="margin-bottom: 4px;"><a class="btn btn-primary" style="padding: 4px 12px; font-size: 0.75rem; display: block; text-align: center;" href="{{ support_boosty }}">Boosty</a></div>{% endif %}
-        {% if support_patreon %}<div style="margin-bottom: 4px;"><a class="btn" style="padding: 4px 12px; font-size: 0.75rem; display: block; text-align: center;" href="{{ support_patreon }}">Patreon</a></div>{% endif %}
-        {% if support_bitcoin %}<div class="mono" style="font-size: 0.7rem; word-break: break-all; color: var(--muted);">BTC {{ support_bitcoin[:12] }}...</div>{% endif %}
-        {% if support_ton %}<div class="mono" style="font-size: 0.7rem; word-break: break-all; color: var(--muted);">TON {{ support_ton[:12] }}...</div>{% endif %}
+        <div style="font-weight: 600;"><a href="/author" style="color: inherit;">{{ author_name or app_author }}</a></div>
     </div>
-    {% endif %}
 </aside>
 <main>
     <div class="topbar">

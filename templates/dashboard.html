@@ -13,7 +13,7 @@
     {% for g in game_cards %}
     <a href="/?game={{ g.id }}" style="text-decoration: none; color: inherit;">
         <div class="card" style="margin-bottom: 0; border-left: 3px solid {{ g.accent }}; {% if g.active %}box-shadow: 0 4px 16px rgba(67,56,202,0.12);{% endif %}">
-            <div class="muted" style="font-size: 0.78rem;">{{ g.name }}</div>
+            <div class="muted" style="font-size: 0.78rem;">{{ g.name }} {% if g.id in games_with_account %}<span class="badge badge-ok" style="font-size: 0.65rem;">account</span>{% endif %}</div>
             <div style="font-size: 1.4rem; font-weight: 700;">{{ g.total }}</div>
             <div class="muted" style="font-size: 0.78rem;">{{ g.redeemed }} redeemed</div>
         </div>
@@ -66,8 +66,10 @@
 </div>
 
 <div class="card" id="sparkline-card" hx-get="/partials/sparkline" hx-trigger="load" hx-swap="outerHTML">
-    <div class="card-title" style="margin-bottom: 4px;">Codes per day · 14 days</div>
-    <p class="muted">Loading chart...</p>
+    <details>
+        <summary class="card-title" style="cursor: pointer;">Codes per day · 14 days</summary>
+        <p class="muted">Loading chart...</p>
+    </details>
 </div>
 
 <div class="card">

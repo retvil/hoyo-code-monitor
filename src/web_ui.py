@@ -89,14 +89,23 @@ class ConfigUpdate(BaseModel):
 def page_ctx(storage: Storage, extra: dict | None = None) -> dict:
     """Build template context with i18n + hardcoded author info (release build)."""
     from src import author as author_module
+    from src.constants import GAME_CONF
 
     lang = get_lang(storage)
+    accounts = storage.list_accounts()
+    games_with_account = {a.get("game") or "genshin" for a in accounts}
     ctx: dict = {
         "t": make_t(lang),
         "lang": lang,
         "langs": SUPPORTED,
         "app_version": APP_VERSION,
         "app_author": APP_AUTHOR,
+        "current_game": "",
+        "game_accents": {
+            gid: {"accent": conf["accent"], "short": conf.get("short", gid.upper())}
+            for gid, conf in GAME_CONF.items()
+        },
+        "games_with_account": games_with_account,
     }
     ctx.update(author_module.as_dict())
     if extra:
