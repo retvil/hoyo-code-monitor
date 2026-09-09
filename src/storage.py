@@ -145,6 +145,7 @@ class Storage:
         attempted_at: datetime | None = None,
         published_at: datetime | str | None = None,
         expires_at: datetime | str | None = None,
+        game: str = "genshin",
     ) -> int:
         """Add a new code to the database.
 
@@ -193,10 +194,10 @@ class Storage:
             # Insert new code
             cursor = conn.execute(
                 """
-                INSERT INTO codes (code, attempted_at, published_at, expires_at)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO codes (code, attempted_at, published_at, expires_at, game)
+                VALUES (?, ?, ?, ?, ?)
                 """,
-                (code, attempted_at.isoformat(), _ts(published_at), _ts(expires_at)),
+                (code, attempted_at.isoformat(), _ts(published_at), _ts(expires_at), game),
             )
             code_id = cursor.lastrowid
 
@@ -315,6 +316,7 @@ class Storage:
         source: str | None = None,
         search: str | None = None,
         status: str | None = None,
+        game: str | None = None,
     ) -> list[dict[str, Any]]:
         """List codes with pagination and filters.
 
@@ -335,6 +337,9 @@ class Storage:
 
         if only_unredeemed:
             conds.append("redeemed = 0")
+        if game:
+            conds.append("game = ?")
+            params.append(game)
         if source:
             conds.append(
                 "id IN (SELECT code_id FROM code_sources WHERE source = ?)"
@@ -410,6 +415,7 @@ class Storage:
         source: str | None = None,
         search: str | None = None,
         status: str | None = None,
+        game: str | None = None,
     ) -> int:
         """Count codes matching filters (for pagination)."""
         query = "SELECT id, code, redeemed FROM codes"
@@ -417,6 +423,9 @@ class Storage:
         params: list[Any] = []
         if only_unredeemed:
             conds.append("redeemed = 0")
+        if game:
+            conds.append("game = ?")
+            params.append(game)
         if source:
             conds.append("id IN (SELECT code_id FROM code_sources WHERE source = ?)")
             params.append(source)
@@ -509,14 +518,15 @@ class Storage:
         browser_wait_seconds: int = 5,
         max_retries: int = 3,
         retry_base_delay: float = 1.0,
+        game: str = "genshin",
     ) -> int:
         """Add a new source to the database."""
         headers_json = json.dumps(headers or {})
         with self._connection() as conn:
             cursor = conn.execute(
                 """
-                INSERT INTO sources (name, url, selector_type, selector, enabled, headers, timeout_seconds, rate_limit_seconds, requires_browser, browser_wait_selector, browser_wait_seconds, max_retries, retry_base_delay)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO sources (name, url, selector_type, selector, enabled, headers, timeout_seconds, rate_limit_seconds, requires_browser, browser_wait_selector, browser_wait_seconds, max_retries, retry_base_delay, game)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     name,
@@ -532,6 +542,7 @@ class Storage:
                     browser_wait_seconds,
                     max_retries,
                     retry_base_delay,
+                    game,
                 ),
             )
             conn.commit()
@@ -550,21 +561,30 @@ class Storage:
             row = conn.execute("SELECT * FROM sources WHERE name = ?", (name,)).fetchone()
             return self._decode_source_row(row) if row else None
 
-    def list_sources(self, enabled_only: bool = False) -> list[dict[str, Any]]:
+    def list_sources(
+        self, enabled_only: bool = False, game: str | None = None
+    ) -> list[dict[str, Any]]:
         """List all sources.
 
         Args:
             enabled_only: If True, only return enabled sources.
+            game: Filter by game id (e.g. "genshin", "hsr").
 
         Returns:
             List of source dictionaries.
         """
         query = "SELECT * FROM sources"
+        conds: list[str] = []
         params: list[Any] = []
 
         if enabled_only:
-            query += " WHERE enabled = 1"
+            conds.append("enabled = 1")
+        if game:
+            conds.append("game = ?")
+            params.append(game)
 
+        if conds:
+            query += " WHERE " + " AND ".join(conds)
         query += " ORDER BY name"
 
         with self._connection() as conn:
@@ -687,6 +707,7 @@ class Storage:
         game_biz: str = "hk4e_global",
         lang: str = "en-us",
         s_lang_key: str = "en-us",
+        game: str = "genshin",
     ) -> int:
         """Add a new account.
 
@@ -707,10 +728,10 @@ class Storage:
         with self._connection() as conn:
             cursor = conn.execute(
                 """
-                INSERT INTO accounts (name, uid, region, game_biz, lang, s_lang_key)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO accounts (name, uid, region, game_biz, lang, s_lang_key, game)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (name, uid, region, game_biz, lang, s_lang_key),
+                (name, uid, region, game_biz, lang, s_lang_key, game),
             )
             conn.commit()
             return cursor.lastrowid
@@ -721,10 +742,15 @@ class Storage:
             row = conn.execute("SELECT * FROM accounts WHERE name = ?", (name,)).fetchone()
             return dict(row) if row else None
 
-    def list_accounts(self) -> list[dict[str, Any]]:
-        """List all accounts."""
+    def list_accounts(self, game: str | None = None) -> list[dict[str, Any]]:
+        """List all accounts, optionally filtered by game."""
         with self._connection() as conn:
-            rows = conn.execute("SELECT * FROM accounts ORDER BY name").fetchall()
+            if game:
+                rows = conn.execute(
+                    "SELECT * FROM accounts WHERE game = ? ORDER BY name", (game,)
+                ).fetchall()
+            else:
+                rows = conn.execute("SELECT * FROM accounts ORDER BY name").fetchall()
             return [dict(row) for row in rows]
 
     def update_account(

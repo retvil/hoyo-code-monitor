@@ -292,9 +292,82 @@ MIGRATIONS: list[Migration] = [
         UPDATE schema_version SET version = 9;
         """,
     ),
+    (
+        11,
+        """
+        -- Migration v11: game dimension for multi-game support
+        ALTER TABLE sources ADD COLUMN game TEXT NOT NULL DEFAULT 'genshin';
+        ALTER TABLE codes ADD COLUMN game TEXT NOT NULL DEFAULT 'genshin';
+        ALTER TABLE accounts ADD COLUMN game TEXT NOT NULL DEFAULT 'genshin';
+        CREATE INDEX IF NOT EXISTS idx_sources_game ON sources(game);
+        CREATE INDEX IF NOT EXISTS idx_codes_game ON codes(game);
+        CREATE INDEX IF NOT EXISTS idx_accounts_game ON accounts(game);
+        UPDATE schema_version SET version = 11;
+        """,
+        """
+        -- Rollback v11: drop game columns (SQLite: recreate tables)
+        -- codes
+        CREATE TABLE codes_old (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT NOT NULL,
+            attempted_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            redeemed BOOLEAN NOT NULL DEFAULT 0,
+            reward TEXT,
+            redeemed_at TIMESTAMP,
+            published_at TIMESTAMP,
+            expires_at TIMESTAMP
+        );
+        INSERT INTO codes_old (id, code, attempted_at, redeemed, reward, redeemed_at, published_at, expires_at)
+        SELECT id, code, attempted_at, redeemed, reward, redeemed_at, published_at, expires_at FROM codes;
+        DROP TABLE codes;
+        ALTER TABLE codes_old RENAME TO codes;
+        -- sources (keep v9 columns, drop game)
+        CREATE TABLE sources_old (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,
+            url TEXT NOT NULL,
+            selector_type TEXT NOT NULL,
+            selector TEXT NOT NULL,
+            enabled BOOLEAN NOT NULL DEFAULT 1,
+            last_checked TIMESTAMP,
+            last_error TEXT,
+            check_count INTEGER NOT NULL DEFAULT 0,
+            success_count INTEGER NOT NULL DEFAULT 0,
+            headers TEXT NOT NULL DEFAULT '{}',
+            timeout_seconds INTEGER NOT NULL DEFAULT 30,
+            rate_limit_seconds REAL NOT NULL DEFAULT 1.0,
+            requires_browser BOOLEAN NOT NULL DEFAULT 0,
+            browser_wait_selector TEXT,
+            browser_wait_seconds INTEGER NOT NULL DEFAULT 5,
+            max_retries INTEGER NOT NULL DEFAULT 3,
+            retry_base_delay REAL NOT NULL DEFAULT 1.0
+        );
+        INSERT INTO sources_old (id, name, url, selector_type, selector, enabled, last_checked, last_error, check_count, success_count, headers, timeout_seconds, rate_limit_seconds, requires_browser, browser_wait_selector, browser_wait_seconds, max_retries, retry_base_delay)
+        SELECT id, name, url, selector_type, selector, enabled, last_checked, last_error, check_count, success_count, headers, timeout_seconds, rate_limit_seconds, requires_browser, browser_wait_selector, browser_wait_seconds, max_retries, retry_base_delay FROM sources;
+        DROP TABLE sources;
+        ALTER TABLE sources_old RENAME TO sources;
+        -- accounts
+        CREATE TABLE accounts_old (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,
+            uid TEXT NOT NULL,
+            region TEXT NOT NULL,
+            game_biz TEXT NOT NULL DEFAULT 'hk4e_global',
+            lang TEXT NOT NULL DEFAULT 'en-us',
+            s_lang_key TEXT NOT NULL DEFAULT 'en-us',
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        INSERT INTO accounts_old (id, name, uid, region, game_biz, lang, s_lang_key, created_at, updated_at)
+        SELECT id, name, uid, region, game_biz, lang, s_lang_key, created_at, updated_at FROM accounts;
+        DROP TABLE accounts;
+        ALTER TABLE accounts_old RENAME TO accounts;
+        UPDATE schema_version SET version = 10;
+        """,
+    ),
 ]
 
-CURRENT_VERSION = 10
+CURRENT_VERSION = 11
 
 
 def get_db_version(conn: sqlite3.Connection) -> int:

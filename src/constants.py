@@ -61,6 +61,49 @@ WEB_PORT: int = 8000
 APP_VERSION: str = "0.1.0"
 APP_AUTHOR: str = "Nod33Eset"
 
+# --- Games (multi-game support, Phase 2) ---
+DEFAULT_GAME: str = "genshin"
+
+GAME_CONF: dict[str, dict[str, str]] = {
+    "genshin": {
+        "name": "Genshin Impact",
+        "game_biz": "hk4e_global",
+        "api_host": "sg-hk4e-api.hoyoverse.com",
+        "accent": "#3ec6b8",
+        "gift_url": "https://genshin.hoyoverse.com/en/gift?code={code}",
+    },
+    "hsr": {
+        "name": "Honkai: Star Rail",
+        "game_biz": "hkrpg_global",
+        "api_host": "sg-hkrpg-api.hoyoverse.com",
+        "accent": "#e5484d",
+        "gift_url": "https://hsr.hoyoverse.com/gift?code={code}",
+    },
+    "zzz": {
+        "name": "Zenless Zone Zero",
+        "game_biz": "nap_global",
+        "api_host": "public-operation-nap.hoyoverse.com",
+        "accent": "#8b5cf6",
+        "gift_url": "https://zenless.hoyoverse.com/redemption?code={code}",
+    },
+    "hi3": {
+        "name": "Honkai Impact 3rd",
+        "game_biz": "bh3_global",
+        "api_host": "sg-bh3-api.hoyoverse.com",
+        "accent": "#f5a623",
+        "gift_url": "https://www.hoyolab.com/article/4886?code={code}",
+    },
+    "tot": {
+        "name": "Tears of Themis",
+        "game_biz": "nxx_global",
+        "api_host": "sg-nxx-api.hoyoverse.com",
+        "accent": "#ec4899",
+        "gift_url": "https://tot.hoyoverse.com/en/gift?code={code}",
+    },
+}
+
+GAMES: tuple[str, ...] = tuple(GAME_CONF.keys())
+
 # --- Redeem links ---
 GIFT_URL: str = "https://genshin.hoyoverse.com/en/gift?code={code}"
 
