@@ -15,10 +15,9 @@ from pydantic import BaseModel
 
 from src.config import ConfigManager
 from src.constants import APP_AUTHOR, APP_VERSION, MASK_VISIBLE_CHARS
-from src.exceptions import StorageError
 from src.i18n import SUPPORTED, get_lang, make_t
 from src.scheduler import create_scheduler_from_storage
-from src.sources import SOURCE_PRESETS, SourceConfig, SourceFetcher, list_presets
+from src.sources import SOURCE_PRESETS, SourceConfig, SourceFetcher
 from src.storage import Storage
 
 logger = logging.getLogger(__name__)
@@ -443,7 +442,9 @@ async def get_account_cookies(name: str):
             )
         else:
             shown = value
-        parts.append(f"<span class='badge badge-info'>{key}</span> <span class='mono'>{shown}</span>")
+        parts.append(
+            f"<span class='badge badge-info'>{key}</span> <span class='mono'>{shown}</span>"
+        )
     return HTMLResponse("<br>".join(parts))
 
 
@@ -723,20 +724,30 @@ async def redeem_single_code(code: str):
             cookies = storage.load_account_cookies(acc["name"])
             try:
                 from src.constants import GAME_CONF as _GC
+
                 _ag = acc.get("game") or "genshin"
                 res = await redeemer.redeem_code(
-                    code=row["code"], cookies=cookies, uid=acc["uid"], region=acc["region"],
+                    code=row["code"],
+                    cookies=cookies,
+                    uid=acc["uid"],
+                    region=acc["region"],
                     game_biz=acc.get("game_biz") or _GC.get(_ag, _GC["genshin"])["game_biz"],
-                    lang=acc.get("lang", "en-us"), s_lang_key=acc.get("s_lang_key", "en-us"),
+                    lang=acc.get("lang", "en-us"),
+                    s_lang_key=acc.get("s_lang_key", "en-us"),
                     game=_ag,
                 )
                 claimed = res.success or res.raw_response.get("retcode") in (-2017, -2018)
-                storage.update_code_redemption(row["code"], claimed, res.reward if res.success else None)
+                storage.update_code_redemption(
+                    row["code"], claimed, res.reward if res.success else None
+                )
                 storage.add_redemption_log(
-                    code=row["code"], account_id=acc["id"],
+                    code=row["code"],
+                    account_id=acc["id"],
                     status="success" if claimed else "failed",
                     reward=res.reward if res.success else None,
-                    error_message=None if claimed else f"{res.message} (retcode {res.raw_response.get('retcode')})",
+                    error_message=None
+                    if claimed
+                    else f"{res.message} (retcode {res.raw_response.get('retcode')})",
                 )
                 results.append(f"{acc['name']}: {'OK' if claimed else res.message}")
             except Exception as e:
@@ -773,7 +784,11 @@ async def redeem_all_codes():
     accounts = [a for a in storage.list_accounts() if storage.is_account_redeem_enabled(a["name"])]
     if not accounts:
         raise HTTPException(status_code=400, detail="No accounts with auto-redeem enabled")
-    codes = [c for c in storage.list_codes(limit=500, only_unredeemed=True) if c.get("display_status") in ("pending", "failed")]
+    codes = [
+        c
+        for c in storage.list_codes(limit=500, only_unredeemed=True)
+        if c.get("display_status") in ("pending", "failed")
+    ]
     if not codes:
         return {"success": True, "result": "Nothing to redeem"}
     gap = int(storage.get_config("redemption_min_gap_seconds", "8") or 8)
@@ -785,20 +800,30 @@ async def redeem_all_codes():
                 cookies = storage.load_account_cookies(acc["name"])
                 try:
                     from src.constants import GAME_CONF as _GC2
+
                     _ag2 = acc.get("game") or "genshin"
                     res = await redeemer.redeem_code(
-                        code=row["code"], cookies=cookies, uid=acc["uid"], region=acc["region"],
+                        code=row["code"],
+                        cookies=cookies,
+                        uid=acc["uid"],
+                        region=acc["region"],
                         game_biz=acc.get("game_biz") or _GC2.get(_ag2, _GC2["genshin"])["game_biz"],
-                        lang=acc.get("lang", "en-us"), s_lang_key=acc.get("s_lang_key", "en-us"),
+                        lang=acc.get("lang", "en-us"),
+                        s_lang_key=acc.get("s_lang_key", "en-us"),
                         game=_ag2,
                     )
                     claimed = res.success or res.raw_response.get("retcode") in (-2017, -2018)
-                    storage.update_code_redemption(row["code"], claimed, res.reward if res.success else None)
+                    storage.update_code_redemption(
+                        row["code"], claimed, res.reward if res.success else None
+                    )
                     storage.add_redemption_log(
-                        code=row["code"], account_id=acc["id"],
+                        code=row["code"],
+                        account_id=acc["id"],
                         status="success" if claimed else "failed",
                         reward=res.reward if res.success else None,
-                        error_message=None if claimed else f"{res.message} (retcode {res.raw_response.get('retcode')})",
+                        error_message=None
+                        if claimed
+                        else f"{res.message} (retcode {res.raw_response.get('retcode')})",
                     )
                     if claimed:
                         done += 1

@@ -341,9 +341,7 @@ class Storage:
             conds.append("game = ?")
             params.append(game)
         if source:
-            conds.append(
-                "id IN (SELECT code_id FROM code_sources WHERE source = ?)"
-            )
+            conds.append("id IN (SELECT code_id FROM code_sources WHERE source = ?)")
             params.append(source)
         if search:
             conds.append("(code LIKE ? ESCAPE '\\' OR reward LIKE ? ESCAPE '\\')")
@@ -500,7 +498,7 @@ class Storage:
             ).fetchone()[0]
             by_source_rows = conn.execute(
                 "SELECT cs.source, COUNT(*) FROM codes c JOIN code_sources cs ON c.id = cs.code_id"
-                + (f" WHERE c.game = ?" if game else "")
+                + (" WHERE c.game = ?" if game else "")
                 + " GROUP BY cs.source",
                 params,
             ).fetchall()

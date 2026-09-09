@@ -112,6 +112,7 @@ def gift_url(code: str) -> str:
     """Official web redemption link with pre-filled code."""
     return GIFT_URL.format(code=code)
 
+
 # --- CLI / Display ---
 MAX_DISPLAY_CODES: int = 5
 MAX_DISPLAY_SOURCES: int = 10

@@ -220,7 +220,10 @@ def login(name, timeout):
     storage = Storage()
     existing = storage.get_account(name)
     if not existing:
-        click.echo(f"Error: Account '{name}' not found. Create it first: accounts add <name> <uid> <region>", err=True)
+        click.echo(
+            f"Error: Account '{name}' not found. Create it first: accounts add <name> <uid> <region>",
+            err=True,
+        )
         sys.exit(1)
 
     click.echo("Opening HoYoLAB in browser - log in, cookies will be saved automatically...")
@@ -447,7 +450,9 @@ def notify_config(bot_token, chat_id):
         storage.set_config("telegram_chat_id", chat_id)
     token_set = bool(storage.get_config("telegram_bot_token", ""))
     chat = storage.get_config("telegram_chat_id", "") or "-"
-    click.echo(f"Telegram notifications: {'configured' if token_set and chat != '-' else 'NOT configured'}")
+    click.echo(
+        f"Telegram notifications: {'configured' if token_set and chat != '-' else 'NOT configured'}"
+    )
     click.echo(f"  chat_id: {chat}")
 
 

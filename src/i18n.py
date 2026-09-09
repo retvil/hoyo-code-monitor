@@ -39,6 +39,7 @@ def system_lang() -> str:
     except Exception:
         return DEFAULT_LANG
 
+
 STRINGS: dict[str, dict[str, str]] = {
     "en": {
         "app_name": "HoYo Code Monitor",
@@ -713,7 +714,7 @@ def get_lang(storage=None) -> str:
 def set_lang(storage, lang: str) -> None:
     """Set UI language code."""
     if lang not in SUPPORTED:
-        raise ValueError(f"Unknown language: {lang}")
+        raise ValueError(f"Unknown language: {lang}")  # noqa: TRY003 -- must name the bad value
     storage.set_config("language", lang)
 
 

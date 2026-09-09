@@ -258,9 +258,7 @@ class Redeemer:
         resolved_biz = game_biz or conf["game_biz"]
         endpoint = f"https://{conf['api_host']}/common/apicdkey/api/webExchangeCdkey"
         if game == "zzz":
-            return await self._redeem_risk(
-                code, cookies, uid, region, conf, lang, s_lang_key
-            )
+            return await self._redeem_risk(code, cookies, uid, region, conf, lang, s_lang_key)
         original_endpoint = self.endpoint
         self.endpoint = endpoint
         try:
@@ -375,7 +373,9 @@ class Redeemer:
                 if result.success:
                     logger.info("ZZZ code redeemed: %s", code[:4] + "****")
                 else:
-                    logger.warning("ZZZ redemption failed: %s - %s", code[:4] + "****", result.message)
+                    logger.warning(
+                        "ZZZ redemption failed: %s - %s", code[:4] + "****", result.message
+                    )
                 return result
         except aiohttp.ClientResponseError as e:
             logger.error("HTTP error redeeming ZZZ code %s: %s", code[:4] + "****", e)

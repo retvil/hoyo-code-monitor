@@ -150,7 +150,9 @@ class Scheduler:
         redeem_accounts: list[dict[str, Any]] = []
         if can_redeem:
             accounts = self.storage.list_accounts()
-            redeem_accounts = [a for a in accounts if self.storage.is_account_redeem_enabled(a["name"])]
+            redeem_accounts = [
+                a for a in accounts if self.storage.is_account_redeem_enabled(a["name"])
+            ]
             if redeem_accounts:
                 acc0 = redeem_accounts[0]
                 ac = self.storage.load_account_cookies(acc0["name"])
@@ -190,9 +192,7 @@ class Scheduler:
         new_codes: list[str] = []
 
         # Game per source (for multi-game storage)
-        source_games = {
-            s["name"]: (s.get("game") or "genshin") for s in sources_data
-        }
+        source_games = {s["name"]: (s.get("game") or "genshin") for s in sources_data}
 
         # Process results
         for source_name, codes in results.items():
@@ -254,7 +254,10 @@ class Scheduler:
                                         codes_redeemed += 1
                                         try:
                                             await notify_redeemed(
-                                                self.storage, code, acc["name"], res.reward or "claimed"
+                                                self.storage,
+                                                code,
+                                                acc["name"],
+                                                res.reward or "claimed",
                                             )
                                         except Exception:
                                             pass

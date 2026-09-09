@@ -61,7 +61,7 @@ async def capture_cookies(timeout_seconds: int = 300) -> dict[str, str]:
     try:
         from playwright.async_api import async_playwright
     except ImportError as e:
-        raise RuntimeError("Playwright is not installed (pip install playwright)") from e
+        raise RuntimeError("Playwright is not installed (pip install playwright)") from e  # noqa: TRY003 -- actionable install hint
 
     deadline = time.time() + timeout_seconds
     async with async_playwright() as p:
@@ -87,7 +87,7 @@ async def capture_cookies(timeout_seconds: int = 300) -> dict[str, str]:
                     logger.info("Auth cookies captured (%d keys)", len(found))
                     return found
                 await asyncio.sleep(POLL_SECONDS)
-            raise TimeoutError(f"No login within {timeout_seconds}s")
+            raise TimeoutError(f"No login within {timeout_seconds}s")  # noqa: TRY003 -- timeout detail needed
         finally:
             await context.close()
 
