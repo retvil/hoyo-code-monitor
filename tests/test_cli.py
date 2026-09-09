@@ -370,7 +370,7 @@ class TestHelpCommand:
         result = runner.invoke(cli, ["--help"])
 
         assert result.exit_code == 0
-        assert "genshin-code-monitor" in result.output
+        assert "hoyo-code-monitor" in result.output
         assert "start" in result.output
         assert "stop" in result.output
         assert "status" in result.output

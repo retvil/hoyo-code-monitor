@@ -1,4 +1,4 @@
-# Genshin Code Monitor
+# HoYo Code Monitor
 
 Lokale Windows-App zur Überwachung von Genshin-Impact-Promocode-Quellen mit automatischer Einlösung neuer Codes über die Hoyolab API. Alles bleibt auf Ihrem PC: SQLite-Datenbank, verschlüsselte Cookies, keine Telemetrie, keine Cloud.
 

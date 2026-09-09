@@ -1,4 +1,4 @@
-# Genshin Code Monitor
+# HoYo Code Monitor
 
 本地 Windows 应用：监控原神兑换码来源，并通过 HoYolab API 自动兑换新码。所有数据保留在本机：SQLite 数据库、加密 Cookie，无遥测，无云端。
 

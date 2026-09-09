@@ -1,19 +1,19 @@
-; Genshin Code Monitor NSIS Installer Script
-; Generates a Windows installer for Genshin Code Monitor
+; HoYo Code Monitor NSIS Installer Script
+; Generates a Windows installer for HoYo Code Monitor
 
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
 
 ; Application info
-!define APP_NAME "Genshin Code Monitor"
+!define APP_NAME "HoYo Code Monitor"
 !define APP_VERSION "0.1.0"
-!define APP_PUBLISHER "Genshin Code Monitor Contributors"
-!define APP_URL "https://github.com/yourusername/genshin-code-monitor"
-!define APP_EXE "genshin-code-monitor.exe"
+!define APP_PUBLISHER "HoYo Code Monitor Contributors"
+!define APP_URL "https://github.com/retvil/hoyo-code-monitor"
+!define APP_EXE "hoyo-code-monitor.exe"
 
 ; Installer settings
 Name "${APP_NAME} ${APP_VERSION}"
-OutFile "genshin-code-monitor-${APP_VERSION}-setup.exe"
+OutFile "hoyo-code-monitor-${APP_VERSION}-setup.exe"
 InstallDir "$LOCALAPPDATA\${APP_NAME}"
 InstallDirRegKey HKCU "Software\${APP_NAME}" ""
 RequestExecutionLevel user
@@ -50,7 +50,7 @@ Section "MainSection" SEC_MAIN
     SetOutPath "$INSTDIR"
     
     ; Main executable
-    File "dist\genshin-code-monitor\${APP_EXE}"
+    File "dist\hoyo-code-monitor\${APP_EXE}"
     
     ; Config file
     File "config.toml"

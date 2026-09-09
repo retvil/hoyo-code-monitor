@@ -1,4 +1,4 @@
-# Genshin Code Monitor
+# HoYo Code Monitor
 
 Local Windows app that monitors Genshin Impact promo-code sources and auto-redeems new codes via the Hoyolab API. Everything stays on your PC: SQLite database, encrypted cookies, no telemetry, no cloud.
 

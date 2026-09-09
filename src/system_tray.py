@@ -1,4 +1,4 @@
-"""System tray integration for Genshin Code Monitor.
+"""System tray integration for HoYo Code Monitor.
 
 Provides a system tray icon with menu for controlling the application.
 """
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 class SystemTray:
-    """System tray icon with menu for Genshin Code Monitor."""
+    """System tray icon with menu for HoYo Code Monitor."""
 
     INTERVALS: tuple[tuple[str, int], ...] = (
         ("Every 5 minutes", 300),
@@ -209,7 +209,7 @@ class SystemTray:
             self._icon = pystray.Icon(
                 "genshin-code-monitor",
                 self._create_icon_image(),
-                "Genshin Code Monitor",
+                "HoYo Code Monitor",
                 self._create_menu(),
             )
         except Exception as e:

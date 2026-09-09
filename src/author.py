@@ -1,4 +1,4 @@
-"""Hardcoded author info for Genshin Code Monitor.
+"""Hardcoded author info for HoYo Code Monitor.
 
 These values are compiled into the app and CANNOT be changed from the UI.
 Fill in real links before release. Empty values are hidden automatically.

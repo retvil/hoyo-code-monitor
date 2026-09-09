@@ -1,4 +1,4 @@
-"""CLI for genshin-code-monitor."""
+"""CLI for hoyo-code-monitor."""
 
 import asyncio
 import json
@@ -31,7 +31,7 @@ def _ensure_single_instance() -> None:
 
 @click.group()
 def cli():
-    """Command group for genshin-code-monitor."""
+    """Command group for hoyo-code-monitor."""
     pass
 
 
@@ -462,7 +462,7 @@ def notify_test():
     if not token or not chat_id:
         click.echo("Not configured. Run: notify config --bot-token <t> --chat-id <id>", err=True)
         sys.exit(1)
-    ok = asyncio.run(send_telegram(token, chat_id, "Genshin Code Monitor: test message ✅"))
+    ok = asyncio.run(send_telegram(token, chat_id, "HoYo Code Monitor: test message ✅"))
     click.echo("Sent." if ok else "Failed to send.", err=not ok)
     if not ok:
         sys.exit(1)
@@ -677,7 +677,7 @@ def tray():
     if scheduler.start():
         click.echo("Auto-started monitoring.")
 
-    click.echo("Genshin Code Monitor running in system tray.")
+    click.echo("HoYo Code Monitor running in system tray.")
     click.echo(f"Settings: {web_url}")
     click.echo("Right-click the tray icon for menu. Press Ctrl+C to exit.")
 

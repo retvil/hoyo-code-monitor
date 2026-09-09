@@ -1,4 +1,4 @@
-"""Telegram notifications for Genshin Code Monitor.
+"""Telegram notifications for HoYo Code Monitor.
 
 Sends messages via Bot API on new codes and successful redemptions.
 Configure with bot token + chat id (stored in DB config, never in git).

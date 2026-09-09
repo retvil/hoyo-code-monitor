@@ -1,3 +1,3 @@
-"""Genshin Code Monitor package."""
+"""HoYo Code Monitor package."""
 
 __version__ = "0.1.0"

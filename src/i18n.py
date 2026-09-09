@@ -1,4 +1,4 @@
-"""Internationalization for Genshin Code Monitor Web UI.
+"""Internationalization for HoYo Code Monitor Web UI.
 
 Supported: English, Russian, German, French, Japanese, Chinese.
 Language is stored in storage config under key "language".
@@ -41,7 +41,7 @@ def system_lang() -> str:
 
 STRINGS: dict[str, dict[str, str]] = {
     "en": {
-        "app_name": "Genshin Code Monitor",
+        "app_name": "HoYo Code Monitor",
         "app_tag": "local · single PC",
         "nav_monitor": "Monitor",
         "nav_dashboard": "Dashboard",
@@ -150,7 +150,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "donate_note": "Your support keeps the monitor running.",
     },
     "ru": {
-        "app_name": "Genshin Code Monitor",
+        "app_name": "HoYo Code Monitor",
         "app_tag": "локально · один ПК",
         "nav_monitor": "Мониторинг",
         "nav_dashboard": "Дашборд",
@@ -259,7 +259,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "donate_note": "Ваша поддержка помогает развивать мониторинг.",
     },
     "de": {
-        "app_name": "Genshin Code Monitor",
+        "app_name": "HoYo Code Monitor",
         "app_tag": "lokal · ein PC",
         "nav_monitor": "Überwachung",
         "nav_dashboard": "Dashboard",
@@ -368,7 +368,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "donate_note": "Deine Unterstützung hält den Monitor am Laufen.",
     },
     "fr": {
-        "app_name": "Genshin Code Monitor",
+        "app_name": "HoYo Code Monitor",
         "app_tag": "local · un seul PC",
         "nav_monitor": "Suivi",
         "nav_dashboard": "Tableau de bord",
@@ -477,7 +477,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "donate_note": "Votre soutien fait vivre le moniteur.",
     },
     "ja": {
-        "app_name": "Genshin Code Monitor",
+        "app_name": "HoYo Code Monitor",
         "app_tag": "ローカル · 単一PC",
         "nav_monitor": "監視",
         "nav_dashboard": "ダッシュボード",
@@ -586,7 +586,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "donate_note": "皆様のご支援が開発の励みになります。",
     },
     "zh": {
-        "app_name": "Genshin Code Monitor",
+        "app_name": "HoYo Code Monitor",
         "app_tag": "本地 · 单机",
         "nav_monitor": "监控",
         "nav_dashboard": "仪表盘",

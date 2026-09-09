@@ -1,4 +1,4 @@
-"""Web UI for Genshin Code Monitor using FastAPI + HTMX."""
+"""Web UI for HoYo Code Monitor using FastAPI + HTMX."""
 
 from __future__ import annotations
 
@@ -44,7 +44,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Genshin Code Monitor",
+    title="HoYo Code Monitor",
     description="Monitor and redeem Genshin Impact promotional codes",
     version="0.1.0",
     lifespan=lifespan,

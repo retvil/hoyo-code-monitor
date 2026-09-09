@@ -1,4 +1,4 @@
-# Dockerfile for Genshin Code Monitor
+# Dockerfile for HoYo Code Monitor
 # Multi-stage build for smaller final image
 
 # Build stage
@@ -61,4 +61,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import sqlite3; conn = sqlite3.connect('/app/data/monitor.db'); conn.execute('SELECT 1'); conn.close()" || exit 1
 
 # Default command
-CMD ["python", "-m", "genshin_code_monitor", "start"]
+CMD ["hoyo-code-monitor", "start"]

@@ -1,4 +1,4 @@
-"""Windows autostart support for Genshin Code Monitor.
+"""Windows autostart support for HoYo Code Monitor.
 
 Registers the app in HKCU\\...\\Run so it starts on user login.
 Local-only, no admin rights required.
@@ -12,7 +12,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-APP_NAME = "GenshinCodeMonitor"
+APP_NAME = "HoYoCodeMonitor"
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 
 

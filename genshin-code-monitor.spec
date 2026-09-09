@@ -129,7 +129,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='genshin-code-monitor',
+    name='hoyo-code-monitor',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -153,5 +153,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='genshin-code-monitor',
+    name='hoyo-code-monitor',
 )

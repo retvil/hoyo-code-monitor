@@ -1,11 +1,11 @@
 version: '3.8'
 
 services:
-  genshin-monitor:
+  hoyo-monitor:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: genshin-code-monitor
+    container_name: hoyo-code-monitor
     restart: unless-stopped
     volumes:
       - ./data:/app/data
@@ -31,7 +31,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: genshin-code-monitor-cli
+    container_name: hoyo-code-monitor-cli
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -41,7 +41,7 @@ services:
       - DB_PATH=/app/data/monitor.db
       - LOG_FILE=/app/logs/app.log
       - GENSHIN_ENCRYPTION_KEY=${GENSHIN_ENCRYPTION_KEY:-}
-    entrypoint: ["python", "-m", "genshin_code_monitor"]
+    entrypoint: ["hoyo-code-monitor"]
     command: ["--help"]
     profiles:
       - cli

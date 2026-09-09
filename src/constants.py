@@ -1,4 +1,4 @@
-"""Central constants for Genshin Code Monitor.
+"""Central constants for HoYo Code Monitor.
 
 All magic values extracted here for ruff PLR2004 compliance and readability.
 """

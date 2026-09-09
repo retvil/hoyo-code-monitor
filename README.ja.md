@@ -1,4 +1,4 @@
-# Genshin Code Monitor
+# HoYo Code Monitor
 
 原神プロモコードの情報源を監視し、新しいコードをHoYolab APIで自動交換するWindowsローカルアプリ。すべてPC内に保存されます:SQLiteデータベース、暗号化Cookie、テレメトリーなし、クラウドなし。
 
