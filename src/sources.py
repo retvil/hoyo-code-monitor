@@ -171,9 +171,14 @@ class SourceConfig:
     browser_wait_seconds: int = 5
     max_retries: int = 3
     retry_base_delay: float = 1.0
+    game: str = "genshin"
 
     def validate(self) -> None:
         """Validate source configuration."""
+        from src.constants import GAMES
+
+        if self.game not in GAMES:
+            raise SourceValidationError(f"Unknown game: {self.game}")  # noqa: TRY003 -- validation message needs interpolation
         if self.selector_type not in EXTRACTORS:
             raise SourceValidationError(f"Unknown selector_type: {self.selector_type}")  # noqa: TRY003 -- validation message needs interpolation
         if not self.url:
@@ -349,6 +354,7 @@ class SourceFetcher:
                 browser_wait_seconds=int(source_data.get("browser_wait_seconds") or 5),
                 max_retries=int(source_data.get("max_retries") or 3),
                 retry_base_delay=float(source_data.get("retry_base_delay") or 1.0),
+                game=source_data.get("game") or "genshin",
             )
             try:
                 codes = await self.fetch_source(source)
@@ -506,6 +512,59 @@ def create_default_sources() -> list[SourceConfig]:
             rate_limit_seconds=2.0,
             max_retries=3,
             retry_base_delay=1.0,
+            game="genshin",
+        ),
+        SourceConfig(
+            name="hoyo_codes_hsr",
+            url="https://hoyo-codes.seria.moe/codes?game=hkrpg",
+            selector_type="json",
+            selector="",
+            enabled=True,
+            headers={"User-Agent": "HoYoCodeMonitor/1.0"},
+            timeout_seconds=30,
+            rate_limit_seconds=2.0,
+            max_retries=3,
+            retry_base_delay=1.0,
+            game="hsr",
+        ),
+        SourceConfig(
+            name="ennead_hsr_api",
+            url="https://api.ennead.cc/mihoyo/honkai/codes",
+            selector_type="json",
+            selector="active",
+            enabled=True,
+            headers={"User-Agent": "HoYoCodeMonitor/1.0"},
+            timeout_seconds=30,
+            rate_limit_seconds=2.0,
+            max_retries=3,
+            retry_base_delay=1.0,
+            game="hsr",
+        ),
+        SourceConfig(
+            name="hoyo_codes_zzz",
+            url="https://hoyo-codes.seria.moe/codes?game=nap",
+            selector_type="json",
+            selector="",
+            enabled=True,
+            headers={"User-Agent": "HoYoCodeMonitor/1.0"},
+            timeout_seconds=30,
+            rate_limit_seconds=2.0,
+            max_retries=3,
+            retry_base_delay=1.0,
+            game="zzz",
+        ),
+        SourceConfig(
+            name="ennead_zzz_api",
+            url="https://api.ennead.cc/mihoyo/zenless/codes",
+            selector_type="json",
+            selector="active",
+            enabled=True,
+            headers={"User-Agent": "HoYoCodeMonitor/1.0"},
+            timeout_seconds=30,
+            rate_limit_seconds=2.0,
+            max_retries=3,
+            retry_base_delay=1.0,
+            game="zzz",
         ),
         SourceConfig(
             name="hoyolab",
@@ -583,6 +642,58 @@ SOURCE_PRESETS: dict[str, SourceConfig] = {
         rate_limit_seconds=1.0,
         max_retries=3,
         retry_base_delay=1.0,
+    ),
+    "hoyo_codes_hsr": SourceConfig(
+        name="hoyo_codes_hsr",
+        url="https://hoyo-codes.seria.moe/codes?game=hkrpg",
+        selector_type="json",
+        selector="",
+        enabled=True,
+        headers={"User-Agent": "HoYoCodeMonitor/1.0"},
+        timeout_seconds=30,
+        rate_limit_seconds=2.0,
+        max_retries=3,
+        retry_base_delay=1.0,
+        game="hsr",
+    ),
+    "ennead_hsr_api": SourceConfig(
+        name="ennead_hsr_api",
+        url="https://api.ennead.cc/mihoyo/honkai/codes",
+        selector_type="json",
+        selector="active",
+        enabled=True,
+        headers={"User-Agent": "HoYoCodeMonitor/1.0"},
+        timeout_seconds=30,
+        rate_limit_seconds=2.0,
+        max_retries=3,
+        retry_base_delay=1.0,
+        game="hsr",
+    ),
+    "hoyo_codes_zzz": SourceConfig(
+        name="hoyo_codes_zzz",
+        url="https://hoyo-codes.seria.moe/codes?game=nap",
+        selector_type="json",
+        selector="",
+        enabled=True,
+        headers={"User-Agent": "HoYoCodeMonitor/1.0"},
+        timeout_seconds=30,
+        rate_limit_seconds=2.0,
+        max_retries=3,
+        retry_base_delay=1.0,
+        game="zzz",
+    ),
+    "ennead_zzz_api": SourceConfig(
+        name="ennead_zzz_api",
+        url="https://api.ennead.cc/mihoyo/zenless/codes",
+        selector_type="json",
+        selector="active",
+        enabled=True,
+        headers={"User-Agent": "HoYoCodeMonitor/1.0"},
+        timeout_seconds=30,
+        rate_limit_seconds=2.0,
+        max_retries=3,
+        retry_base_delay=1.0,
+        game="zzz",
     ),
     "ennead_mihoyo_api": SourceConfig(
         name="ennead_mihoyo_api",
@@ -762,6 +873,7 @@ async def seed_default_sources(storage: Storage) -> int:
                 browser_wait_seconds=source.browser_wait_seconds,
                 max_retries=source.max_retries,
                 retry_base_delay=source.retry_base_delay,
+                game=source.game,
             )
             count += 1
             logger.info("Seeded source: %s", source.name)

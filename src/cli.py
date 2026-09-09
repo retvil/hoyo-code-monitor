@@ -107,7 +107,8 @@ def list():
 @click.option("--game-biz", default="hk4e_global", help="Game business identifier.")
 @click.option("--lang", default="en-us", help="Language code.")
 @click.option("--s-lang-key", default="en-us", help="Secondary language key.")
-def add(name, uid, region, game_biz, lang, s_lang_key):
+@click.option("--game", default="genshin", help="Game id: genshin, hsr, zzz, hi3, tot.")
+def add(name, uid, region, game_biz, lang, s_lang_key, game):
     """Add a new account <name> <uid> <region>."""
     storage = Storage()
     existing = storage.get_account(name)
@@ -123,6 +124,7 @@ def add(name, uid, region, game_biz, lang, s_lang_key):
             game_biz=game_biz,
             lang=lang,
             s_lang_key=s_lang_key,
+            game=game,
         )
     except Exception as e:
         click.echo(f"Error adding account: {e}", err=True)

@@ -220,9 +220,10 @@ class Redeemer:
         cookies: dict[str, str],
         uid: str,
         region: str,
-        game_biz: str = "hk4e_global",
+        game_biz: str | None = None,
         lang: str = "en-us",
         s_lang_key: str = "en-us",
+        game: str = "genshin",
     ) -> RedemptionResult:
         """Redeem a promotional code via Hoyolab API.
 
@@ -235,6 +236,8 @@ class Redeemer:
             game_biz: Game business identifier. Defaults to "hk4e_global".
             lang: Language code. Defaults to "en-us".
             s_lang_key: Secondary language key. Defaults to "en-us".
+            game: Game id for endpoint selection ("genshin", "hsr", "zzz").
+                ZZZ uses the Risk POST endpoint.
 
         Returns:
             RedemptionResult with success status, reward, message, and raw response.
@@ -243,12 +246,41 @@ class Redeemer:
             aiohttp.ClientError: On network/connection errors.
             ValueError: If required cookies are missing.
         """
-        # Validate required cookies
+        from src.constants import GAME_CONF
+
+        # Validate required cookies first
         required_cookies = ["ltuid", "ltoken"]
         missing = [c for c in required_cookies if not cookies.get(c)]
         if missing:
             raise RedeemerError(f"Missing required cookies: {missing}")  # noqa: TRY003 -- validation message needs interpolation
 
+        conf = GAME_CONF.get(game, GAME_CONF["genshin"])
+        resolved_biz = game_biz or conf["game_biz"]
+        endpoint = f"https://{conf['api_host']}/common/apicdkey/api/webExchangeCdkey"
+        if game == "zzz":
+            return await self._redeem_risk(
+                code, cookies, uid, region, conf, lang, s_lang_key
+            )
+        original_endpoint = self.endpoint
+        self.endpoint = endpoint
+        try:
+            return await self._redeem_get(
+                code, cookies, uid, region, resolved_biz, lang, s_lang_key
+            )
+        finally:
+            self.endpoint = original_endpoint
+
+    async def _redeem_get(
+        self,
+        code: str,
+        cookies: dict[str, str],
+        uid: str,
+        region: str,
+        game_biz: str,
+        lang: str,
+        s_lang_key: str,
+    ) -> RedemptionResult:
+        """Redeem via GET webExchangeCdkey (Genshin/HSR/HI3/ToT)."""
         session = await self._get_session()
         headers = self._build_headers(cookies)
         form_data = self._build_form_data(
@@ -304,6 +336,65 @@ class Redeemer:
             )
         except Exception as e:
             logger.exception("Unexpected error redeeming code %s", code[:4] + "****")
+            return RedemptionResult(
+                success=False,
+                reward="",
+                message=f"Unexpected error: {e}",
+                raw_response={"retcode": -1, "message": str(e), "data": {}},
+            )
+
+    async def _redeem_risk(
+        self,
+        code: str,
+        cookies: dict[str, str],
+        uid: str,
+        region: str,
+        conf: dict[str, str],
+        lang: str,
+        s_lang_key: str,
+    ) -> RedemptionResult:
+        """Redeem via POST webExchangeCdkeyRisk (ZZZ)."""
+        session = await self._get_session()
+        headers = self._build_headers(cookies)
+        headers["Content-Type"] = "application/json"
+        payload = {
+            "game_biz": conf["game_biz"],
+            "uid": uid,
+            "region": region,
+            "cdkey": code,
+            "lang": lang,
+        }
+        url = f"https://{conf['api_host']}/common/apicdkey/api/webExchangeCdkeyRisk"
+
+        logger.info("Attempting to redeem ZZZ code: %s", code[:4] + "****")
+
+        try:
+            async with session.post(url, headers=headers, json=payload) as response:
+                response.raise_for_status()
+                result = self._parse_response(await response.json())
+                if result.success:
+                    logger.info("ZZZ code redeemed: %s", code[:4] + "****")
+                else:
+                    logger.warning("ZZZ redemption failed: %s - %s", code[:4] + "****", result.message)
+                return result
+        except aiohttp.ClientResponseError as e:
+            logger.error("HTTP error redeeming ZZZ code %s: %s", code[:4] + "****", e)
+            return RedemptionResult(
+                success=False,
+                reward="",
+                message=f"HTTP {e.status}: {e.message}",
+                raw_response={"retcode": -1, "message": str(e), "data": {}},
+            )
+        except aiohttp.ClientError as e:
+            logger.error("Network error redeeming ZZZ code %s: %s", code[:4] + "****", e)
+            return RedemptionResult(
+                success=False,
+                reward="",
+                message=f"Network error: {e}",
+                raw_response={"retcode": -1, "message": str(e), "data": {}},
+            )
+        except Exception as e:
+            logger.exception("Unexpected error redeeming ZZZ code %s", code[:4] + "****")
             return RedemptionResult(
                 success=False,
                 reward="",

@@ -189,6 +189,11 @@ class Scheduler:
 
         new_codes: list[str] = []
 
+        # Game per source (for multi-game storage)
+        source_games = {
+            s["name"]: (s.get("game") or "genshin") for s in sources_data
+        }
+
         # Process results
         for source_name, codes in results.items():
             for code in codes:
@@ -197,10 +202,11 @@ class Scheduler:
                     continue
 
                 codes_found += 1
+                code_game = source_games.get(source_name, "genshin")
 
                 # Try to add code to database (will fail if duplicate)
                 try:
-                    self.storage.add_code(code, source_name)
+                    self.storage.add_code(code, source_name, game=code_game)
                     new_codes.append(code)
                     logger.info("New code found: %s from %s", code[:4] + "****", source_name)
 
@@ -210,6 +216,10 @@ class Scheduler:
                             # Log redemption per account
                             for idx, acc in enumerate(redeem_accounts):
                                 try:
+                                    from src.constants import GAME_CONF
+
+                                    acc_game = acc.get("game") or "genshin"
+                                    gconf = GAME_CONF.get(acc_game, GAME_CONF["genshin"])
                                     cookies = (
                                         self.storage.load_account_cookies(acc["name"])
                                         or self.config.cookies
@@ -219,9 +229,10 @@ class Scheduler:
                                         cookies=cookies,
                                         uid=acc["uid"],
                                         region=acc["region"],
-                                        game_biz=acc.get("game_biz", "hk4e_global"),
+                                        game_biz=acc.get("game_biz") or gconf["game_biz"],
                                         lang=acc.get("lang", "en-us"),
                                         s_lang_key=acc.get("s_lang_key", "en-us"),
+                                        game=acc_game,
                                     )
                                     claimed = res.success or res.raw_response.get("retcode") in (
                                         -2017,

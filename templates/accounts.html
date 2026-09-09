@@ -44,6 +44,9 @@
         </div>
         <form hx-post="/accounts" hx-swap="none" hx-on::after-request="if(event.detail.successful){document.getElementById('account-modal').classList.remove('active');location.reload()}">
             <div style="margin-bottom: 10px;"><label>{{ t('name') }}</label><input type="text" name="name" required placeholder="main"></div>
+            <div style="margin-bottom: 10px;"><label>Game</label>
+                <select name="game"><option value="genshin">Genshin Impact</option><option value="hsr">Honkai: Star Rail</option><option value="zzz">Zenless Zone Zero</option><option value="hi3">Honkai Impact 3rd</option><option value="tot">Tears of Themis</option></select>
+            </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                 <div style="margin-bottom: 10px;"><label>{{ t('uid') }}</label><input type="text" name="uid" required placeholder="123456789"></div>
                 <div style="margin-bottom: 10px;"><label>{{ t('region') }}</label>

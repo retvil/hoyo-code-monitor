@@ -362,9 +362,14 @@ async def create_account(
     game_biz: str = Form("hk4e_global"),
     lang: str = Form("en-us"),
     s_lang_key: str = Form("en-us"),
+    game: str = Form("genshin"),
 ):
     """Create a new account (accepts form-data from HTMX modal)."""
+    from src.constants import GAMES
+
     storage = Storage()
+    if game not in GAMES:
+        raise HTTPException(status_code=400, detail=f"Unknown game: {game}")
     try:
         storage.add_account(
             name=name,
@@ -373,6 +378,7 @@ async def create_account(
             game_biz=game_biz,
             lang=lang,
             s_lang_key=s_lang_key,
+            game=game,
         )
         return {"success": True, "message": f"Account '{name}' created"}
     except Exception as e:
@@ -716,10 +722,13 @@ async def redeem_single_code(code: str):
         for acc in accounts:
             cookies = storage.load_account_cookies(acc["name"])
             try:
+                from src.constants import GAME_CONF as _GC
+                _ag = acc.get("game") or "genshin"
                 res = await redeemer.redeem_code(
                     code=row["code"], cookies=cookies, uid=acc["uid"], region=acc["region"],
-                    game_biz=acc.get("game_biz", "hk4e_global"),
+                    game_biz=acc.get("game_biz") or _GC.get(_ag, _GC["genshin"])["game_biz"],
                     lang=acc.get("lang", "en-us"), s_lang_key=acc.get("s_lang_key", "en-us"),
+                    game=_ag,
                 )
                 claimed = res.success or res.raw_response.get("retcode") in (-2017, -2018)
                 storage.update_code_redemption(row["code"], claimed, res.reward if res.success else None)
@@ -775,10 +784,13 @@ async def redeem_all_codes():
             for acc in accounts:
                 cookies = storage.load_account_cookies(acc["name"])
                 try:
+                    from src.constants import GAME_CONF as _GC2
+                    _ag2 = acc.get("game") or "genshin"
                     res = await redeemer.redeem_code(
                         code=row["code"], cookies=cookies, uid=acc["uid"], region=acc["region"],
-                        game_biz=acc.get("game_biz", "hk4e_global"),
+                        game_biz=acc.get("game_biz") or _GC2.get(_ag2, _GC2["genshin"])["game_biz"],
                         lang=acc.get("lang", "en-us"), s_lang_key=acc.get("s_lang_key", "en-us"),
+                        game=_ag2,
                     )
                     claimed = res.success or res.raw_response.get("retcode") in (-2017, -2018)
                     storage.update_code_redemption(row["code"], claimed, res.reward if res.success else None)
@@ -814,6 +826,7 @@ async def export_data():
                 "reward": c.get("reward"),
                 "attempted_at": c.get("attempted_at"),
                 "redeemed_at": c.get("redeemed_at"),
+                "game": c.get("game", "genshin"),
             }
             for c in codes
         ],
@@ -831,7 +844,7 @@ async def import_data(payload: str = Form(...)):
     items = data.get("codes", []) if isinstance(data, dict) else []
     added, skipped = 0, 0
     for item in items:
-        code = str(item.get("code", "")).strip().upper()
+        code = str(item.get("code", "")).strip()
         if not code:
             continue
         existing = storage.get_code(code)
@@ -841,7 +854,7 @@ async def import_data(payload: str = Form(...)):
         try:
             for src in item.get("sources", ["import"]) or ["import"]:
                 try:
-                    storage.add_code(code, str(src))
+                    storage.add_code(code, str(src), game=str(item.get("game", "genshin")))
                     break
                 except Exception:
                     continue
