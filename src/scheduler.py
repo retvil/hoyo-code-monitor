@@ -185,6 +185,10 @@ class Scheduler:
                 "errors": [f"Fetch error: {e}"],
             }
 
+        from src.notify import notify_new_codes, notify_redeemed
+
+        new_codes: list[str] = []
+
         # Process results
         for source_name, codes in results.items():
             for code in codes:
@@ -197,6 +201,7 @@ class Scheduler:
                 # Try to add code to database (will fail if duplicate)
                 try:
                     self.storage.add_code(code, source_name)
+                    new_codes.append(code)
                     logger.info("New code found: %s from %s", code[:4] + "****", source_name)
 
                     # Attempt redemption if enabled and configured
@@ -236,6 +241,12 @@ class Scheduler:
                                     )
                                     if claimed:
                                         codes_redeemed += 1
+                                        try:
+                                            await notify_redeemed(
+                                                self.storage, code, acc["name"], res.reward or "claimed"
+                                            )
+                                        except Exception:
+                                            pass
                                 except Exception as e:
                                     logger.error(
                                         "Error redeeming code %s for %s: %s",
@@ -256,6 +267,12 @@ class Scheduler:
                 except Exception as e:
                     logger.error("Error storing code %s: %s", code[:4] + "****", e)
                     errors.append(f"Storage error for {code[:4]}****: {e}")
+
+        if new_codes:
+            try:
+                await notify_new_codes(self.storage, new_codes)
+            except Exception:
+                pass
 
         return {
             "success": len(errors) == 0,

@@ -427,6 +427,47 @@ def health():
         sys.exit(1)
 
 
+@cli.group()
+def notify():
+    """Telegram notification settings."""
+    pass
+
+
+@notify.command("config")
+@click.option("--bot-token", default=None, help="Telegram bot token from @BotFather.")
+@click.option("--chat-id", default=None, help="Telegram chat id (from @userinfobot).")
+def notify_config(bot_token, chat_id):
+    """Show or set Telegram notification settings."""
+    storage = Storage()
+    if bot_token is not None:
+        storage.set_config("telegram_bot_token", bot_token)
+    if chat_id is not None:
+        storage.set_config("telegram_chat_id", chat_id)
+    token_set = bool(storage.get_config("telegram_bot_token", ""))
+    chat = storage.get_config("telegram_chat_id", "") or "-"
+    click.echo(f"Telegram notifications: {'configured' if token_set and chat != '-' else 'NOT configured'}")
+    click.echo(f"  chat_id: {chat}")
+
+
+@notify.command("test")
+def notify_test():
+    """Send a test message to Telegram."""
+    import asyncio
+
+    from src.notify import send_telegram
+
+    storage = Storage()
+    token = storage.get_config("telegram_bot_token", "") or ""
+    chat_id = storage.get_config("telegram_chat_id", "") or ""
+    if not token or not chat_id:
+        click.echo("Not configured. Run: notify config --bot-token <t> --chat-id <id>", err=True)
+        sys.exit(1)
+    ok = asyncio.run(send_telegram(token, chat_id, "Genshin Code Monitor: test message ✅"))
+    click.echo("Sent." if ok else "Failed to send.", err=not ok)
+    if not ok:
+        sys.exit(1)
+
+
 @cli.command()
 def status():
     """Show current status."""
