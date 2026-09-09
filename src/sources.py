@@ -116,7 +116,12 @@ class JSONExtractor:
         def find_codes(obj: Any) -> None:
             if isinstance(obj, dict):
                 for k, v in obj.items():
-                    if isinstance(k, str) and k.lower() in CODE_KEYS and isinstance(v, str) and v.strip():
+                    if (
+                        isinstance(k, str)
+                        and k.lower() in CODE_KEYS
+                        and isinstance(v, str)
+                        and v.strip()
+                    ):
                         codes.append(v.strip())
                     else:
                         find_codes(v)
@@ -868,6 +873,19 @@ SOURCE_PRESETS: dict[str, SourceConfig] = {
         rate_limit_seconds=2.0,
         max_retries=3,
         retry_base_delay=1.0,
+    ),
+    "hoyolab_news_official": SourceConfig(
+        name="hoyolab_news_official",
+        url="https://bbs-api-os.hoyolab.com/community/post/wapi/getNewsList?gids=2&page_size=20&type=1",
+        selector_type="json",
+        selector="",
+        enabled=False,  # Very noisy: ~400 word-like candidates per fetch, mostly article text
+        headers={"User-Agent": "HoYoCodeMonitor/1.0", "x-rpc-language": "en-us"},
+        timeout_seconds=30,
+        rate_limit_seconds=5.0,
+        max_retries=3,
+        retry_base_delay=1.0,
+        game="genshin",
     ),
     "hoyoverse_news": SourceConfig(
         name="hoyoverse_news",
