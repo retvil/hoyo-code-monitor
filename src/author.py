@@ -8,9 +8,9 @@ from __future__ import annotations
 
 AUTHOR_NAME: str = "Nod33Eset"
 AUTHOR_URL: str = ""
-AUTHOR_TELEGRAM: str = ""
-AUTHOR_EMAIL: str = ""
-AUTHOR_GITHUB: str = ""
+AUTHOR_TELEGRAM: str = "@Nod33Eset"
+AUTHOR_EMAIL: str = "sdcloud@mail.ru"
+AUTHOR_GITHUB: str = "https://github.com/retvil"
 
 SUPPORT_URL: str = ""
 SUPPORT_PATREON: str = ""
