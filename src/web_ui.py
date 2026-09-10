@@ -106,6 +106,7 @@ def page_ctx(storage: Storage, extra: dict | None = None) -> dict:
             for gid, conf in GAME_CONF.items()
         },
         "games_with_account": games_with_account,
+        "gift_urls": {gid: conf["gift_url"] for gid, conf in GAME_CONF.items()},
     }
     ctx.update(author_module.as_dict())
     if extra:
@@ -158,8 +159,10 @@ async def dashboard(request: Request, game: str = ""):
     # Get recent codes
     codes = storage.list_codes(limit=20, only_unredeemed=False, game=current_game or None)
 
-    # Get redeemed codes (all, newest first by redemption time)
-    redeemed_codes = [c for c in storage.list_codes(limit=200) if c.get("redeemed")]
+    # Get redeemed codes (filtered by game, newest first by redemption time)
+    redeemed_codes = [
+        c for c in storage.list_codes(limit=200, game=current_game or None) if c.get("redeemed")
+    ]
     redeemed_codes.sort(key=lambda c: c.get("redeemed_at") or "", reverse=True)
 
     # Get sources

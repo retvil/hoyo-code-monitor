@@ -86,26 +86,31 @@
 </div>
 
 <div class="card">
-    <div class="card-title" style="margin-bottom: 12px;">{{ t('redeemed_codes') }}</div>
-    {% if redeemed_codes %}
-    <div class="table-scroll">
-    <table>
-        <thead><tr><th>{{ t('code') }}</th><th>{{ t('sources') }}</th><th>{{ t('reward') }}</th><th>{{ t('redeemed_at') }}</th></tr></thead>
-        <tbody>
-            {% for code in redeemed_codes %}
-            <tr>
-                <td class="mono"><strong>{{ code.code }}</strong></td>
-                <td>{% for src in code.sources %}<span class="badge badge-info">{{ src }}</span> {% endfor %}</td>
-                <td>{{ code.reward or '-' }}</td>
-                <td class="muted">{{ code.redeemed_at[:19] if code.redeemed_at else '-' }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    </div>
-    {% else %}
-    <p class="muted">{{ t('no_redeemed') }}</p>
-    {% endif %}
+    <details>
+        <summary class="card-title" style="cursor: pointer;">{{ t('redeemed_codes') }} ({{ redeemed_codes | length }})</summary>
+        <div style="margin-top: 12px;">
+        {% if redeemed_codes %}
+        <div class="table-scroll">
+        <table>
+            <thead><tr><th>{{ t('code') }}</th><th>Game</th><th>{{ t('sources') }}</th><th>{{ t('reward') }}</th><th>{{ t('redeemed_at') }}</th></tr></thead>
+            <tbody>
+                {% for code in redeemed_codes %}
+                <tr>
+                    <td class="mono"><strong>{{ code.code }}</strong></td>
+                    <td>{% if code.game in game_accents %}<span class="badge" style="background: {{ game_accents[code.game].accent }}22; color: {{ game_accents[code.game].accent }};">{{ game_accents[code.game].short }}</span>{% else %}{{ code.game or '-' }}{% endif %}</td>
+                    <td>{% for src in code.sources %}<span class="badge badge-info">{{ src }}</span> {% endfor %}</td>
+                    <td>{{ code.reward or '-' }}</td>
+                    <td class="muted">{{ code.redeemed_at[:19] if code.redeemed_at else '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% else %}
+        <p class="muted">{{ t('no_redeemed') }}</p>
+        {% endif %}
+        </div>
+    </details>
 </div>
 
 <div class="card" id="codes-table" hx-get="/partials/recent-codes" hx-trigger="load" hx-swap="outerHTML">
