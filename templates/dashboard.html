@@ -2,6 +2,11 @@
 {% block title %}{{ t('nav_dashboard') }} - {{ t('app_name') }}{% endblock %}
 {% block page_title %}{{ t('nav_dashboard') }}{% endblock %}
 {% block content %}
+<div class="hero">
+    <svg class="mascot" aria-hidden="true"><use href="#mascot"/></svg>
+    <h2>{% if current_game and current_game in game_accents %}{{ game_accents[current_game].name }}{% else %}{{ t('app_name') }}{% endif %}</h2>
+    <p>{{ stats.total_codes }} codes · {{ stats.successful }} redeemed · {{ stats.failed }} pending</p>
+</div>
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px;">
     <a href="/" style="text-decoration: none; color: inherit;">
         <div class="card" style="margin-bottom: 0; border-left: 3px solid var(--border); {% if not current_game %}box-shadow: 0 4px 16px rgba(67,56,202,0.12);{% endif %}">
@@ -111,7 +116,7 @@
         </table>
         </div>
         {% else %}
-        <p class="muted">{{ t('no_redeemed') }}</p>
+        <div class="empty"><svg aria-hidden="true"><use href="#mascot"/></svg><p>{{ t('no_redeemed') }}</p></div>
         {% endif %}
         </div>
     </details>
@@ -135,7 +140,7 @@
             {% endfor %}
         </div>
         {% else %}
-        <p class="muted">{{ t('no_logs') }}</p>
+        <div class="empty"><svg aria-hidden="true"><use href="#mascot"/></svg><p>{{ t('no_logs') }}</p></div>
         {% endif %}
         </div>
     </details>
