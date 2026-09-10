@@ -275,6 +275,26 @@ class SourceFetcher:
                 )
                 return codes
 
+            except aiohttp.ClientResponseError as e:
+                # 4xx (except 429) will not recover — fail fast without retries
+                if e.status != 429 and 400 <= e.status < 500:
+                    logger.error("HTTP %s fetching %s (no retry): %s", e.status, source.name, e)
+                    raise
+                if attempt == max_retries - 1:
+                    logger.error(
+                        "HTTP error fetching %s after %d retries: %s", source.name, max_retries, e
+                    )
+                    raise
+                delay = base_delay * (2**attempt)
+                logger.warning(
+                    "Fetch attempt %d/%d failed for %s: %s. Retrying in %.1fs",
+                    attempt + 1,
+                    max_retries,
+                    source.name,
+                    e,
+                    delay,
+                )
+                await asyncio.sleep(delay)
             except aiohttp.ClientError as e:
                 if attempt == max_retries - 1:
                     logger.error(
