@@ -102,7 +102,12 @@ def page_ctx(storage: Storage, extra: dict | None = None) -> dict:
         "app_author": APP_AUTHOR,
         "current_game": "",
         "game_accents": {
-            gid: {"accent": conf["accent"], "short": conf.get("short", gid.upper())}
+            gid: {
+                "accent": conf["accent"],
+                "accent_soft": conf.get("accent_soft", "#ede9fe"),
+                "short": conf.get("short", gid.upper()),
+                "name": conf.get("name", gid),
+            }
             for gid, conf in GAME_CONF.items()
         },
         "games_with_account": games_with_account,

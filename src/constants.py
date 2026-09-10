@@ -71,6 +71,7 @@ GAME_CONF: dict[str, dict[str, str]] = {
         "game_biz": "hk4e_global",
         "api_host": "sg-hk4e-api.hoyoverse.com",
         "accent": "#3ec6b8",
+        "accent_soft": "#d9f7f3",
         "gift_url": "https://genshin.hoyoverse.com/en/gift?code={code}",
     },
     "hsr": {
@@ -79,6 +80,7 @@ GAME_CONF: dict[str, dict[str, str]] = {
         "game_biz": "hkrpg_global",
         "api_host": "sg-hkrpg-api.hoyoverse.com",
         "accent": "#e5484d",
+        "accent_soft": "#fde6e7",
         "gift_url": "https://hsr.hoyoverse.com/gift?code={code}",
     },
     "zzz": {
@@ -87,6 +89,7 @@ GAME_CONF: dict[str, dict[str, str]] = {
         "game_biz": "nap_global",
         "api_host": "public-operation-nap.hoyoverse.com",
         "accent": "#8b5cf6",
+        "accent_soft": "#ede9fe",
         "gift_url": "https://zenless.hoyoverse.com/redemption?code={code}",
     },
     "hi3": {
@@ -95,6 +98,7 @@ GAME_CONF: dict[str, dict[str, str]] = {
         "game_biz": "bh3_global",
         "api_host": "sg-bh3-api.hoyoverse.com",
         "accent": "#f5a623",
+        "accent_soft": "#fef3dc",
         "gift_url": "https://www.hoyolab.com/article/4886?code={code}",
     },
     "tot": {
@@ -103,6 +107,7 @@ GAME_CONF: dict[str, dict[str, str]] = {
         "game_biz": "nxx_global",
         "api_host": "sg-nxx-api.hoyoverse.com",
         "accent": "#ec4899",
+        "accent_soft": "#fce7f1",
         "gift_url": "https://tot.hoyoverse.com/en/gift?code={code}",
     },
 }

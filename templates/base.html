@@ -120,7 +120,14 @@
     </style>
     {% block extra_css %}{% endblock %}
 </head>
-<body{% if current_game and current_game in game_accents %} style="--game-accent: {{ game_accents[current_game].accent }};"{% endif %}>
+<body{% if current_game and current_game in game_accents %} style="--accent: {{ game_accents[current_game].accent }}; --accent-soft: {{ game_accents[current_game].accent_soft }}; --game-accent: {{ game_accents[current_game].accent }};"{% endif %}>
+<svg width="0" height="0" style="position: absolute;" aria-hidden="true">
+    <symbol id="g-genshin" viewBox="0 0 24 24"><path d="M12 1l2.6 7.2 7.4 2.8-7.4 2.8L12 21l-2.6-7.2L2 11l7.4-2.8z" fill="currentColor"/><circle cx="12" cy="11" r="2.2" fill="var(--surface, #fff)"/></symbol>
+    <symbol id="g-hsr" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.4"/><circle cx="12" cy="12" r="3" fill="currentColor"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
+    <symbol id="g-zzz" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M8 6V3.5M16 6V3.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><circle cx="12" cy="12" r="2" fill="currentColor"/></symbol>
+    <symbol id="g-hi3" viewBox="0 0 24 24"><path d="M12 2c1 5-4 7-4 12a4.5 4.5 0 009 0c0-2-1-3.5-2-5-.5 1.5-1.5 2-1.5 2 .5-3-1.5-7-1.5-9z" fill="currentColor"/></symbol>
+    <symbol id="g-tot" viewBox="0 0 24 24"><path d="M12 3v18M5 7h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M5 7l-2.5 6a3 3 0 005 0L5 7zM19 7l-2.5 6a3 3 0 005 0L19 7z" fill="currentColor"/></symbol>
+</svg>
 <script>
 try {
     var th = localStorage.getItem('gcm-theme') || 'light';
@@ -140,7 +147,7 @@ function copyText(txt, el) {
 }
 </script>
 <aside class="sidebar">
-    <div class="brand"><span class="brand-mark" aria-hidden="true">{% if current_game and current_game in game_accents %}<span style="display: block; transform: rotate(-45deg); font-size: 9px; font-weight: 700; color: #fff; text-align: center; line-height: 22px;">{{ game_accents[current_game].short }}</span>{% endif %}</span><span>{{ t('app_name') }}<small>v{{ app_version }} · by {{ app_author }}{% if current_game and current_game in game_accents %} · {{ game_accents[current_game].short }}{% endif %}</small></span></div>
+    <div class="brand">{% if current_game and current_game in game_accents %}<svg style="width: 26px; height: 26px; flex: none; color: {{ game_accents[current_game].accent }};"><use href="#g-{{ current_game }}"/></svg>{% else %}<span class="brand-mark" aria-hidden="true"></span>{% endif %}<span>{{ t('app_name') }}<small>v{{ app_version }} · by {{ app_author }}{% if current_game and current_game in game_accents %} · {{ game_accents[current_game].name }}{% endif %}</small></span></div>
     <nav class="nav">
         <div class="group-label">{{ t('nav_monitor') }}</div>
         <a href="/" class="{% if request.path == '/' %}active{% endif %}">{{ t('nav_dashboard') }}</a>
