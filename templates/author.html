@@ -40,41 +40,53 @@
         {% if author.sponsr %}<a class="btn btn-primary" href="{{ author.sponsr }}">Sponsr</a>{% endif %}
         {% if author.url_generic %}<a class="btn btn-primary" href="{{ author.url_generic }}">{{ t('support_author') }}</a>{% endif %}
     </div>
+    {% if author.bitcoin or author.ton or author.usdt or author.usdt_erc20 or author.usdt_sol %}
+    <details style="margin-top: 12px;">
+        <summary class="card-title" style="cursor: pointer;">Crypto</summary>
+        <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
+    {% endif %}
     {% if author.bitcoin %}
-    <div class="mono" style="font-size: 0.85rem; background: var(--bg); padding: 10px 14px; border-radius: 8px; word-break: break-all; margin-bottom: 8px;">
-        <strong>BTC</strong> {{ author.bitcoin }}
-        <button class="btn" style="padding: 2px 10px; font-size: 0.75rem; margin-left: 8px;" onclick="navigator.clipboard.writeText('{{ author.bitcoin }}');this.textContent='{{ t('copied') }}'">{{ t('copy') }}</button>
-        <img src="/author/qr?kind=bitcoin" alt="BTC QR" class="qr-thumb" onclick="this.classList.toggle('zoomed')" title="Click to enlarge">
+    <div style="display: flex; gap: 10px; align-items: center; background: var(--bg); padding: 8px 12px; border-radius: 8px;">
+        <svg style="width: 26px; height: 26px; flex: none;"><use href="#c-btc"/></svg>
+        <div class="mono" style="font-size: 0.8rem; word-break: break-all; flex: 1;"><strong>BTC</strong> {{ author.bitcoin }}</div>
+        <button class="btn" style="padding: 2px 10px; font-size: 0.75rem; flex: none;" onclick="navigator.clipboard.writeText('{{ author.bitcoin }}');this.textContent='{{ t('copied') }}'">{{ t('copy') }}</button>
+        <img src="/author/qr?kind=bitcoin" alt="BTC QR" class="qr-thumb" style="margin-top: 0;" onclick="this.classList.toggle('zoomed')" title="Click to enlarge">
     </div>
     {% endif %}
     {% if author.ton %}
-    <div class="mono" style="font-size: 0.85rem; background: var(--bg); padding: 10px 14px; border-radius: 8px; word-break: break-all; margin-bottom: 8px;">
-        <strong>TON</strong> {{ author.ton }}
-        <button class="btn" style="padding: 2px 10px; font-size: 0.75rem; margin-left: 8px;" onclick="navigator.clipboard.writeText('{{ author.ton }}');this.textContent='{{ t('copied') }}'">{{ t('copy') }}</button>
-        <img src="/author/qr?kind=ton" alt="TON QR" class="qr-thumb" onclick="this.classList.toggle('zoomed')" title="Click to enlarge">
+    <div style="display: flex; gap: 10px; align-items: center; background: var(--bg); padding: 8px 12px; border-radius: 8px;">
+        <svg style="width: 26px; height: 26px; flex: none;"><use href="#c-ton"/></svg>
+        <div class="mono" style="font-size: 0.8rem; word-break: break-all; flex: 1;"><strong>TON</strong> {{ author.ton }}</div>
+        <button class="btn" style="padding: 2px 10px; font-size: 0.75rem; flex: none;" onclick="navigator.clipboard.writeText('{{ author.ton }}');this.textContent='{{ t('copied') }}'">{{ t('copy') }}</button>
+        <img src="/author/qr?kind=ton" alt="TON QR" class="qr-thumb" style="margin-top: 0;" onclick="this.classList.toggle('zoomed')" title="Click to enlarge">
     </div>
     {% endif %}
     {% if author.usdt %}
-    <div class="mono" style="font-size: 0.85rem; background: var(--bg); padding: 10px 14px; border-radius: 6px; word-break: break-all; margin-bottom: 8px;">
-        <strong>USDT (TRC-20)</strong> {{ author.usdt }}
-        <button class="btn" style="padding: 2px 10px; font-size: 0.75rem; margin-left: 8px;" onclick="navigator.clipboard.writeText('{{ author.usdt }}');this.textContent='{{ t('copied') }}'">{{ t('copy') }}</button>
-        <img src="/author/qr?kind=usdt_trc20" alt="USDT QR" class="qr-thumb" onclick="this.classList.toggle('zoomed')" title="Click to enlarge">
+    <div style="display: flex; gap: 10px; align-items: center; background: var(--bg); padding: 8px 12px; border-radius: 8px;">
+        <svg style="width: 26px; height: 26px; flex: none;"><use href="#c-usdt"/></svg>
+        <div class="mono" style="font-size: 0.8rem; word-break: break-all; flex: 1;"><strong>USDT (TRC-20)</strong> {{ author.usdt }}</div>
+        <button class="btn" style="padding: 2px 10px; font-size: 0.75rem; flex: none;" onclick="navigator.clipboard.writeText('{{ author.usdt }}');this.textContent='{{ t('copied') }}'">{{ t('copy') }}</button>
+        <img src="/author/qr?kind=usdt_trc20" alt="USDT QR" class="qr-thumb" style="margin-top: 0;" onclick="this.classList.toggle('zoomed')" title="Click to enlarge">
     </div>
     {% endif %}
     {% if author.usdt_erc20 %}
-    <div class="mono" style="font-size: 0.85rem; background: var(--bg); padding: 10px 14px; border-radius: 6px; word-break: break-all; margin-bottom: 8px;">
-        <strong>USDT (ERC-20)</strong> {{ author.usdt_erc20 }}
-        <button class="btn" style="padding: 2px 10px; font-size: 0.75rem; margin-left: 8px;" onclick="navigator.clipboard.writeText('{{ author.usdt_erc20 }}');this.textContent='{{ t('copied') }}'">{{ t('copy') }}</button>
-        <img src="/author/qr?kind=usdt_erc20" alt="USDT QR" class="qr-thumb" onclick="this.classList.toggle('zoomed')" title="Click to enlarge">
+    <div style="display: flex; gap: 10px; align-items: center; background: var(--bg); padding: 8px 12px; border-radius: 8px;">
+        <svg style="width: 26px; height: 26px; flex: none;"><use href="#c-usdt"/></svg>
+        <div class="mono" style="font-size: 0.8rem; word-break: break-all; flex: 1;"><strong>USDT (ERC-20)</strong> {{ author.usdt_erc20 }}</div>
+        <button class="btn" style="padding: 2px 10px; font-size: 0.75rem; flex: none;" onclick="navigator.clipboard.writeText('{{ author.usdt_erc20 }}');this.textContent='{{ t('copied') }}'">{{ t('copy') }}</button>
+        <img src="/author/qr?kind=usdt_erc20" alt="USDT QR" class="qr-thumb" style="margin-top: 0;" onclick="this.classList.toggle('zoomed')" title="Click to enlarge">
     </div>
     {% endif %}
     {% if author.usdt_sol %}
-    <div class="mono" style="font-size: 0.85rem; background: var(--bg); padding: 10px 14px; border-radius: 6px; word-break: break-all;">
-        <strong>USDT (Solana)</strong> {{ author.usdt_sol }}
-        <button class="btn" style="padding: 2px 10px; font-size: 0.75rem; margin-left: 8px;" onclick="navigator.clipboard.writeText('{{ author.usdt_sol }}');this.textContent='{{ t('copied') }}'">{{ t('copy') }}</button>
-        <img src="/author/qr?kind=usdt_sol" alt="USDT QR" class="qr-thumb" onclick="this.classList.toggle('zoomed')" title="Click to enlarge">
+    <div style="display: flex; gap: 10px; align-items: center; background: var(--bg); padding: 8px 12px; border-radius: 8px;">
+        <svg style="width: 26px; height: 26px; flex: none;"><use href="#c-usdt"/></svg>
+        <div class="mono" style="font-size: 0.8rem; word-break: break-all; flex: 1;"><strong>USDT (Solana)</strong> {{ author.usdt_sol }}</div>
+        <button class="btn" style="padding: 2px 10px; font-size: 0.75rem; flex: none;" onclick="navigator.clipboard.writeText('{{ author.usdt_sol }}');this.textContent='{{ t('copied') }}'">{{ t('copy') }}</button>
+        <img src="/author/qr?kind=usdt_sol" alt="USDT QR" class="qr-thumb" style="margin-top: 0;" onclick="this.classList.toggle('zoomed')" title="Click to enlarge">
     </div>
     {% endif %}
+        </div>
+    </details>
     {% if not has_any %}
     <p class="muted">{{ t('author_empty') }}</p>
     {% endif %}
