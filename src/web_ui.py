@@ -550,6 +550,7 @@ async def author_page(request: Request):
         "ton": raw.get("support_ton", ""),
         "usdt": raw.get("support_usdt_trc20", ""),
         "usdt_erc20": raw.get("support_usdt_erc20", ""),
+        "usdt_sol": raw.get("support_usdt_sol", ""),
     }
     return templates.TemplateResponse(
         request,
@@ -577,6 +578,7 @@ async def author_qr(kind: str = "bitcoin"):
         "usdt": "support_usdt_trc20",
         "usdt_trc20": "support_usdt_trc20",
         "usdt_erc20": "support_usdt_erc20",
+        "usdt_sol": "support_usdt_sol",
     }.get(kind, "support_bitcoin")
     address = data.get(key, "") or ""
     if not address:

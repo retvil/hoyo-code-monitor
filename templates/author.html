@@ -59,10 +59,17 @@
     </div>
     {% endif %}
     {% if author.usdt_erc20 %}
-    <div class="mono" style="font-size: 0.85rem; background: var(--bg); padding: 10px 14px; border-radius: 6px; word-break: break-all;">
+    <div class="mono" style="font-size: 0.85rem; background: var(--bg); padding: 10px 14px; border-radius: 6px; word-break: break-all; margin-bottom: 8px;">
         <strong>USDT (ERC-20)</strong> {{ author.usdt_erc20 }}
         <button class="btn" style="padding: 2px 10px; font-size: 0.75rem; margin-left: 8px;" onclick="navigator.clipboard.writeText('{{ author.usdt_erc20 }}');this.textContent='{{ t('copied') }}'">{{ t('copy') }}</button>
         <img src="/author/qr?kind=usdt_erc20" alt="USDT QR" style="display: block; margin-top: 8px; width: 160px; height: 160px; background: #fff; padding: 6px; border-radius: 8px;">
+    </div>
+    {% endif %}
+    {% if author.usdt_sol %}
+    <div class="mono" style="font-size: 0.85rem; background: var(--bg); padding: 10px 14px; border-radius: 6px; word-break: break-all;">
+        <strong>USDT (Solana)</strong> {{ author.usdt_sol }}
+        <button class="btn" style="padding: 2px 10px; font-size: 0.75rem; margin-left: 8px;" onclick="navigator.clipboard.writeText('{{ author.usdt_sol }}');this.textContent='{{ t('copied') }}'">{{ t('copy') }}</button>
+        <img src="/author/qr?kind=usdt_sol" alt="USDT QR" style="display: block; margin-top: 8px; width: 160px; height: 160px; background: #fff; padding: 6px; border-radius: 8px;">
     </div>
     {% endif %}
     {% if not has_any %}
