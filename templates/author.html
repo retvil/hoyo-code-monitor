@@ -37,7 +37,7 @@
         {% if author.donatepay %}<a class="btn btn-primary" href="{{ author.donatepay }}"><svg class="plat-ic" aria-hidden="true"><use href="#p-dp"/></svg>DonatePay</a>{% endif %}
         {% if author.donate_stream %}<a class="btn btn-primary" href="{{ author.donate_stream }}"><svg class="plat-ic" aria-hidden="true"><use href="#p-link"/></svg>Donate.Stream</a>{% endif %}
         {% if author.donatty %}<a class="btn btn-primary" href="{{ author.donatty }}"><svg class="plat-ic" aria-hidden="true"><use href="#p-link"/></svg>Donatty</a>{% endif %}
-        {% if author.sponsr %}<a class="btn btn-primary" href="{{ author.sponsr }}"><svg class="plat-ic" aria-hidden="true"><use href="#p-link"/></svg>Sponsr</a>{% endif %}
+        
         {% if author.url_generic %}<a class="btn btn-primary" href="{{ author.url_generic }}"><svg class="plat-ic" aria-hidden="true"><use href="#p-link"/></svg>{{ t('support_author') }}</a>{% endif %}
     </div>
     {% if author.bitcoin or author.ton or author.usdt or author.usdt_erc20 or author.usdt_sol %}

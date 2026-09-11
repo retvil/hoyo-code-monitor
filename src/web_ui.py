@@ -548,7 +548,6 @@ async def author_page(request: Request):
         "donatepay": raw.get("support_donatepay", ""),
         "donate_stream": raw.get("support_donate_stream", ""),
         "donatty": raw.get("support_donatty", ""),
-        "sponsr": raw.get("support_sponsr", ""),
         "bitcoin": raw.get("support_bitcoin", ""),
         "ton": raw.get("support_ton", ""),
         "usdt": raw.get("support_usdt_trc20", ""),
