@@ -14,13 +14,13 @@ AUTHOR_GITHUB: str = "https://github.com/retvil"
 
 SUPPORT_URL: str = ""
 SUPPORT_PATREON: str = ""
-SUPPORT_BOOSTY: str = ""
+SUPPORT_BOOSTY: str = "https://boosty.to/nod33eset/donate"
 SUPPORT_KOFI: str = ""
 SUPPORT_DONATIONALERTS: str = ""
 SUPPORT_CLOUDTIPS: str = ""
 SUPPORT_DONATEPAY: str = ""
 SUPPORT_BITCOIN: str = ""
-SUPPORT_TON: str = ""
+SUPPORT_TON: str = "UQDmvr4SKOxSION3Yky6aOgzAnCDXySPuAbG4EKJa5JUT7tC"
 SUPPORT_USDT_TRC20: str = ""
 
 
