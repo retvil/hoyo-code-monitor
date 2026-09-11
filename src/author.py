@@ -21,7 +21,7 @@ SUPPORT_CLOUDTIPS: str = ""
 SUPPORT_DONATEPAY: str = ""
 SUPPORT_BITCOIN: str = "bc1qunld3rsp37qf5gg69aune50y0qqkd0eugg7j97"
 SUPPORT_TON: str = "UQDmvr4SKOxSION3Yky6aOgzAnCDXySPuAbG4EKJa5JUT7tC"
-SUPPORT_USDT_TRC20: str = ""
+SUPPORT_USDT_TRC20: str = "TBPJSSLu1mUcX54g9UyxUohYGf2fuRvbwd"
 
 
 def as_dict() -> dict[str, str]:
