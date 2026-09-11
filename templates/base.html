@@ -83,6 +83,7 @@
         .badge-ok { background: var(--good-soft); color: var(--good); }
         .badge-bad { background: var(--bad-soft); color: var(--bad); }
         .badge-info { background: var(--accent-soft); color: var(--accent); }
+        .plat-ic { width: 18px; height: 18px; vertical-align: -4px; margin-right: 6px; }
         .mono { font-family: Consolas, monospace; font-size: 0.85em; }
         .muted { color: var(--muted); }
         .modal { display: none; position: fixed; inset: 0; background: rgba(28,27,26,0.45); z-index: 50; align-items: center; justify-content: center; }
@@ -144,6 +145,16 @@
     <symbol id="c-btc" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#f7931a"/><text x="12" y="16" text-anchor="middle" font-size="11" font-weight="bold" fill="#fff" font-family="sans-serif">B</text></symbol>
     <symbol id="c-ton" viewBox="0 0 24 24"><path d="M12 2l9 6-9 14L3 8z" fill="#0098ea"/><path d="M12 2l9 6h-9z" fill="#fff" opacity="0.85"/><path d="M12 2L3 8h9z" fill="#fff" opacity="0.6"/></symbol>
     <symbol id="c-usdt" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#26a17b"/><text x="12" y="16" text-anchor="middle" font-size="10" font-weight="bold" fill="#fff" font-family="sans-serif">T</text></symbol>
+    <symbol id="p-tg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#229ed9"/><path d="M7 12.5l4.5 1.5 1.5 4.5 2.5-4 4-6.5-6 3z" fill="#fff"/><path d="M11.5 14l6-6" stroke="#229ed9" stroke-width="1.2" stroke-linecap="round"/></symbol>
+    <symbol id="p-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 7l8 6 8-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="p-gh" viewBox="0 0 24 24"><path d="M12 2a10 10 0 00-3.2 19.5c.5.1.7-.2.7-.5v-1.7c-2.8.6-3.4-1.3-3.4-1.3-.5-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.6 2.4 1.1 3 .9.1-.7.4-1.1.6-1.4-2.2-.3-4.6-1.1-4.6-5 0-1.1.4-2 1-2.7-.1-.2-.4-1.3.1-2.6 0 0 .8-.3 2.7 1a9.4 9.4 0 015 0c1.9-1.3 2.7-1 2.7-1 .5 1.3.2 2.4.1 2.6.6.7 1 1.6 1 2.7 0 3.9-2.4 4.7-4.6 5 .4.3.7.9.7 1.9v2.8c0 .3.2.6.7.5A10 10 0 0012 2z" fill="currentColor"/></symbol>
+    <symbol id="p-patreon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#ff424d"/><rect x="9" y="6.5" width="6" height="11" rx="3" fill="#fff"/></symbol>
+    <symbol id="p-boosty" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#f15a24"/><text x="12" y="16.5" text-anchor="middle" font-size="11" font-weight="bold" fill="#fff" font-family="sans-serif">B</text></symbol>
+    <symbol id="p-kofi" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#ff5e5b"/><path d="M8 9h8v5a3 3 0 01-3 3H9a1 1 0 01-1-1z" fill="#fff"/><path d="M16 10h1.5a1.8 1.8 0 010 3.6H16" fill="none" stroke="#fff" stroke-width="1.4"/></symbol>
+    <symbol id="p-da" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#f9b233"/><path d="M12 6a4.5 4.5 0 00-4.5 4.5c0 3-1.2 4-1.2 4h11.4s-1.2-1-1.2-4A4.5 4.5 0 0012 6zM10 16.5a2 2 0 004 0z" fill="#fff"/></symbol>
+    <symbol id="p-ct" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#1a73e8"/><path d="M7 14.5a3 3 0 01.6-5.9A4.2 4.2 0 0115.8 10 2.8 2.8 0 0115 15.5H8.5z" fill="#fff"/></symbol>
+    <symbol id="p-dp" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#2f7d4a"/><rect x="6" y="8.5" width="12" height="8" rx="1.8" fill="none" stroke="#fff" stroke-width="1.8"/><path d="M6 11h12" stroke="#fff" stroke-width="1.8"/></symbol>
+    <symbol id="p-link" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#6b6964"/><path d="M10 14a3.5 3.5 0 005 0l2-2a3.54 3.54 0 00-5-5l-1 1M14 10a3.5 3.5 0 00-5 0l-2 2a3.54 3.54 0 005 5l1-1" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/></symbol>
     <symbol id="mascot" viewBox="0 0 64 64">
         <path d="M32 4l10 18 18 10-18 10-10 18-10-18-18-10 18-10z" fill="currentColor" opacity="0.9"/>
         <circle cx="25" cy="30" r="2.4" fill="var(--surface, #fff)"/>

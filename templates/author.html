@@ -18,9 +18,9 @@
 <div class="card">
     <div class="card-title" style="margin-bottom: 12px;">{{ t('contacts') }}</div>
     <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-        {% if author.telegram %}<a class="btn" href="https://t.me/{{ author.telegram | replace('@', '') }}">Telegram{% if author.telegram.startswith('@') %}: {{ author.telegram }}{% endif %}</a>{% endif %}
-        {% if author.email %}<a class="btn" href="mailto:{{ author.email }}">Email: {{ author.email }}</a>{% endif %}
-        {% if author.github %}<a class="btn" href="{{ author.github }}">GitHub</a>{% endif %}
+        {% if author.telegram %}<a class="btn" href="https://t.me/{{ author.telegram | replace('@', '') }}"><svg class="plat-ic" aria-hidden="true"><use href="#p-tg"/></svg>Telegram{% if author.telegram.startswith('@') %}: {{ author.telegram }}{% endif %}</a>{% endif %}
+        {% if author.email %}<a class="btn" href="mailto:{{ author.email }}"><svg class="plat-ic" aria-hidden="true"><use href="#p-mail"/></svg>Email: {{ author.email }}</a>{% endif %}
+        {% if author.github %}<a class="btn" href="{{ author.github }}"><svg class="plat-ic" aria-hidden="true"><use href="#p-gh"/></svg>GitHub</a>{% endif %}
     </div>
 </div>
 {% endif %}
@@ -29,16 +29,16 @@
     <div class="card-title" style="margin-bottom: 4px;">{{ t('support_author') }}</div>
     <p class="muted" style="margin-top: 0;">{{ t('donate_note') }}</p>
     <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 6px;">
-        {% if author.patreon %}<a class="btn btn-primary" href="{{ author.patreon }}">Patreon</a>{% endif %}
-        {% if author.boosty %}<a class="btn btn-primary" href="{{ author.boosty }}">Boosty</a>{% endif %}
-        {% if author.kofi %}<a class="btn btn-primary" href="{{ author.kofi }}">Ko-fi</a>{% endif %}
-        {% if author.donationalerts %}<a class="btn btn-primary" href="{{ author.donationalerts }}">DonationAlerts</a>{% endif %}
-        {% if author.cloudtips %}<a class="btn btn-primary" href="{{ author.cloudtips }}">CloudTips</a>{% endif %}
-        {% if author.donatepay %}<a class="btn btn-primary" href="{{ author.donatepay }}">DonatePay</a>{% endif %}
-        {% if author.donate_stream %}<a class="btn btn-primary" href="{{ author.donate_stream }}">Donate.Stream</a>{% endif %}
-        {% if author.donatty %}<a class="btn btn-primary" href="{{ author.donatty }}">Donatty</a>{% endif %}
-        {% if author.sponsr %}<a class="btn btn-primary" href="{{ author.sponsr }}">Sponsr</a>{% endif %}
-        {% if author.url_generic %}<a class="btn btn-primary" href="{{ author.url_generic }}">{{ t('support_author') }}</a>{% endif %}
+        {% if author.patreon %}<a class="btn btn-primary" href="{{ author.patreon }}"><svg class="plat-ic" aria-hidden="true"><use href="#p-patreon"/></svg>Patreon</a>{% endif %}
+        {% if author.boosty %}<a class="btn btn-primary" href="{{ author.boosty }}"><svg class="plat-ic" aria-hidden="true"><use href="#p-boosty"/></svg>Boosty</a>{% endif %}
+        {% if author.kofi %}<a class="btn btn-primary" href="{{ author.kofi }}"><svg class="plat-ic" aria-hidden="true"><use href="#p-kofi"/></svg>Ko-fi</a>{% endif %}
+        {% if author.donationalerts %}<a class="btn btn-primary" href="{{ author.donationalerts }}"><svg class="plat-ic" aria-hidden="true"><use href="#p-da"/></svg>DonationAlerts</a>{% endif %}
+        {% if author.cloudtips %}<a class="btn btn-primary" href="{{ author.cloudtips }}"><svg class="plat-ic" aria-hidden="true"><use href="#p-ct"/></svg>CloudTips</a>{% endif %}
+        {% if author.donatepay %}<a class="btn btn-primary" href="{{ author.donatepay }}"><svg class="plat-ic" aria-hidden="true"><use href="#p-dp"/></svg>DonatePay</a>{% endif %}
+        {% if author.donate_stream %}<a class="btn btn-primary" href="{{ author.donate_stream }}"><svg class="plat-ic" aria-hidden="true"><use href="#p-link"/></svg>Donate.Stream</a>{% endif %}
+        {% if author.donatty %}<a class="btn btn-primary" href="{{ author.donatty }}"><svg class="plat-ic" aria-hidden="true"><use href="#p-link"/></svg>Donatty</a>{% endif %}
+        {% if author.sponsr %}<a class="btn btn-primary" href="{{ author.sponsr }}"><svg class="plat-ic" aria-hidden="true"><use href="#p-link"/></svg>Sponsr</a>{% endif %}
+        {% if author.url_generic %}<a class="btn btn-primary" href="{{ author.url_generic }}"><svg class="plat-ic" aria-hidden="true"><use href="#p-link"/></svg>{{ t('support_author') }}</a>{% endif %}
     </div>
     {% if author.bitcoin or author.ton or author.usdt or author.usdt_erc20 or author.usdt_sol %}
     <details style="margin-top: 12px;">
