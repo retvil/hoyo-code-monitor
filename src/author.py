@@ -13,7 +13,7 @@ AUTHOR_EMAIL: str = "sdcloud@mail.ru"
 AUTHOR_GITHUB: str = "https://github.com/retvil"
 
 SUPPORT_URL: str = ""
-SUPPORT_PATREON: str = ""
+SUPPORT_PATREON: str = "https://www.patreon.com/cw/nod33eset"
 SUPPORT_BOOSTY: str = "https://boosty.to/nod33eset/donate"
 SUPPORT_KOFI: str = ""
 SUPPORT_DONATIONALERTS: str = ""
