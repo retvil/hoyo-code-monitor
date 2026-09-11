@@ -35,6 +35,9 @@
         {% if author.donationalerts %}<a class="btn btn-primary" href="{{ author.donationalerts }}">DonationAlerts</a>{% endif %}
         {% if author.cloudtips %}<a class="btn btn-primary" href="{{ author.cloudtips }}">CloudTips</a>{% endif %}
         {% if author.donatepay %}<a class="btn btn-primary" href="{{ author.donatepay }}">DonatePay</a>{% endif %}
+        {% if author.donate_stream %}<a class="btn btn-primary" href="{{ author.donate_stream }}">Donate.Stream</a>{% endif %}
+        {% if author.donatty %}<a class="btn btn-primary" href="{{ author.donatty }}">Donatty</a>{% endif %}
+        {% if author.sponsr %}<a class="btn btn-primary" href="{{ author.sponsr }}">Sponsr</a>{% endif %}
         {% if author.url_generic %}<a class="btn btn-primary" href="{{ author.url_generic }}">{{ t('support_author') }}</a>{% endif %}
     </div>
     {% if author.bitcoin %}

@@ -19,6 +19,9 @@ SUPPORT_KOFI: str = ""
 SUPPORT_DONATIONALERTS: str = ""
 SUPPORT_CLOUDTIPS: str = ""
 SUPPORT_DONATEPAY: str = ""
+SUPPORT_DONATE_STREAM: str = ""
+SUPPORT_DONATTY: str = ""
+SUPPORT_SPONSR: str = ""
 SUPPORT_BITCOIN: str = "bc1qunld3rsp37qf5gg69aune50y0qqkd0eugg7j97"
 SUPPORT_TON: str = "UQDmvr4SKOxSION3Yky6aOgzAnCDXySPuAbG4EKJa5JUT7tC"
 SUPPORT_USDT_TRC20: str = "TBPJSSLu1mUcX54g9UyxUohYGf2fuRvbwd"
@@ -39,8 +42,11 @@ def as_dict() -> dict[str, str]:
         "support_boosty": SUPPORT_BOOSTY,
         "support_kofi": SUPPORT_KOFI,
         "support_donationalerts": SUPPORT_DONATIONALERTS,
-        "support_cloudtips": SUPPORT_CLOUDTIPS,
-        "support_donatepay": SUPPORT_DONATEPAY,
+    "support_cloudtips": SUPPORT_CLOUDTIPS,
+    "support_donatepay": SUPPORT_DONATEPAY,
+    "support_donate_stream": SUPPORT_DONATE_STREAM,
+    "support_donatty": SUPPORT_DONATTY,
+    "support_sponsr": SUPPORT_SPONSR,
         "support_bitcoin": SUPPORT_BITCOIN,
         "support_ton": SUPPORT_TON,
     "support_usdt_trc20": SUPPORT_USDT_TRC20,
