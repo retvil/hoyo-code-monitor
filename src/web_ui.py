@@ -549,6 +549,7 @@ async def author_page(request: Request):
         "bitcoin": raw.get("support_bitcoin", ""),
         "ton": raw.get("support_ton", ""),
         "usdt": raw.get("support_usdt_trc20", ""),
+        "usdt_erc20": raw.get("support_usdt_erc20", ""),
     }
     return templates.TemplateResponse(
         request,
@@ -570,9 +571,13 @@ async def author_qr(kind: str = "bitcoin"):
     from src import author as author_module
 
     data = author_module.as_dict()
-    key = {"bitcoin": "support_bitcoin", "ton": "support_ton", "usdt": "support_usdt_trc20"}.get(
-        kind, "support_bitcoin"
-    )
+    key = {
+        "bitcoin": "support_bitcoin",
+        "ton": "support_ton",
+        "usdt": "support_usdt_trc20",
+        "usdt_trc20": "support_usdt_trc20",
+        "usdt_erc20": "support_usdt_erc20",
+    }.get(kind, "support_bitcoin")
     address = data.get(key, "") or ""
     if not address:
         raise HTTPException(status_code=404, detail="Address not set")

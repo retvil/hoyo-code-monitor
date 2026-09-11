@@ -22,6 +22,7 @@ SUPPORT_DONATEPAY: str = ""
 SUPPORT_BITCOIN: str = "bc1qunld3rsp37qf5gg69aune50y0qqkd0eugg7j97"
 SUPPORT_TON: str = "UQDmvr4SKOxSION3Yky6aOgzAnCDXySPuAbG4EKJa5JUT7tC"
 SUPPORT_USDT_TRC20: str = "TBPJSSLu1mUcX54g9UyxUohYGf2fuRvbwd"
+SUPPORT_USDT_ERC20: str = "0x25CAED3776Ef5b18E03392bC5b254Bbd78E8180C"
 
 
 def as_dict() -> dict[str, str]:
@@ -41,8 +42,9 @@ def as_dict() -> dict[str, str]:
         "support_donatepay": SUPPORT_DONATEPAY,
         "support_bitcoin": SUPPORT_BITCOIN,
         "support_ton": SUPPORT_TON,
-        "support_usdt_trc20": SUPPORT_USDT_TRC20,
-    }
+    "support_usdt_trc20": SUPPORT_USDT_TRC20,
+    "support_usdt_erc20": SUPPORT_USDT_ERC20,
+}
 
 
 def has_any() -> bool:
