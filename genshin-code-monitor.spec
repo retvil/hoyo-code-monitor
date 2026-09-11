@@ -5,15 +5,17 @@ block_cipher = None
 
 a = Analysis(
     ['src/cli.py'],
-    pathex=[],
+    pathex=['.'],
     binaries=[],
     datas=[
         ('templates', 'templates'),
         ('config.toml', '.'),
     ],
     hiddenimports=[
+        'src',
         'cryptography',
         'keyring',
+        'qrcode',
         'playwright',
         'psutil',
         'portalocker',
