@@ -242,6 +242,7 @@ class Scheduler:
                                         code=code,
                                         redeemed=claimed,
                                         reward=res.reward if res.success else None,
+                                        game=code_game,
                                     )
                                     self.storage.add_redemption_log(
                                         code=code,

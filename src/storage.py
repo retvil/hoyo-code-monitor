@@ -169,8 +169,10 @@ class Storage:
             return v.isoformat() if isinstance(v, datetime) else str(v)
 
         with self._connection() as conn:
-            # Check if code already exists
-            existing = conn.execute("SELECT id FROM codes WHERE code = ?", (code,)).fetchone()
+            # Check if code already exists for this game ((code, game) identity)
+            existing = conn.execute(
+                "SELECT id FROM codes WHERE code = ? AND game = ?", (code, game)
+            ).fetchone()
 
             if existing:
                 code_id = existing[0]
@@ -244,17 +246,23 @@ class Storage:
             return "failed"
         return "pending"
 
-    def get_code(self, code: str) -> dict[str, Any] | None:
-        """Retrieve a code by its code string.
+    def get_code(self, code: str, game: str | None = None) -> dict[str, Any] | None:
+        """Retrieve a code by its code string (optionally scoped to a game).
 
         Args:
             code: The promotional code to look up.
+            game: Game id to scope lookup; None = first match any game.
 
         Returns:
             Dictionary with code data including sources list, or None if not found.
         """
         with self._connection() as conn:
-            row = conn.execute("SELECT * FROM codes WHERE code = ?", (code,)).fetchone()
+            if game:
+                row = conn.execute(
+                    "SELECT * FROM codes WHERE code = ? AND game = ?", (code, game)
+                ).fetchone()
+            else:
+                row = conn.execute("SELECT * FROM codes WHERE code = ?", (code,)).fetchone()
             if not row:
                 return None
             data = dict(row)
@@ -281,14 +289,16 @@ class Storage:
         redeemed: bool,
         reward: str | None = None,
         redeemed_at: datetime | None = None,
+        game: str | None = None,
     ) -> bool:
-        """Update redemption status for a code.
+        """Update redemption status for a code (optionally scoped to a game).
 
         Args:
             code: The promotional code to update.
             redeemed: Whether the code was successfully redeemed.
             reward: Description of the reward received.
             redeemed_at: Timestamp of redemption. Defaults to now if redeemed.
+            game: Game id to scope update; None = all rows with this code.
 
         Returns:
             True if row was updated, False if code not found.
@@ -297,14 +307,30 @@ class Storage:
             redeemed_at = datetime.now()
 
         with self._connection() as conn:
-            cursor = conn.execute(
-                """
-                UPDATE codes
-                SET redeemed = ?, reward = ?, redeemed_at = ?
-                WHERE code = ?
-                """,
-                (int(redeemed), reward, redeemed_at.isoformat() if redeemed_at else None, code),
-            )
+            if game:
+                cursor = conn.execute(
+                    """
+                    UPDATE codes
+                    SET redeemed = ?, reward = ?, redeemed_at = ?
+                    WHERE code = ? AND game = ?
+                    """,
+                    (
+                        int(redeemed),
+                        reward,
+                        redeemed_at.isoformat() if redeemed_at else None,
+                        code,
+                        game,
+                    ),
+                )
+            else:
+                cursor = conn.execute(
+                    """
+                    UPDATE codes
+                    SET redeemed = ?, reward = ?, redeemed_at = ?
+                    WHERE code = ?
+                    """,
+                    (int(redeemed), reward, redeemed_at.isoformat() if redeemed_at else None, code),
+                )
             conn.commit()
             return cursor.rowcount > 0
 

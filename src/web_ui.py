@@ -736,10 +736,12 @@ async def redeem_single_code(code: str):
     from src.redeemer import Redeemer
 
     storage = Storage()
-    row = storage.get_code(code.upper().strip())
+    row = storage.get_code(code.strip()) or storage.get_code(code.strip().upper())
     if not row:
         raise HTTPException(status_code=404, detail="Code not found")
-    accounts = [a for a in storage.list_accounts() if storage.is_account_redeem_enabled(a["name"])]
+    row_game = row.get("game") or "genshin"
+    enabled = [a for a in storage.list_accounts() if storage.is_account_redeem_enabled(a["name"])]
+    accounts = [a for a in enabled if (a.get("game") or "genshin") == row_game] or enabled
     if not accounts:
         raise HTTPException(status_code=400, detail="No accounts with auto-redeem enabled")
     gap = int(storage.get_config("redemption_min_gap_seconds", "8") or 8)
@@ -753,14 +755,14 @@ async def redeem_single_code(code: str):
 
                 _ag = acc.get("game") or "genshin"
                 res = await redeemer.redeem_code(
-                    code=row["code"],
-                    cookies=cookies,
-                    uid=acc["uid"],
-                    region=acc["region"],
+                    code=row["code"], cookies=cookies, uid=acc["uid"], region=acc["region"],
                     game_biz=acc.get("game_biz") or _GC.get(_ag, _GC["genshin"])["game_biz"],
-                    lang=acc.get("lang", "en-us"),
-                    s_lang_key=acc.get("s_lang_key", "en-us"),
+                    lang=acc.get("lang", "en-us"), s_lang_key=acc.get("s_lang_key", "en-us"),
                     game=_ag,
+                )
+                claimed = res.success or res.raw_response.get("retcode") in (-2017, -2018)
+                storage.update_code_redemption(
+                    row["code"], claimed, res.reward if res.success else None, game=row_game
                 )
                 claimed = res.success or res.raw_response.get("retcode") in (-2017, -2018)
                 storage.update_code_redemption(
@@ -786,7 +788,7 @@ async def redeem_single_code(code: str):
 async def delete_single_code(code: str):
     """Delete a code (logs are kept for history)."""
     storage = Storage()
-    if not storage.delete_code(code.upper().strip()):
+    if not storage.delete_code(code.strip()):
         raise HTTPException(status_code=404, detail="Code not found")
     return {"success": True}
 
@@ -822,7 +824,9 @@ async def redeem_all_codes():
     redeemer = Redeemer()
     async with redeemer:
         for row in codes:
-            for acc in accounts:
+            row_game = row.get("game") or "genshin"
+            matched = [a for a in accounts if (a.get("game") or "genshin") == row_game] or accounts
+            for acc in matched:
                 cookies = storage.load_account_cookies(acc["name"])
                 try:
                     from src.constants import GAME_CONF as _GC2
@@ -840,7 +844,7 @@ async def redeem_all_codes():
                     )
                     claimed = res.success or res.raw_response.get("retcode") in (-2017, -2018)
                     storage.update_code_redemption(
-                        row["code"], claimed, res.reward if res.success else None
+                        row["code"], claimed, res.reward if res.success else None, game=row_game
                     )
                     storage.add_redemption_log(
                         code=row["code"],

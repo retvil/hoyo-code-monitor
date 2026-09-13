@@ -104,8 +104,11 @@ class TestMiscApi:
         assert client.post("/language", data={"language": "xx"}).status_code == 400
         client.post("/language", data={"language": "en"})
 
-    def test_author_qr_missing(self, client: TestClient) -> None:
-        assert client.get("/author/qr?kind=bitcoin").status_code == 404
+    def test_author_qr(self, client: TestClient) -> None:
+        r = client.get("/author/qr?kind=bitcoin")
+        assert r.status_code == 200
+        assert r.headers["content-type"] == "image/png"
+        assert client.get("/author/qr?kind=nosuchcoin").status_code == 200  # falls back to bitcoin
 
     def test_codes_crud(self, client: TestClient, temp_db: str) -> None:
         s = Storage(temp_db)

@@ -365,9 +365,21 @@ MIGRATIONS: list[Migration] = [
         UPDATE schema_version SET version = 10;
         """,
     ),
+    (
+        12,
+        """
+        -- Migration v12: codes identity is (code, game)
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_codes_code_game ON codes(code, game);
+        UPDATE schema_version SET version = 12;
+        """,
+        """
+        DROP INDEX IF EXISTS idx_codes_code_game;
+        UPDATE schema_version SET version = 11;
+        """,
+    ),
 ]
 
-CURRENT_VERSION = 11
+CURRENT_VERSION = 12
 
 
 def get_db_version(conn: sqlite3.Connection) -> int:
