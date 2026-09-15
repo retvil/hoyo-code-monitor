@@ -6,7 +6,7 @@
 
 ; Application info
 !define APP_NAME "HoYo Code Monitor"
-!define APP_VERSION "0.1.0"
+!define APP_VERSION "1.0.0-beta.1"
 !define APP_PUBLISHER "HoYo Code Monitor Contributors"
 !define APP_URL "https://github.com/retvil/hoyo-code-monitor"
 !define APP_EXE "hoyo-code-monitor.exe"
@@ -19,9 +19,9 @@ InstallDirRegKey HKCU "Software\${APP_NAME}" ""
 RequestExecutionLevel user
 
 ; Modern UI
-!define MUI_ICON "assets/icon.ico"
-!define MUI_UNICON "assets/icon.ico"
-!define MUI_WELCOMEFINISHPAGE_BITMAP "assets/installer_banner.bmp"
+!define MUI_ICON "F:\SDProject\GIPromoCode\assets\icon.ico"
+!define MUI_UNICON "F:\SDProject\GIPromoCode\assets\icon.ico"
+!define MUI_WELCOMEFINISHPAGE_BITMAP "F:\SDProject\GIPromoCode\assets\installer_banner.bmp"
 !define MUI_WELCOMEPAGE_TITLE "Welcome to ${APP_NAME} Setup"
 !define MUI_WELCOMEPAGE_TEXT "This wizard will guide you through the installation of ${APP_NAME} ${APP_VERSION}.\n\nClick Next to continue."
 !define MUI_FINISHPAGE_TITLE "Setup Complete"
@@ -49,14 +49,8 @@ RequestExecutionLevel user
 Section "MainSection" SEC_MAIN
     SetOutPath "$INSTDIR"
     
-    ; Main executable
-    File "dist\hoyo-code-monitor\${APP_EXE}"
-    
-    ; Config file
-    File "config.toml"
-    
-    ; Templates directory
-    File /r "templates\*.html"
+    ; Copy entire dist folder (onedir build)
+    File /r "dist\hoyo-code-monitor\*.*"
     
     ; Create data and logs directories
     CreateDirectory "$INSTDIR\data"
@@ -85,13 +79,7 @@ SectionEnd
 ; Uninstaller section
 Section "Uninstall"
     ; Remove files
-    Delete "$INSTDIR\${APP_EXE}"
-    Delete "$INSTDIR\config.toml"
-    Delete "$INSTDIR\uninstall.exe"
-    RMDir /r "$INSTDIR\templates"
-    RMDir /r "$INSTDIR\data"
-    RMDir /r "$INSTDIR\logs"
-    RMDir "$INSTDIR"
+    RMDir /r "$INSTDIR"
     
     ; Remove shortcuts
     Delete "$SMPROGRAMS\${APP_NAME}\${APP_NAME}.lnk"
