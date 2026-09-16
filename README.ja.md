@@ -20,11 +20,11 @@
 
 | ダッシュボード | ソース | 設定 |
 |---|---|---|
-| ![ダッシュボード](docs/screenshots/dashboard.png) | ![ソース](docs/screenshots/sources.png) | ![設定](docs/screenshots/config.png) |
+| ![ダッシュボード](docs/screenshots/dashboard_ja.png) | ![ソース](docs/screenshots/sources_ja.png) | ![設定](docs/screenshots/config_ja.png) |
 
 | 作者 |
 |---|
-| ![作者](docs/screenshots/author.png) |
+| ![作者](docs/screenshots/author_ja.png) |
 
 ## ソース (実動作確認済み)
 

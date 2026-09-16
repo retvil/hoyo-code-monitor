@@ -20,11 +20,11 @@
 
 | 仪表盘 | 来源 | 设置 |
 |---|---|---|
-| ![仪表盘](docs/screenshots/dashboard.png) | ![来源](docs/screenshots/sources.png) | ![设置](docs/screenshots/config.png) |
+| ![仪表盘](docs/screenshots/dashboard_zh.png) | ![来源](docs/screenshots/sources_zh.png) | ![设置](docs/screenshots/config_zh.png) |
 
 | 作者 |
 |---|
-| ![作者](docs/screenshots/author.png) |
+| ![作者](docs/screenshots/author_zh.png) |
 
 ## 来源 (已实测)
 

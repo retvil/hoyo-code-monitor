@@ -20,11 +20,11 @@ Application Windows locale qui surveille les sources de codes promo Genshin Impa
 
 | Tableau de bord | Sources | Config |
 |---|---|---|
-| ![Tableau de bord](docs/screenshots/dashboard.png) | ![Sources](docs/screenshots/sources.png) | ![Config](docs/screenshots/config.png) |
+| ![Tableau de bord](docs/screenshots/dashboard_fr.png) | ![Sources](docs/screenshots/sources_fr.png) | ![Config](docs/screenshots/config_fr.png) |
 
 | Auteur |
 |---|
-| ![Auteur](docs/screenshots/author.png) |
+| ![Auteur](docs/screenshots/author_fr.png) |
 
 ## Sources (vérifiées en direct)
 

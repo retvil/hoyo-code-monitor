@@ -20,11 +20,11 @@
 
 | Дашборд | Источники | Настройки |
 |---|---|---|
-| ![Дашборд](docs/screenshots/dashboard.png) | ![Источники](docs/screenshots/sources.png) | ![Настройки](docs/screenshots/config.png) |
+| ![Дашборд](docs/screenshots/dashboard_ru.png) | ![Источники](docs/screenshots/sources_ru.png) | ![Настройки](docs/screenshots/config_ru.png) |
 
 | Об авторе |
 |---|
-| ![Об авторе](docs/screenshots/author.png) |
+| ![Об авторе](docs/screenshots/author_ru.png) |
 
 ## Источники (проверены живьём)
 

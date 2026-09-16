@@ -20,11 +20,11 @@ Lokale Windows-App zur Überwachung von Genshin-Impact-Promocode-Quellen mit aut
 
 | Dashboard | Quellen | Config |
 |---|---|---|
-| ![Dashboard](docs/screenshots/dashboard.png) | ![Quellen](docs/screenshots/sources.png) | ![Config](docs/screenshots/config.png) |
+| ![Dashboard](docs/screenshots/dashboard_de.png) | ![Quellen](docs/screenshots/sources_de.png) | ![Config](docs/screenshots/config_de.png) |
 
 | Autor |
 |---|
-| ![Autor](docs/screenshots/author.png) |
+| ![Autor](docs/screenshots/author_de.png) |
 
 ## Quellen (live geprüft)
 
