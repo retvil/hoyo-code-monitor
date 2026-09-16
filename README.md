@@ -18,13 +18,13 @@ Local Windows app that monitors Genshin Impact promo-code sources and auto-redee
 
 ## Screenshots
 
-| Dashboard | Sources | Accounts |
+| Dashboard | Sources | Config |
 |---|---|---|
-| ![Dashboard](docs/screenshots/dashboard.png) | ![Sources](docs/screenshots/sources.png) | ![Accounts](docs/screenshots/accounts.png) |
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Sources](docs/screenshots/sources.png) | ![Config](docs/screenshots/config.png) |
 
-| Config | Author |
-|---|---|
-| ![Config](docs/screenshots/config.png) | ![Author](docs/screenshots/author.png) |
+| Author |
+|---|
+| ![Author](docs/screenshots/author.png) |
 
 ## Sources (verified live)
 

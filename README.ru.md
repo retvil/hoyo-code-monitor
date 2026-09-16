@@ -18,13 +18,13 @@
 
 ## Скриншоты
 
-| Дашборд | Источники | Аккаунты |
+| Дашборд | Источники | Настройки |
 |---|---|---|
-| ![Дашборд](docs/screenshots/dashboard.png) | ![Источники](docs/screenshots/sources.png) | ![Аккаунты](docs/screenshots/accounts.png) |
+| ![Дашборд](docs/screenshots/dashboard.png) | ![Источники](docs/screenshots/sources.png) | ![Настройки](docs/screenshots/config.png) |
 
-| Настройки | Об авторе |
-|---|---|
-| ![Настройки](docs/screenshots/config.png) | ![Об авторе](docs/screenshots/author.png) |
+| Об авторе |
+|---|
+| ![Об авторе](docs/screenshots/author.png) |
 
 ## Источники (проверены живьём)
 
