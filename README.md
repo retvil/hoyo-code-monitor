@@ -16,6 +16,16 @@ Local Windows app that monitors Genshin Impact promo-code sources and auto-redee
 - **Encrypted cookies** — Fernet (AES-128), key in env / OS keyring / local file
 - **Autostart** — optional Windows login autostart
 
+## Screenshots
+
+| Dashboard | Sources | Accounts |
+|---|---|---|
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Sources](docs/screenshots/sources.png) | ![Accounts](docs/screenshots/accounts.png) |
+
+| Config | Author |
+|---|---|
+| ![Config](docs/screenshots/config.png) | ![Author](docs/screenshots/author.png) |
+
 ## Sources (verified live)
 
 | Source | Type | Status |
