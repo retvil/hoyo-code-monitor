@@ -16,6 +16,16 @@ Lokale Windows-App zur Überwachung von Genshin-Impact-Promocode-Quellen mit aut
 - **Verschlüsselte Cookies** — Fernet (AES-128), Schlüssel in env / OS-Keyring / lokaler Datei
 - **Autostart** — optionaler Windows-Login-Autostart
 
+## Screenshots
+
+| Dashboard | Quellen | Config |
+|---|---|---|
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Quellen](docs/screenshots/sources.png) | ![Config](docs/screenshots/config.png) |
+
+| Autor |
+|---|
+| ![Autor](docs/screenshots/author.png) |
+
 ## Quellen (live geprüft)
 
 | Quelle | Typ | Status |

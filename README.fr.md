@@ -16,6 +16,16 @@ Application Windows locale qui surveille les sources de codes promo Genshin Impa
 - **Cookies chiffrés** — Fernet (AES-128), clé dans env / trousseau OS / fichier local
 - **Démarrage auto** — démarrage Windows optionnel
 
+## Captures d'écran
+
+| Tableau de bord | Sources | Config |
+|---|---|---|
+| ![Tableau de bord](docs/screenshots/dashboard.png) | ![Sources](docs/screenshots/sources.png) | ![Config](docs/screenshots/config.png) |
+
+| Auteur |
+|---|
+| ![Auteur](docs/screenshots/author.png) |
+
 ## Sources (vérifiées en direct)
 
 | Source | Type | Statut |

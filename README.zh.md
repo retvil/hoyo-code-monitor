@@ -16,6 +16,16 @@
 - **Cookie 加密** — Fernet (AES-128)，密钥存于 env / 系统钥匙串 / 本地文件
 - **开机自启** — 可选的 Windows 登录自启
 
+## 截图
+
+| 仪表盘 | 来源 | 设置 |
+|---|---|---|
+| ![仪表盘](docs/screenshots/dashboard.png) | ![来源](docs/screenshots/sources.png) | ![设置](docs/screenshots/config.png) |
+
+| 作者 |
+|---|
+| ![作者](docs/screenshots/author.png) |
+
 ## 来源 (已实测)
 
 | 来源 | 类型 | 状态 |

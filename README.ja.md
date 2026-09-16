@@ -16,6 +16,16 @@
 - **Cookie暗号化** — Fernet (AES-128)、鍵はenv / OSキーリング / ローカルファイル
 - **自動起動** — Windowsログイン時の自動起動 (任意)
 
+## スクリーンショット
+
+| ダッシュボード | ソース | 設定 |
+|---|---|---|
+| ![ダッシュボード](docs/screenshots/dashboard.png) | ![ソース](docs/screenshots/sources.png) | ![設定](docs/screenshots/config.png) |
+
+| 作者 |
+|---|
+| ![作者](docs/screenshots/author.png) |
+
 ## ソース (実動作確認済み)
 
 | ソース | 種類 | 状態 |
