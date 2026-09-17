@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="tile-field" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#181541"/>
+      <stop offset="0.55" stop-color="#4338CA"/>
+      <stop offset="1" stop-color="#2AA79A"/>
+    </linearGradient>
+    <clipPath id="tile">
+      <rect x="76" y="76" width="872" height="872" rx="212"/>
+    </clipPath>
+  </defs>
+
+  <rect x="76" y="76" width="872" height="872" rx="212" fill="url(#tile-field)"/>
+
+  <g clip-path="url(#tile)">
+    <circle cx="512" cy="478" r="335" fill="none" stroke="#FFFFFF" stroke-opacity="0.20" stroke-width="7"/>
+    <circle cx="512" cy="478" r="252" fill="none" stroke="#FFFFFF" stroke-opacity="0.24" stroke-width="7"/>
+    <circle cx="512" cy="478" r="172" fill="none" stroke="#3EC6B8" stroke-opacity="0.55" stroke-width="8"/>
+    <path d="M585 279 A212 212 0 0 1 696 372" fill="none" stroke="#BFF3EE" stroke-opacity="0.88" stroke-width="38" stroke-linecap="round"/>
+    <circle cx="696" cy="372" r="17" fill="#BFF3EE"/>
+    <circle cx="255" cy="692" r="13" fill="#FFFFFF" fill-opacity="0.72"/>
+    <circle cx="730" cy="700" r="11" fill="#FFFFFF" fill-opacity="0.55"/>
+    <ellipse cx="356" cy="238" rx="230" ry="118" fill="#FFFFFF" fill-opacity="0.10"/>
+  </g>
+
+  <path d="M512 288 L559 469 L740 516 L559 563 L512 744 L465 563 L284 516 L465 469 Z" fill="#FFFFFF"/>
+  <path d="M512 413 L562 516 L512 619 L462 516 Z" fill="#3EC6B8"/>
+  <circle cx="512" cy="516" r="24" fill="#4338CA"/>
+
+  <rect x="352" y="786" width="320" height="72" rx="22" fill="#0F0D2E" fill-opacity="0.42"/>
+  <rect x="382" y="808" width="70" height="28" rx="14" fill="#FFFFFF" fill-opacity="0.90"/>
+  <rect x="464" y="808" width="112" height="28" rx="14" fill="#3EC6B8"/>
+  <rect x="588" y="808" width="54" height="28" rx="14" fill="#FFFFFF" fill-opacity="0.64"/>
+  <rect x="79" y="79" width="866" height="866" rx="210" fill="none" stroke="#FFFFFF" stroke-opacity="0.12" stroke-width="3"/>
+</svg>

@@ -54,6 +54,11 @@ Section "!Main program" SEC_MAIN
     
     ; Copy entire dist folder (onedir build)
     File /r "dist\hoyo-code-monitor\*.*"
+
+    ; Ship the branded shortcut icon referenced by Start Menu/Desktop shortcuts
+    SetOutPath "$INSTDIR\assets"
+    File "assets\icon.ico"
+    SetOutPath "$INSTDIR"
     
     ; Create data and logs directories
     CreateDirectory "$INSTDIR\data"
