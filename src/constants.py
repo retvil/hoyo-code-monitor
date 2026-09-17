@@ -58,7 +58,7 @@ WEB_HOST: str = "127.0.0.1"
 WEB_PORT: int = 8000
 
 # --- App identity ---
-APP_VERSION: str = "0.1.0"
+APP_VERSION: str = "1.0.0-beta.2"
 APP_AUTHOR: str = "Nod33Eset"
 
 # --- Games (multi-game support, Phase 2) ---
