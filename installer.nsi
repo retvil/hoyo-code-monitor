@@ -29,9 +29,11 @@ RequestExecutionLevel user
 !define MUI_FINISHPAGE_RUN "Run ${APP_NAME}"
 !define MUI_FINISHPAGE_RUN_FUNCTION "RunApplication"
 !define MUI_FINISHPAGE_RUN_NOTCHECKED
+!define MUI_COMPONENTSPAGE_NODESC
 
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_LICENSE "LICENSE"
+!insertmacro MUI_PAGE_COMPONENTS
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
@@ -46,7 +48,8 @@ RequestExecutionLevel user
 !insertmacro MUI_LANGUAGE "Russian"
 
 ; Sections
-Section "MainSection" SEC_MAIN
+Section "!Main program" SEC_MAIN
+    SectionIn RO
     SetOutPath "$INSTDIR"
     
     ; Copy entire dist folder (onedir build)
@@ -69,11 +72,16 @@ Section "MainSection" SEC_MAIN
     
     ; Start menu shortcuts
     CreateDirectory "$SMPROGRAMS\${APP_NAME}"
-    CreateShortcut "$SMPROGRAMS\${APP_NAME}\${APP_NAME}.lnk" "$INSTDIR\${APP_EXE}" "" "$INSTDIR\assets\icon.ico"
+    CreateShortcut "$SMPROGRAMS\${APP_NAME}\${APP_NAME}.lnk" "$INSTDIR\${APP_EXE}" "tray" "$INSTDIR\assets\icon.ico"
     CreateShortcut "$SMPROGRAMS\${APP_NAME}\Uninstall.lnk" "$INSTDIR\uninstall.exe"
-    
-    ; Desktop shortcut (optional)
-    ; CreateShortcut "$DESKTOP\${APP_NAME}.lnk" "$INSTDIR\${APP_EXE}" "" "$INSTDIR\assets\icon.ico"
+SectionEnd
+
+Section "Desktop shortcut" SEC_DESKTOP
+    CreateShortcut "$DESKTOP\${APP_NAME}.lnk" "$INSTDIR\${APP_EXE}" "tray" "$INSTDIR\assets\icon.ico"
+SectionEnd
+
+Section /o "Autostart on Windows login" SEC_AUTOSTART
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "HoYoCodeMonitor" '"$INSTDIR\${APP_EXE}" tray'
 SectionEnd
 
 ; Uninstaller section
@@ -85,16 +93,25 @@ Section "Uninstall"
     Delete "$SMPROGRAMS\${APP_NAME}\${APP_NAME}.lnk"
     Delete "$SMPROGRAMS\${APP_NAME}\Uninstall.lnk"
     RMDir "$SMPROGRAMS\${APP_NAME}"
+    Delete "$DESKTOP\${APP_NAME}.lnk"
     
     ; Registry cleanup
     DeleteRegKey HKCU "Software\${APP_NAME}"
     DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}"
+    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "HoYoCodeMonitor"
 SectionEnd
 
 ; Function to run application after install
 Function RunApplication
     Exec '"$INSTDIR\${APP_EXE}" tray'
 FunctionEnd
+
+; Descriptions
+!insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
+    !insertmacro MUI_DESCRIPTION_TEXT ${SEC_MAIN} "Main program files (required)"
+    !insertmacro MUI_DESCRIPTION_TEXT ${SEC_DESKTOP} "Create a shortcut on the Desktop"
+    !insertmacro MUI_DESCRIPTION_TEXT ${SEC_AUTOSTART} "Launch HoYo Code Monitor automatically when you log in to Windows"
+!insertmacro MUI_FUNCTION_DESCRIPTION_END
 
 ; Language strings
 LangString DESC_SecMain ${LANG_ENGLISH} "Main program files"
