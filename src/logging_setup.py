@@ -110,6 +110,13 @@ class SensitiveDataFilter(logging.Filter):
         return text
 
 
+def _default_log_file() -> str:
+    """Default log file path (app data dir aware)."""
+    from src.paths import default_log_path
+
+    return default_log_path()
+
+
 def _get_log_level(level_str: str | None) -> int:
     """Convert log level string to logging constant."""
     if not level_str:
@@ -226,7 +233,11 @@ def setup_logging(config: dict[str, Any] | None = None) -> logging.Logger:
     config = config or {}
 
     log_level = _get_log_level(config.get("log_level"))
-    log_file = Path(config.get("log_file", "logs/app.log"))
+    log_file = Path(config.get("log_file") or _default_log_file())
+    if not log_file.is_absolute():
+        from src.paths import app_data_dir
+
+        log_file = app_data_dir() / log_file
     max_bytes = config.get("log_max_bytes", 10 * 1024 * 1024)
     backup_count = config.get("log_backup_count", 5)
     console_enabled = config.get("console_enabled", True)

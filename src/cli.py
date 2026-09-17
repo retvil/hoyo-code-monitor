@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import logging
 import sys
 
 import click
@@ -32,7 +33,9 @@ def _ensure_single_instance() -> None:
 @click.group()
 def cli():
     """Command group for hoyo-code-monitor."""
-    pass
+    from src.logging_setup import setup_logging
+
+    setup_logging()
 
 
 @cli.group()
@@ -619,12 +622,17 @@ def tray():
 
             from src.web_ui import app
 
-            uvicorn.run(app, host=WEB_HOST, port=WEB_PORT, log_level="warning")
+            # log_config=None: uvicorn's default dictConfig crashes in windowed
+            # (PyInstaller) mode because sys.stdout lacks isatty(); our root
+            # logging (setup_logging) captures uvicorn records via propagation.
+            uvicorn.run(app, host=WEB_HOST, port=WEB_PORT, log_level="warning", log_config=None)
         except ImportError:
             logger_web_missing = __import__("logging").getLogger(__name__)
             logger_web_missing.warning("Web UI not available (fastapi/uvicorn not installed)")
         except OSError as e:
-            print(f"Web server already running or port busy: {e}")
+            logging.getLogger(__name__).warning("Web server port busy: %s", e)
+        except Exception:
+            logging.getLogger(__name__).exception("Web server crashed")
 
     web_thread = threading.Thread(target=_run_web_server, daemon=True, name="WebUI")
     web_thread.start()

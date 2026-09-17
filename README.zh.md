@@ -78,7 +78,15 @@ Web 界面：`http://127.0.0.1:8000` — Dashboard、Sources、Accounts、Config
 
 ## 作者与支持
 
-见应用仪表盘内的“关于作者”区块 (联系方式、打赏链接和加密地址均可配置)。
+见应用仪表盘内的“关于作者”区块，或下方：
+
+**加密货币：**
+
+- BTC: `bc1qunld3rsp37qf5gg69aune50y0qqkd0eugg7j97`
+- TON: `UQDmvr4SKOxSION3Yky6aOgzAnCDXySPuAbG4EKJa5JUT7tC`
+- USDT (TRC20): `TBPJSSLu1mUcX54g9UyxUohYGf2fuRvbwd`
+- USDT (ERC20): `0x25CAED3776Ef5b18E03392bC5b254Bbd78E8180C`
+- USDT (SOL): `3qgN5z291CEcj2FUi2Zza5DioxKgNw72kC7P52pCcTrG`
 
 ## 许可证
 

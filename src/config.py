@@ -32,6 +32,13 @@ except ImportError:
     _toml_legacy = None  # type: ignore[assignment]
 
 
+def _default(fn_name: str):
+    """Lazy default from src.paths (keeps import graph acyclic)."""
+    from importlib import import_module
+
+    return getattr(import_module("src.paths"), fn_name)()
+
+
 @dataclass
 class Settings:
     """Typed application settings. All durations are in seconds."""
@@ -44,9 +51,9 @@ class Settings:
     retry_backoff_seconds: list[int] = field(default_factory=lambda: [30, 120, 600])
     heartbeat_seconds: int = 5
     heartbeat_timeout_seconds: int = 30
-    db_path: str = "data/monitor.db"
+    db_path: str = field(default_factory=lambda: _default("default_db_path"))
     log_level: str = "INFO"
-    log_file: str = "logs/app.log"
+    log_file: str = field(default_factory=lambda: _default("default_log_path"))
     max_log_size: int = 10485760
     backup_count: int = 5
 
@@ -67,7 +74,9 @@ class ConfigManager:
 
     def __init__(self, config_path: str | Path | None = None) -> None:
         if config_path is None:
-            config_path = os.environ.get("CONFIG_PATH", "config.toml")
+            from src.paths import default_config_path
+
+            config_path = os.environ.get("CONFIG_PATH", default_config_path())
         self.config_path = Path(config_path)
         self._settings = Settings()
         self._lock = threading.RLock()

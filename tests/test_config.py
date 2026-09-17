@@ -46,9 +46,9 @@ class TestSettingsDefaults:
         assert s.retry_backoff_seconds == [30, 120, 600]
         assert s.heartbeat_seconds == 5
         assert s.heartbeat_timeout_seconds == 30
-        assert s.db_path == "data/monitor.db"
+        assert s.db_path.endswith("monitor.db")
         assert s.log_level == "INFO"
-        assert s.log_file == "logs/app.log"
+        assert s.log_file.endswith("app.log")
         assert s.max_log_size == 10485760
         assert s.backup_count == 5
 
@@ -79,7 +79,7 @@ class TestConfigManagerInit:
     def test_init_default_path(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("CONFIG_PATH", raising=False)
         cm = ConfigManager()
-        assert cm.config_path == Path("config.toml")
+        assert cm.config_path.name == "config.toml"
 
 
 class TestConfigManagerLoad:

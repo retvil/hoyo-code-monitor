@@ -49,8 +49,17 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Templates
-templates = Jinja2Templates(directory="templates")
+# Templates — resolve relative to app root, works both from source and frozen (PyInstaller)
+def _templates_dir() -> str:
+    import sys
+    from pathlib import Path
+
+    if getattr(sys, "frozen", False):
+        return str(Path(sys._MEIPASS) / "templates")  # noqa: SLF001 -- PyInstaller standard attr
+    return str(Path(__file__).resolve().parent.parent / "templates")
+
+
+templates = Jinja2Templates(directory=_templates_dir())
 
 # Static files (if any)
 
@@ -1075,4 +1084,4 @@ async def partial_recent_logs(request: Request):
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    uvicorn.run(app, host="127.0.0.1", port=8000, log_config=None)

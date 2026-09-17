@@ -15,7 +15,11 @@ logger = logging.getLogger(__name__)
 class SingleInstance:
     """File-lock guard. Hold the object while the app runs."""
 
-    def __init__(self, lock_path: str | Path = "data/app.lock") -> None:
+    def __init__(self, lock_path: str | Path | None = None) -> None:
+        if lock_path is None:
+            from src.paths import app_data_dir
+
+            lock_path = app_data_dir() / "app.lock"
         self.lock_path = Path(lock_path)
         self._fh: Any | None = None
 

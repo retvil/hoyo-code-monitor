@@ -28,13 +28,16 @@ class Storage:
         db_path: Path to the SQLite database file.
     """
 
-    def __init__(self, db_path: str = "data/monitor.db") -> None:
+    def __init__(self, db_path: str | None = None) -> None:
         """Initialize storage with database path.
 
         Args:
-            db_path: Path to SQLite database file. Defaults to "data/monitor.db".
+            db_path: Path to SQLite database file. Defaults to the app data dir
+                (repo `data/` in source mode, %LOCALAPPDATA% when frozen).
         """
-        self.db_path = Path(db_path)
+        from src.paths import default_db_path
+
+        self.db_path = Path(db_path) if db_path else Path(default_db_path())
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._fernet = self._get_or_create_fernet()
         run_migrations(str(self.db_path), CURRENT_VERSION)

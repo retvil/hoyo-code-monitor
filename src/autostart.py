@@ -19,6 +19,8 @@ RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 def _tray_command() -> str:
     """Build the command that starts the app in tray mode."""
     exe = Path(sys.executable)
+    if getattr(sys, "frozen", False):
+        return f'"{exe}" tray'
     # Prefer pythonw to avoid console window
     pythonw = exe.with_name("pythonw.exe")
     python = str(pythonw if pythonw.exists() else exe)

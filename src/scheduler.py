@@ -423,11 +423,11 @@ class Scheduler:
         return self._thread is not None and self._thread.is_alive()
 
 
-def create_scheduler_from_storage(db_path: str = "data/monitor.db") -> Scheduler:
+def create_scheduler_from_storage(db_path: str | None = None) -> Scheduler:
     """Create a scheduler instance with default components from storage.
 
     Args:
-        db_path: Path to SQLite database.
+        db_path: Path to SQLite database (defaults to app data dir).
 
     Returns:
         Configured Scheduler instance.

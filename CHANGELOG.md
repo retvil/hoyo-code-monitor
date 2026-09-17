@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+### Fixed
+- **Frozen exe failed to start** (hung silently, no tray, no web UI): missing runtime
+  dependencies in the PyInstaller bundle (`aiohttp`, `bs4`, `pystray`, `Pillow`, `qrcode`,
+  `python-multipart`) crashed the import chain; `console=False` hid the traceback
+- **Web server crashed in windowed builds**: uvicorn's default `dictConfig` calls
+  `sys.stdout.isatty()`, unavailable in PyInstaller windowed mode — now runs with
+  `log_config=None` and logs through the app's root logger
+- **Dashboard returned HTTP 500 in frozen builds**: Jinja2 templates resolved from CWD;
+  now resolved from `sys._MEIPASS` when frozen
+- **Data written to read-only install dir**: db/config/logs/lock/key now live in
+  `%LOCALAPPDATA%\HoYoCodeMonitor` when frozen (repo-relative paths in source mode,
+  override with `HCM_DATA_DIR`)
+- **Autostart registered a python+cli.py command in frozen builds** — now registers the exe
+- **Logging was never initialized** — `setup_logging()` now runs for every CLI command;
+  rotating file log at `%LOCALAPPDATA%\HoYoCodeMonitor\logs\app.log`
+- UPX disabled in PyInstaller spec (known to corrupt OpenSSL DLLs); PIL image plugins no
+  longer excluded (QR codes and tray icon rendering)
+- `requirements.txt` / `pyproject.toml` now declare `pystray`, `Pillow`, `qrcode`,
+  `python-multipart`
+
 ### Added
 - Web UI in 6 languages (EN/RU/DE/FR/JA/ZH) with sidebar switcher; default language follows the OS
 - Per-account auto-redeem toggles (Accounts page)
