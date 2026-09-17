@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hoyo-code-monitor"
-version = "1.0.0-beta.2"
+version = "1.0.0-beta.3"
 description = "Local Windows app to monitor and redeem Genshin Impact promo codes"
 readme = "README.md"
 requires-python = ">=3.11"

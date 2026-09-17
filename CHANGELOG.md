@@ -3,6 +3,14 @@
 ## [Unreleased]
 
 ### Fixed
+- **Account auto-login crashed with bare 500 in frozen builds**: Playwright looked for
+  browsers inside the bundle temp dir (`_MEI...\playwright\driver\package\.local-browsers`).
+  Now `PLAYWRIGHT_BROWSERS_PATH` points to `%LOCALAPPDATA%\HoYoCodeMonitor\ms-playwright`
+  when frozen, missing Chromium auto-downloads on first login (~170MB, one-time),
+  and browser errors return HTTP 502 with detail instead of Internal Server Error
+- Browser profile moved to the app-data dir (was CWD-relative `data/browser-profile`)
+
+### Fixed
 - **Frozen exe failed to start** (hung silently, no tray, no web UI): missing runtime
   dependencies in the PyInstaller bundle (`aiohttp`, `bs4`, `pystray`, `Pillow`, `qrcode`,
   `python-multipart`) crashed the import chain; `console=False` hid the traceback

@@ -442,6 +442,10 @@ async def login_account(name: str, timeout: int = 300):
         raise HTTPException(status_code=408, detail=str(e)) from e
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
+    except Exception as e:
+        # e.g. playwright._impl._errors.Error (browser launch failure):
+        # report the detail instead of a bare 500 page
+        raise HTTPException(status_code=502, detail=f"Browser login failed: {e}") from e
     storage.store_account_cookies(name, cookies)
     return {"success": True, "message": f"Cookies saved for '{name}'", "keys": sorted(cookies)}
 

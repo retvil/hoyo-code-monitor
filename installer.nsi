@@ -6,7 +6,7 @@
 
 ; Application info
 !define APP_NAME "HoYo Code Monitor"
-!define APP_VERSION "1.0.0-beta.2"
+!define APP_VERSION "1.0.0-beta.3"
 !define APP_PUBLISHER "HoYo Code Monitor Contributors"
 !define APP_URL "https://github.com/retvil/hoyo-code-monitor"
 !define APP_EXE "hoyo-code-monitor.exe"
