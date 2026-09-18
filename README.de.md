@@ -1,8 +1,20 @@
 # HoYo Code Monitor
 
-Lokale Windows-App zur Überwachung von Genshin-Impact-Promocode-Quellen mit automatischer Einlösung neuer Codes über die Hoyolab API. Alles bleibt auf Ihrem PC: SQLite-Datenbank, verschlüsselte Cookies, keine Telemetrie, keine Cloud.
+[![Release](https://img.shields.io/github/v/release/retvil/hoyo-code-monitor?sort=date)](https://github.com/retvil/hoyo-code-monitor/releases) [![License MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE) [![Platform Windows](https://img.shields.io/badge/platform-Windows-blue)](https://github.com/retvil/hoyo-code-monitor/releases)
 
-> Lesen auf: [English](README.md) · [Русский](README.ru.md) · [Français](README.fr.md) · [日本語](README.ja.md) · [中文](README.zh.md)
+**Verpassen Sie nie wieder einen HoYoverse-Promocode — lokale Überwachung und Auto-Einlösung für 5 Spiele, direkt auf Ihrem PC.**
+
+[🇬🇧 English](README.md) | [🇷🇺 Русский](README.ru.md) | **🇩🇪 Deutsch** | [🇫🇷 Français](README.fr.md) | [🇯🇵 日本語](README.ja.md) | [🇨🇳 中文](README.zh.md)
+
+## Was ist das?
+
+HoYoverse-Spiele veröffentlichen regelmäßig zeitlich begrenzte Promocodes — und sie laufen schnell ab. **HoYo Code Monitor** überwacht 16 Code-Quellen in 5 Spielen (Genshin Impact, Honkai: Star Rail, Zenless Zone Zero, Honkai Impact 3rd, Tears of Themis) und löst neue Codes automatisch auf Ihren Konten ein. Alles läuft lokal auf Ihrem PC: SQLite-Datenbank, verschlüsselte Cookies, keine Telemetrie, keine Cloud.
+
+### So funktioniert es
+
+1. Der Planer fragt aktivierte Quellen ab, extrahiert Codes (`[A-Z0-9]{8,14}`), speichert neue.
+2. Für jedes Konto mit aktivierter Auto-Einlösung: `GET webExchangeCdkey` mit Konto-Cookies, 8s Pause zwischen Einlösungen.
+3. Ergebnis wird protokolliert: `success` → Done + Belohnung; `-2017/-2018` → bereits eingelöst (zählt als Done); `-2001` abgelaufen, `-2003` ungültig/nur China.
 
 ## Funktionen
 
@@ -18,6 +30,9 @@ Lokale Windows-App zur Überwachung von Genshin-Impact-Promocode-Quellen mit aut
 
 ## Screenshots
 
+<details>
+<summary>Dashboard / Quellen / Config / Autor</summary>
+
 | Dashboard | Quellen | Config |
 |---|---|---|
 | ![Dashboard](docs/screenshots/dashboard_de.png) | ![Quellen](docs/screenshots/sources_de.png) | ![Config](docs/screenshots/config_de.png) |
@@ -25,6 +40,8 @@ Lokale Windows-App zur Überwachung von Genshin-Impact-Promocode-Quellen mit aut
 | Autor |
 |---|
 | ![Autor](docs/screenshots/author_de.png) |
+
+</details>
 
 ## Quellen (live geprüft)
 
@@ -36,9 +53,35 @@ Lokale Windows-App zur Überwachung von Genshin-Impact-Promocode-Quellen mit aut
 | `api.ennead.cc` (2 Endpunkte) | JSON API | Funktioniert |
 | Pocket Tactics, TheClick, Eurogamer, MMO Culture, Playnforge | CSS-Guides | Funktionieren |
 
-## Installation
+## Fertige Builds
 
-Python 3.11+ erforderlich.
+Installer aus [Releases](https://github.com/retvil/hoyo-code-monitor/releases) herunterladen:
+
+- **Windows** — `hoyo-code-monitor-1.0.0-beta.3-setup.exe` (Installation pro Benutzer, keine Adminrechte nötig)
+
+Stille Installation: `setup.exe /S`. Optionale Komponenten: Desktop-Verknüpfung, Windows-Autostart.
+
+> **Hinweis:** Beim ersten Browser-Login lädt die App Chromium herunter (~170MB, einmalig).
+
+## Schnellstart
+
+```powershell
+# 1. Installieren und starten — die App lebt im System-Tray
+# 2. Konto hinzufügen (Region: os_usa / os_euro / os_asia / os_cht)
+genshin-code-monitor accounts add main <UID> <REGION>
+
+# 3. Cookies einmal erfassen (Browser öffnet sich, einmal einloggen)
+genshin-code-monitor accounts login main
+
+# 4. Auto-Einlösung aktivieren (oder Schalter pro Konto in der Web UI)
+genshin-code-monitor config set redemption_enabled true
+```
+
+5. Dashboard öffnen: `http://127.0.0.1:8000` — Dashboard, Sources, Accounts, Config (Sprachumschalter EN/RU/DE/FR/JA/ZH in der Seitenleiste).
+
+## Installation aus Quellen
+
+Python 3.11+ erforderlich ([python.org](https://python.org)).
 
 ```powershell
 pip install -e .
@@ -46,29 +89,13 @@ pip install -e .
 python -m playwright install chromium
 ```
 
-## Verwendung
+Tray-Modus (empfohlen) / Einzelprüfung / Web UI:
 
 ```powershell
-# Konto hinzufügen + Cookies automatisch erfassen (Browser öffnet sich, einmal einloggen)
-genshin-code-monitor accounts add main <UID> <REGION>   # Region: os_usa / os_euro / os_asia / os_cht
-genshin-code-monitor accounts login main
-
-# Auto-Einlösung aktivieren (oder Schalter pro Konto in der Web UI)
-genshin-code-monitor config set redemption_enabled true
-
-# Tray-Modus (empfohlen) / Einzelprüfung / Web UI
 genshin-code-monitor tray
 genshin-code-monitor run-once
 python -m uvicorn src.web_ui:app --host 127.0.0.1 --port 8000
 ```
-
-Web UI: `http://127.0.0.1:8000` — Dashboard, Sources, Accounts, Config (Sprachumschalter EN/RU/DE/FR/JA/ZH in der Seitenleiste).
-
-## So funktioniert die Einlösung
-
-1. Der Planer fragt aktivierte Quellen ab, extrahiert Codes (`[A-Z0-9]{8,14}`), speichert neue.
-2. Für jedes Konto mit aktivierter Auto-Einlösung: `GET webExchangeCdkey` mit Konto-Cookies, 8s Pause.
-3. Ergebnis wird protokolliert: `success` → Done + Belohnung; `-2017/-2018` → bereits eingelöst (zählt als Done); `-2001` abgelaufen, `-2003` ungültig/nur China.
 
 ## FAQ
 

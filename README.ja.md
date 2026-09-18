@@ -1,8 +1,20 @@
 # HoYo Code Monitor
 
-原神プロモコードの情報源を監視し、新しいコードをHoYolab APIで自動交換するWindowsローカルアプリ。すべてPC内に保存されます:SQLiteデータベース、暗号化Cookie、テレメトリーなし、クラウドなし。
+[![Release](https://img.shields.io/github/v/release/retvil/hoyo-code-monitor?sort=date)](https://github.com/retvil/hoyo-code-monitor/releases) [![License MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE) [![Platform Windows](https://img.shields.io/badge/platform-Windows-blue)](https://github.com/retvil/hoyo-code-monitor/releases)
 
-> 他の言語で読む: [English](README.md) · [Русский](README.ru.md) · [Deutsch](README.de.md) · [Français](README.fr.md) · [中文](README.zh.md)
+**HoYoverseのプロモコードを見逃さない — 5つのゲームに対応したローカル監視・自動交換をあなたのPCで。**
+
+[🇬🇧 English](README.md) | [🇷🇺 Русский](README.ru.md) | [🇩🇪 Deutsch](README.de.md) | [🇫🇷 Français](README.fr.md) | **🇯🇵 日本語** | [🇨🇳 中文](README.zh.md)
+
+## これは何?
+
+HoYoverseのゲームでは期限付きプロモコードが定期的に配布されます — そしてすぐ期限切れになります。**HoYo Code Monitor** は5つのゲーム (原神、崩壊:スターレイル、ゼンレスゾーンゼロ、崩壊3rd、未定事件簿) の16のコード情報源を監視し、新しいコードをあなたのアカウントに自動で交換します。すべてPC内のローカル動作です:SQLiteデータベース、暗号化Cookie、テレメトリーなし、クラウドなし。
+
+### 仕組み
+
+1. スケジューラが有効なソースを取得し、コード (`[A-Z0-9]{8,14}`) を抽出して保存。
+2. 自動交換ONのアカウントごとにCookie付きで `GET webExchangeCdkey`、交換間隔8秒。
+3. 結果を記録: `success` → Done + 報酬、`-2017/-2018` → 交換済み (Done扱い)、`-2001` 期限切れ、`-2003` 無効/中国限定。
 
 ## 機能
 
@@ -18,6 +30,9 @@
 
 ## スクリーンショット
 
+<details>
+<summary>ダッシュボード / ソース / 設定 / 作者</summary>
+
 | ダッシュボード | ソース | 設定 |
 |---|---|---|
 | ![ダッシュボード](docs/screenshots/dashboard_ja.png) | ![ソース](docs/screenshots/sources_ja.png) | ![設定](docs/screenshots/config_ja.png) |
@@ -25,6 +40,8 @@
 | 作者 |
 |---|
 | ![作者](docs/screenshots/author_ja.png) |
+
+</details>
 
 ## ソース (実動作確認済み)
 
@@ -36,9 +53,35 @@
 | `api.ennead.cc` (2エンドポイント) | JSON API | 動作 |
 | Pocket Tactics、TheClick、Eurogamer、MMO Culture、Playnforge | CSSガイド | 動作 |
 
-## インストール
+## 配布ビルド
 
-Python 3.11+ が必要です。
+[Releases](https://github.com/retvil/hoyo-code-monitor/releases) からインストーラをダウンロード:
+
+- **Windows** — `hoyo-code-monitor-1.0.0-beta.3-setup.exe` (ユーザー単位インストール、管理者権限不要)
+
+サイレントインストール: `setup.exe /S`。オプション: デスクトップショートカット、Windows自動起動。
+
+> **注意:** 初回のブラウザログイン時にChromium (~170MB) を自動ダウンロードします (一度だけ)。
+
+## クイックスタート
+
+```powershell
+# 1. インストールして起動 — アプリはシステムトレイに常駐
+# 2. アカウント追加 (region: os_usa / os_euro / os_asia / os_cht)
+genshin-code-monitor accounts add main <UID> <REGION>
+
+# 3. Cookieを一度だけ取得 (ブラウザが開くので一度ログイン)
+genshin-code-monitor accounts login main
+
+# 4. 自動交換を有効化 (またはWeb UIでアカウント別に切替)
+genshin-code-monitor config set redemption_enabled true
+```
+
+5. ダッシュボードを開く: `http://127.0.0.1:8000` — Dashboard、Sources、Accounts、Config (サイドバーでEN/RU/DE/FR/JA/ZH切替)。
+
+## ソースからインストール
+
+Python 3.11+ が必要です ([python.org](https://python.org))。
 
 ```powershell
 pip install -e .
@@ -46,29 +89,13 @@ pip install -e .
 python -m playwright install chromium
 ```
 
-## 使い方
+トレイモード (推奨) / 単発チェック / Web UI:
 
 ```powershell
-# アカウント追加 + Cookie自動取得 (ブラウザが開くので一度ログイン)
-genshin-code-monitor accounts add main <UID> <REGION>   # region: os_usa / os_euro / os_asia / os_cht
-genshin-code-monitor accounts login main
-
-# 自動交換を有効化 (またはWeb UIでアカウント別に切替)
-genshin-code-monitor config set redemption_enabled true
-
-# トレイモード (推奨) / 単発チェック / Web UI
 genshin-code-monitor tray
 genshin-code-monitor run-once
 python -m uvicorn src.web_ui:app --host 127.0.0.1 --port 8000
 ```
-
-Web UI: `http://127.0.0.1:8000` — Dashboard、Sources、Accounts、Config (サイドバーでEN/RU/DE/FR/JA/ZH切替)。
-
-## 交換の仕組み
-
-1. スケジューラが有効なソースを取得し、コード (`[A-Z0-9]{8,14}`) を抽出して保存。
-2. 自動交換ONのアカウントごとにCookie付きで `GET webExchangeCdkey`、8秒間隔。
-3. 結果を記録: `success` → Done + 報酬、`-2017/-2018` → 交換済み (Done扱い)、`-2001` 期限切れ、`-2003` 無効/中国限定。
 
 ## FAQ
 

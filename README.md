@@ -1,8 +1,20 @@
 # HoYo Code Monitor
 
-Local Windows app that monitors Genshin Impact promo-code sources and auto-redeems new codes via the Hoyolab API. Everything stays on your PC: SQLite database, encrypted cookies, no telemetry, no cloud.
+[![Release](https://img.shields.io/github/v/release/retvil/hoyo-code-monitor?sort=date)](https://github.com/retvil/hoyo-code-monitor/releases) [![License MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE) [![Platform Windows](https://img.shields.io/badge/platform-Windows-blue)](https://github.com/retvil/hoyo-code-monitor/releases)
 
-> Read this in: [Русский](README.ru.md) · [Deutsch](README.de.md) · [Français](README.fr.md) · [日本語](README.ja.md) · [中文](README.zh.md)
+**Never miss a HoYoverse promo code again — local monitoring and auto-redeem for 5 games, right on your PC.**
+
+**🇬🇧 English** | [🇷🇺 Русский](README.ru.md) | [🇩🇪 Deutsch](README.de.md) | [🇫🇷 Français](README.fr.md) | [🇯🇵 日本語](README.ja.md) | [🇨🇳 中文](README.zh.md)
+
+## What is this?
+
+HoYoverse games regularly release time-limited promo codes — and they expire fast. **HoYo Code Monitor** watches 16 code sources across 5 games (Genshin Impact, Honkai: Star Rail, Zenless Zone Zero, Honkai Impact 3rd, Tears of Themis) and redeems new codes to your accounts automatically. Everything runs locally on your PC: SQLite database, encrypted cookies, no telemetry, no cloud.
+
+### How it works
+
+1. The scheduler polls enabled sources, extracts codes (`[A-Z0-9]{8,14}`), stores new ones.
+2. For each account with auto-redeem ON: `GET webExchangeCdkey` with the account's cookies, 8s gap between redemptions.
+3. Result recorded: `success` → Done + reward; `-2017/-2018` → already claimed (counts as Done); `-2001` expired, `-2003` invalid/CN-only.
 
 ## Features
 
@@ -18,6 +30,9 @@ Local Windows app that monitors Genshin Impact promo-code sources and auto-redee
 
 ## Screenshots
 
+<details>
+<summary>Dashboard / Sources / Config / Author</summary>
+
 | Dashboard | Sources | Config |
 |---|---|---|
 | ![Dashboard](docs/screenshots/dashboard_en.png) | ![Sources](docs/screenshots/sources_en.png) | ![Config](docs/screenshots/config_en.png) |
@@ -25,6 +40,8 @@ Local Windows app that monitors Genshin Impact promo-code sources and auto-redee
 | Author |
 |---|
 | ![Author](docs/screenshots/author_en.png) |
+
+</details>
 
 ## Sources (verified live)
 
@@ -36,9 +53,35 @@ Local Windows app that monitors Genshin Impact promo-code sources and auto-redee
 | `api.ennead.cc` (x2 endpoints) | JSON API | Working |
 | Pocket Tactics, TheClick, Eurogamer, MMO Culture, Playnforge | CSS guides | Working |
 
-## Install
+## Ready builds
 
-Requires Python 3.11+.
+Download the installer from [Releases](https://github.com/retvil/hoyo-code-monitor/releases):
+
+- **Windows** — `hoyo-code-monitor-1.0.0-beta.3-setup.exe` (per-user install, no admin rights needed)
+
+Silent install: `setup.exe /S`. Optional components: desktop shortcut, Windows autostart.
+
+> **Note:** On first browser login the app downloads Chromium (~170MB, one-time).
+
+## Quick start
+
+```powershell
+# 1. Install and launch — the app lives in the system tray
+# 2. Add an account (region: os_usa / os_euro / os_asia / os_cht)
+genshin-code-monitor accounts add main <UID> <REGION>
+
+# 3. Capture cookies once (browser opens, you log in once)
+genshin-code-monitor accounts login main
+
+# 4. Enable auto-redeem (or toggle per account in the Web UI)
+genshin-code-monitor config set redemption_enabled true
+```
+
+5. Open the dashboard: `http://127.0.0.1:8000` — Dashboard, Sources, Accounts, Config (EN/RU/DE/FR/JA/ZH switcher in sidebar).
+
+## Install from source
+
+Requires Python 3.11+ ([python.org](https://python.org)).
 
 ```powershell
 pip install -e .
@@ -46,29 +89,13 @@ pip install -e .
 python -m playwright install chromium
 ```
 
-## Usage
+Run in tray (recommended) / one-shot check / Web UI:
 
 ```powershell
-# Add account + auto-capture cookies (browser opens, you log in once)
-genshin-code-monitor accounts add main <UID> <REGION>   # region: os_usa / os_euro / os_asia / os_cht
-genshin-code-monitor accounts login main
-
-# Enable auto-redeem (or toggle per account in Web UI)
-genshin-code-monitor config set redemption_enabled true
-
-# Run in tray (recommended) / one-shot check / Web UI
 genshin-code-monitor tray
 genshin-code-monitor run-once
 python -m uvicorn src.web_ui:app --host 127.0.0.1 --port 8000
 ```
-
-Web UI: `http://127.0.0.1:8000` — Dashboard, Sources, Accounts, Config (EN/RU/DE/FR/JA/ZH switcher in sidebar).
-
-## How redemption works
-
-1. Scheduler fetches enabled sources, extracts codes (`[A-Z0-9]{8,14}`), stores new ones.
-2. For each account with auto-redeem ON: `GET webExchangeCdkey` with account cookies, 8s gap.
-3. Result recorded: `success` → Done + reward; `-2017/-2018` → already claimed (counts as Done); `-2001` expired, `-2003` invalid/CN-only.
 
 ## FAQ
 

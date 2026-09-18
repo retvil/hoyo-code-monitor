@@ -1,8 +1,20 @@
 # HoYo Code Monitor
 
-本地 Windows 应用：监控原神兑换码来源，并通过 HoYolab API 自动兑换新码。所有数据保留在本机：SQLite 数据库、加密 Cookie，无遥测，无云端。
+[![Release](https://img.shields.io/github/v/release/retvil/hoyo-code-monitor?sort=date)](https://github.com/retvil/hoyo-code-monitor/releases) [![License MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE) [![Platform Windows](https://img.shields.io/badge/platform-Windows-blue)](https://github.com/retvil/hoyo-code-monitor/releases)
 
-> 其他语言版本：[English](README.md) · [Русский](README.ru.md) · [Deutsch](README.de.md) · [Français](README.fr.md) · [日本語](README.ja.md)
+**再也不错过 HoYoverse 兑换码 —— 5 款游戏的本地监控与自动兑换，就在你的电脑上。**
+
+[🇬🇧 English](README.md) | [🇷🇺 Русский](README.ru.md) | [🇩🇪 Deutsch](README.de.md) | [🇫🇷 Français](README.fr.md) | [🇯🇵 日本語](README.ja.md) | **🇨🇳 中文**
+
+## 这是什么？
+
+HoYoverse 游戏会定期发布限时兑换码 —— 而且很快过期。**HoYo Code Monitor** 监控 5 款游戏 (原神、崩坏：星穹铁道、绝区零、崩坏3、未定事件簿) 的 16 个兑换码来源，并自动为你的账号兑换新码。全部在本机运行：SQLite 数据库、加密 Cookie，无遥测，无云端。
+
+### 工作原理
+
+1. 调度器抓取已启用的来源，提取兑换码 (`[A-Z0-9]{8,14}`) 并保存新增。
+2. 对每个开启自动兑换的账号：携带账号 Cookie 调用 `GET webExchangeCdkey`，每次兑换间隔 8 秒。
+3. 记录结果：`success` → Done + 奖励；`-2017/-2018` → 已兑换过 (记为 Done)；`-2001` 已过期，`-2003` 无效/仅限国服。
 
 ## 功能
 
@@ -18,6 +30,9 @@
 
 ## 截图
 
+<details>
+<summary>仪表盘 / 来源 / 设置 / 作者</summary>
+
 | 仪表盘 | 来源 | 设置 |
 |---|---|---|
 | ![仪表盘](docs/screenshots/dashboard_zh.png) | ![来源](docs/screenshots/sources_zh.png) | ![设置](docs/screenshots/config_zh.png) |
@@ -25,6 +40,8 @@
 | 作者 |
 |---|
 | ![作者](docs/screenshots/author_zh.png) |
+
+</details>
 
 ## 来源 (已实测)
 
@@ -36,9 +53,35 @@
 | `api.ennead.cc` (2 个接口) | JSON API | 可用 |
 | Pocket Tactics、TheClick、Eurogamer、MMO Culture、Playnforge | CSS 攻略 | 可用 |
 
-## 安装
+## 现成构建
 
-需要 Python 3.11+。
+从 [Releases](https://github.com/retvil/hoyo-code-monitor/releases) 下载安装程序：
+
+- **Windows** — `hoyo-code-monitor-1.0.0-beta.3-setup.exe` (按用户安装，无需管理员权限)
+
+静默安装：`setup.exe /S`。可选组件：桌面快捷方式、Windows 开机自启。
+
+> **注意：** 首次通过浏览器登录时，应用会自动下载 Chromium (约 170 MB，仅一次)。
+
+## 快速上手
+
+```powershell
+# 1. 安装并启动 —— 应用常驻系统托盘
+# 2. 添加账号 (region: os_usa / os_euro / os_asia / os_cht)
+genshin-code-monitor accounts add main <UID> <REGION>
+
+# 3. 获取一次 Cookie (会打开浏览器，登录一次即可)
+genshin-code-monitor accounts login main
+
+# 4. 启用自动兑换 (或在 Web 界面按账号开关)
+genshin-code-monitor config set redemption_enabled true
+```
+
+5. 打开仪表盘：`http://127.0.0.1:8000` — Dashboard、Sources、Accounts、Config (侧边栏可切换 EN/RU/DE/FR/JA/ZH)。
+
+## 从源码安装
+
+需要 Python 3.11+ ([python.org](https://python.org))。
 
 ```powershell
 pip install -e .
@@ -46,29 +89,13 @@ pip install -e .
 python -m playwright install chromium
 ```
 
-## 使用
+托盘模式 (推荐) / 单次检查 / Web 界面：
 
 ```powershell
-# 添加账号 + 自动获取 Cookie (会打开浏览器，登录一次即可)
-genshin-code-monitor accounts add main <UID> <REGION>   # region: os_usa / os_euro / os_asia / os_cht
-genshin-code-monitor accounts login main
-
-# 启用自动兑换 (或在 Web 界面按账号开关)
-genshin-code-monitor config set redemption_enabled true
-
-# 托盘模式 (推荐) / 单次检查 / Web 界面
 genshin-code-monitor tray
 genshin-code-monitor run-once
 python -m uvicorn src.web_ui:app --host 127.0.0.1 --port 8000
 ```
-
-Web 界面：`http://127.0.0.1:8000` — Dashboard、Sources、Accounts、Config (侧边栏可切换 EN/RU/DE/FR/JA/ZH)。
-
-## 兑换原理
-
-1. 调度器抓取已启用的来源，提取兑换码 (`[A-Z0-9]{8,14}`) 并保存新增。
-2. 对每个开启自动兑换的账号：携带账号 Cookie 调用 `GET webExchangeCdkey`，间隔 8 秒。
-3. 记录结果：`success` → Done + 奖励；`-2017/-2018` → 已兑换过 (记为 Done)；`-2001` 已过期，`-2003` 无效/仅限国服。
 
 ## FAQ
 
