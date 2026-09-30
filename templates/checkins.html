@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}{{ t('checkins_title') }} - {{ t('app_name') }}{% endblock %}
+{% block page_title %}{{ t('checkins_title') }}{% endblock %}
+{% block content %}
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+        <div class="card-title">{{ t('checkins_title') }}</div>
+        <button class="btn btn-primary" hx-post="/checkins/run-now" hx-swap="none" hx-on::after-request="location.reload()">{{ t('checkin_run_now') }}</button>
+    </div>
+    <div id="checkin-progress" hx-get="/api/checkins/progress" hx-trigger="load, every 2s" hx-swap="innerHTML">
+        <p class="muted">{{ t('checkin_no_logs') }}</p>
+    </div>
+    <p class="muted" style="margin-bottom: 14px;">
+        {{ t('checkin_last') }}: {{ checkin_status.last_checkin_run or '—' }} ·
+        {{ t('checkin_next') }}: {{ checkin_status.next_checkin_run or '—' }}
+    </p>
+    <form hx-post="/checkins/settings" hx-swap="none" hx-on::after-request="location.reload()" style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 14px;">
+        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="checkbox" name="checkin_enabled" value="true" {% if checkin_settings.enabled %}checked{% endif %} style="width: 18px; height: 18px;">
+            {{ t('checkin_enabled') }}
+        </label>
+        <div><label>{{ t('checkin_time') }}</label><input type="text" name="checkin_time" value="{{ checkin_settings.time }}" placeholder="04:00" style="width: 90px;"></div>
+        <div><label>{{ t('checkin_jitter') }}</label><input type="number" name="checkin_jitter_minutes" value="{{ checkin_settings.jitter }}" min="0" max="120" style="width: 80px;"></div>
+        <button type="submit" class="btn">{{ t('save') }}</button>
+    </form>
+</div>
+
+<div class="card">
+    <div class="card-title" style="margin-bottom: 14px;">{{ t('checkin_claimed') }}</div>
+    <div hx-get="/partials/checkin-logs" hx-trigger="load" hx-swap="innerHTML">
+        <p class="muted">{{ t('checkin_no_logs') }}</p>
+    </div>
+</div>
+{% endblock %}

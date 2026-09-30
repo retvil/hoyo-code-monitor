@@ -124,6 +124,16 @@ class TestMiscApi:
     def test_redeem_no_accounts(self, client: TestClient) -> None:
         assert client.post("/codes/NOPE/redeem").status_code in (400, 404)
 
+    def test_sources_status_tolerates_bad_timestamp(self, client: TestClient, temp_db: str) -> None:
+        s = Storage(temp_db)
+        s.add_source("t1", "https://example.com", "css", ".code")
+        with s._connection() as conn:
+            conn.execute("UPDATE sources SET last_checked = 'not-a-date' WHERE name = 't1'")
+            conn.commit()
+        r = client.get("/api/sources/status")
+        assert r.status_code == 200
+        assert r.json()[0]["status"] == "unknown"
+
     def test_redeem_single_mocked(self, client: TestClient, temp_db: str) -> None:
         from src.redeemer import RedemptionResult
 

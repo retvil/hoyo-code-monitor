@@ -15,11 +15,13 @@ Les jeux HoYoverse publient régulièrement des codes promo à durée limitée �
 1. Le planificateur interroge les sources activées, extrait les codes (`[A-Z0-9]{8,14}`), stocke les nouveaux.
 2. Pour chaque compte avec échange auto : `GET webExchangeCdkey` avec les cookies du compte, pause de 8s entre les échanges.
 3. Résultat enregistré : `success` → Done + récompense ; `-2017/-2018` → déjà échangé (compte comme Done) ; `-2001` expiré, `-2003` invalide/Chine uniquement.
+4. Les check-ins quotidiens HoYoLAB suivent leur propre planning (04h00 + marge par défaut) : `info → sign → home` par compte × jeu, mêmes cookies, résultats sur la page Check-ins.
 
 ## Fonctionnalités
 
 - **Surveillance en arrière-plan** — vérifie les sources toutes les N minutes (configurable, 15 par défaut)
 - **Échange auto** — échange les nouveaux codes via l'API Hoyolab `webExchangeCdkey` (opt-in, par compte)
+- **Check-ins quotidiens** — connexion auto sur HoYoLAB pour Genshin + Star Rail (opt-in, par compte, planning dédié, idempotent)
 - **Multi-sources** — Wiki, Wiki API, API JSON communautaires, sites de guides (16 préréglages)
 - **Multi-comptes** — chaque compte a ses cookies chiffrés et son interrupteur
 - **Statistiques** — total / échangés / en attente, par source, journal d'échange
@@ -57,7 +59,7 @@ Les jeux HoYoverse publient régulièrement des codes promo à durée limitée �
 
 Téléchargez l'installeur depuis [Releases](https://github.com/retvil/hoyo-code-monitor/releases) :
 
-- **Windows** — `hoyo-code-monitor-1.0.0-beta.3-setup.exe` (installation par utilisateur, sans droits admin)
+- **Windows** — `hoyo-code-monitor-1.1.6-setup.exe` (installation par utilisateur, sans droits admin)
 
 Installation silencieuse : `setup.exe /S`. Composants optionnels : raccourci bureau, démarrage Windows.
 

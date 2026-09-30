@@ -27,6 +27,15 @@ DEFAULT_REDEMPTION_MIN_GAP_SECONDS: int = 8
 DEFAULT_SOURCE_TIMEOUT_SECONDS: int = 30
 DEFAULT_MAX_RETRY_ATTEMPTS: int = 3
 
+# --- Daily check-in schedule ---
+DEFAULT_CHECKIN_TIME: str = "04:00"
+DEFAULT_CHECKIN_JITTER_MINUTES: int = 15
+CHECKIN_FALLBACK_HOUR: int = 4
+CHECKIN_FALLBACK_MINUTE: int = 0
+MAX_CHECKIN_HOUR: int = 23
+MAX_CHECKIN_MINUTE: int = 59
+MAX_CHECKIN_JITTER_MINUTES: int = 120
+
 # --- Storage ---
 DEFAULT_DB_PATH: str = "data/monitor.db"
 DEFAULT_CODE_SOURCES_LIMIT: int = 100
@@ -58,7 +67,7 @@ WEB_HOST: str = "127.0.0.1"
 WEB_PORT: int = 8000
 
 # --- App identity ---
-APP_VERSION: str = "1.0.0-beta.3"
+APP_VERSION: str = "1.1.6"
 APP_AUTHOR: str = "Nod33Eset"
 
 # --- Games (multi-game support, Phase 2) ---

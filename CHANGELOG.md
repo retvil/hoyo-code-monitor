@@ -1,6 +1,16 @@
 # Changelog
 
-## [Unreleased]
+## [1.1.6] - 2026-09-30
+
+### Added
+- **Daily HoYoLAB check-ins (auto sign-in)**: second pipeline next to code redemption —
+  `GET info → POST sign → GET home` per account x game (MVP: Genshin + HSR, overseas).
+  Own schedule (`checkin_time`, default 04:00 + `checkin_jitter_minutes`), per-account
+  `Auto check-in` toggles, `/checkins` page with history, manual "Claim now" button
+  and `/api/checkins/status` JSON. Idempotent via `UNIQUE(account_id, game, claimed_date)`
+  (migration v13, `checkin_log` table); stable per-account `device_id` avoids re-logins.
+  Retcode `-5003` treated as already-claimed, expired cookies surface a refresh hint.
+  41 new tests (runner, storage, scheduler, web UI)
 
 ### Fixed
 - **Account auto-login crashed with bare 500 in frozen builds**: Playwright looked for

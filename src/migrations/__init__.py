@@ -377,9 +377,36 @@ MIGRATIONS: list[Migration] = [
         UPDATE schema_version SET version = 11;
         """,
     ),
+    (
+        13,
+        """
+        -- Migration v13: daily check-in log (one row per account x game x date)
+        CREATE TABLE IF NOT EXISTS checkin_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+            game TEXT NOT NULL,
+            claimed_date TEXT NOT NULL,
+            status TEXT NOT NULL,
+            reward_name TEXT,
+            reward_amount INTEGER NOT NULL DEFAULT 0,
+            error_message TEXT,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(account_id, game, claimed_date)
+        );
+        CREATE INDEX IF NOT EXISTS idx_checkin_log_account ON checkin_log(account_id);
+        CREATE INDEX IF NOT EXISTS idx_checkin_log_date ON checkin_log(claimed_date);
+        UPDATE schema_version SET version = 13;
+        """,
+        """
+        DROP INDEX IF EXISTS idx_checkin_log_date;
+        DROP INDEX IF EXISTS idx_checkin_log_account;
+        DROP TABLE IF EXISTS checkin_log;
+        UPDATE schema_version SET version = 12;
+        """,
+    ),
 ]
 
-CURRENT_VERSION = 12
+CURRENT_VERSION = 13
 
 
 def get_db_version(conn: sqlite3.Connection) -> int:

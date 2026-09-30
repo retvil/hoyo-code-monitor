@@ -17,5 +17,9 @@ class RedeemerError(ValueError):
     """Raised when a redemption error occurs."""
 
 
+class CheckinError(ValueError):
+    """Raised when a daily check-in error occurs."""
+
+
 class SourceValidationError(ValueError):
     """Raised when source validation fails."""

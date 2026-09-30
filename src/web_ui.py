@@ -2,19 +2,28 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
+import re
 import time
 from contextlib import asynccontextmanager
+from datetime import datetime
 from typing import Any
 
 from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, Response
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from src.config import ConfigManager
-from src.constants import APP_AUTHOR, APP_VERSION, MASK_VISIBLE_CHARS
+from src.constants import (
+    APP_AUTHOR,
+    APP_VERSION,
+    MASK_VISIBLE_CHARS,
+    MAX_CHECKIN_JITTER_MINUTES,
+)
 from src.i18n import SUPPORTED, get_lang, make_t
 from src.scheduler import create_scheduler_from_storage
 from src.sources import SOURCE_PRESETS, SourceConfig, SourceFetcher
@@ -45,23 +54,22 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="HoYo Code Monitor",
     description="Monitor and redeem Genshin Impact promotional codes",
-    version="0.1.0",
+    version=APP_VERSION,
     lifespan=lifespan,
 )
 
-# Templates — resolve relative to app root, works both from source and frozen (PyInstaller)
-def _templates_dir() -> str:
+from src.templates import templates
+
+def _static_dir() -> str:
     import sys
     from pathlib import Path
 
     if getattr(sys, "frozen", False):
-        return str(Path(sys._MEIPASS) / "templates")  # noqa: SLF001 -- PyInstaller standard attr
-    return str(Path(__file__).resolve().parent.parent / "templates")
+        return str(Path(sys._MEIPASS) / "static")
+    return str(Path(__file__).resolve().parent.parent / "static")
 
 
-templates = Jinja2Templates(directory=_templates_dir())
-
-# Static files (if any)
+app.mount("/static", StaticFiles(directory=_static_dir()), name="static")
 
 
 # Pydantic models for API
@@ -539,6 +547,17 @@ async def update_config(
         raise HTTPException(status_code=400, detail=str(e)) from e
 
 
+@app.get("/dashboard/experiment", response_class=HTMLResponse)
+async def dashboard_experiment(request: Request):
+    """Experimental dashboard with new design."""
+    storage = Storage()
+    return templates.TemplateResponse(
+        request,
+        "dashboard_experiment.html",
+        page_ctx(storage, {"request": request}),
+    )
+
+
 @app.get("/author", response_class=HTMLResponse)
 async def author_page(request: Request):
     """Author page with contacts and support options."""
@@ -678,6 +697,61 @@ async def api_stats():
     return storage.get_stats()
 
 
+@app.get("/api/dashboard/stats")
+async def api_dashboard_stats(game: str = ""):
+    """Get dashboard stats for a specific game or overall."""
+    storage = Storage()
+    stats = storage.get_stats(game=game if game else None)
+
+    # Add game-specific info if game is specified
+    if game and game in ["genshin", "hsr", "zzz", "hi3", "tot"]:
+        from src.constants import GAME_CONF
+        stats["game_name"] = GAME_CONF.get(game, {}).get("name", game.upper())
+        stats["game_accent"] = GAME_CONF.get(game, {}).get("accent", "#c9a832")
+
+    return stats
+
+
+def _is_source_stale(last_checked: str | None) -> bool:
+    """Check if a source is stale (not checked for over an hour).
+
+    Returns False on missing or malformed timestamps instead of raising.
+    """
+    if not last_checked:
+        return False
+    try:
+        checked_at = datetime.fromisoformat(last_checked)
+    except (TypeError, ValueError):
+        logger.warning("Ignoring malformed last_checked %r", last_checked)
+        return False
+    return (datetime.now() - checked_at).total_seconds() > 3600
+
+
+@app.get("/api/sources/status")
+async def api_sources_status():
+    """Get status of all sources."""
+    storage = Storage()
+    sources = storage.list_sources()
+
+    # Format for frontend consumption
+    source_status = []
+    for source in sources:
+        source_status.append({
+            "name": source["name"],
+            "enabled": bool(source["enabled"]),
+            "game": source.get("game", "unknown"),
+            "last_checked": source.get("last_checked"),
+            "last_success": source.get("last_success"),
+            "error_count": source.get("error_count", 0),
+            "status": "active" if source["enabled"] and source.get("last_success") else
+                     "error" if source.get("error_count", 0) > 3 else
+                     "warning" if _is_source_stale(source.get("last_checked"))
+                     else "unknown"
+    })
+
+    return source_status
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
@@ -725,6 +799,156 @@ async def toggle_account_redeem(name: str):
     new_value = not storage.is_account_redeem_enabled(name)
     storage.set_account_redeem(name, new_value)
     return _account_redeem_switch_html(name, new_value)
+
+
+def _checkin_logs_with_names(storage: Storage, **filters: Any) -> list[dict[str, Any]]:
+    """Check-in logs with account names attached for templates."""
+    logs = storage.get_checkin_logs(**filters)
+    names = {a["id"]: a["name"] for a in storage.list_accounts()}
+    for row in logs:
+        row["account_name"] = names.get(row["account_id"], f"id:{row['account_id']}")
+    return logs
+
+
+def _account_checkin_switch_html(name: str, enabled: bool) -> str:
+    """Render per-account auto-check-in toggle switch (full span for outerHTML swap)."""
+    checked = "checked" if enabled else ""
+    label = "ON" if enabled else "OFF"
+    cls = "badge-ok" if enabled else "badge-bad"
+    return (
+        f"<span id='checkin-{name}'>"
+        f"<label style='display: flex; align-items: center; gap: 8px; cursor: pointer;'>"
+        f"<input type='checkbox' {checked} style='width: 18px; height: 18px;' "
+        f"hx-post='/accounts/{name}/checkin/toggle' hx-target='#checkin-{name}' hx-swap='outerHTML'>"
+        f"<span class='badge {cls}'>{label}</span></label></span>"
+    )
+
+
+@app.get("/accounts/{name}/checkin-state", response_class=HTMLResponse)
+async def account_checkin_state(name: str) -> str:
+    """Current per-account auto-check-in switch HTML (for initial load)."""
+    storage = Storage()
+    if not storage.get_account(name):
+        raise HTTPException(status_code=404, detail="Account not found")
+    return _account_checkin_switch_html(name, storage.is_account_checkin_enabled(name))
+
+
+@app.post("/accounts/{name}/checkin/toggle", response_class=HTMLResponse)
+async def toggle_account_checkin(name: str) -> str:
+    """Toggle per-account auto-check-in on/off, returns switch HTML."""
+    storage = Storage()
+    if not storage.get_account(name):
+        raise HTTPException(status_code=404, detail="Account not found")
+    new_value = not storage.is_account_checkin_enabled(name)
+    storage.set_account_checkin(name, new_value)
+    return _account_checkin_switch_html(name, new_value)
+
+
+@app.get("/checkins", response_class=HTMLResponse)
+async def checkins_page(request: Request) -> HTMLResponse:
+    """Daily check-ins page: schedule settings, manual run, history."""
+    storage = Storage()
+    logs = _checkin_logs_with_names(storage, limit=50)
+    sched = scheduler.status if scheduler else None
+    settings = {
+        "enabled": storage.get_config("checkin_enabled", "true") == "true",
+        "time": storage.get_config("checkin_time", "04:00") or "04:00",
+        "jitter": storage.get_config("checkin_jitter_minutes", "15") or "15",
+    }
+    checkin_status = {
+        "last_checkin_run": sched.last_checkin_run if sched else None,
+        "next_checkin_run": sched.next_checkin_run if sched else None,
+    }
+    return templates.TemplateResponse(
+        request,
+        "checkins.html",
+        page_ctx(
+            storage,
+            {
+                "request": request,
+                "logs": logs,
+                "checkin_settings": settings,
+                "checkin_status": checkin_status,
+            },
+        ),
+    )
+
+
+@app.post("/checkins/run-now")
+async def run_checkins_now() -> dict[str, Any]:
+    """Run a daily check-in pass immediately (blocking work runs in a thread)."""
+    global scheduler  # noqa: PLW0603 -- mirrors scheduler start/stop/run-once routes
+    if not scheduler:
+        scheduler = create_scheduler_from_storage()
+    try:
+        result = await asyncio.to_thread(scheduler.run_checkins_now)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+    else:
+        return {"success": True, "result": result}
+
+
+@app.post("/checkins/settings")
+async def update_checkin_settings(
+    checkin_enabled: bool = Form(False),
+    checkin_time: str = Form("04:00"),
+    checkin_jitter_minutes: int = Form(15),
+) -> dict[str, Any]:
+    """Update daily check-in schedule settings (form-data)."""
+    storage = Storage()
+    if not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", (checkin_time or "").strip()):
+        raise HTTPException(status_code=400, detail="checkin_time must be HH:MM")
+    if not 0 <= checkin_jitter_minutes <= MAX_CHECKIN_JITTER_MINUTES:
+        raise HTTPException(status_code=400, detail="jitter must be 0..120")
+    storage.set_config("checkin_enabled", "true" if checkin_enabled else "false")
+    storage.set_config("checkin_time", checkin_time.strip())
+    storage.set_config("checkin_jitter_minutes", str(checkin_jitter_minutes))
+    return {"success": True, "message": "Check-in settings saved"}
+
+
+@app.get("/partials/checkin-logs")
+async def partial_checkin_logs(
+    request: Request, game: str = "", status: str = ""
+) -> HTMLResponse:
+    """HTMX partial for check-in history with filters."""
+    storage = Storage()
+    logs = _checkin_logs_with_names(
+        storage, limit=50, game=game or None, status=status or None
+    )
+    return templates.TemplateResponse(
+        request,
+        "partials/checkin_logs.html",
+        page_ctx(storage, {"request": request, "logs": logs}),
+    )
+
+
+@app.get("/api/checkins/status")
+async def api_checkins_status() -> dict[str, Any]:
+    """Today's check-in summary per game as JSON."""
+    storage = Storage()
+    today = datetime.now().date().isoformat()
+    logs = storage.get_checkin_logs(limit=500)
+    by_game: dict[str, dict[str, int]] = {}
+    for row in logs:
+        if row.get("claimed_date") != today:
+            continue
+        entry = by_game.setdefault(row.get("game", "?"), {})
+        entry[row.get("status", "?")] = entry.get(row.get("status", "?"), 0) + 1
+    sched = scheduler.status if scheduler else None
+    return {
+        "date": today,
+        "by_game": by_game,
+        "last_checkin_run": sched.last_checkin_run if sched else None,
+        "next_checkin_run": sched.next_checkin_run if sched else None,
+    }
+
+
+@app.get("/api/checkins/progress")
+async def api_checkins_progress() -> dict[str, Any]:
+    """Current check-in pass progress (empty dict when idle)."""
+    if scheduler is None:
+        return {}
+    return scheduler.get_checkin_progress()
 
 
 def _account_redeem_switch_html(name: str, enabled: bool) -> str:
@@ -776,10 +1000,6 @@ async def redeem_single_code(code: str):
                 claimed = res.success or res.raw_response.get("retcode") in (-2017, -2018)
                 storage.update_code_redemption(
                     row["code"], claimed, res.reward if res.success else None, game=row_game
-                )
-                claimed = res.success or res.raw_response.get("retcode") in (-2017, -2018)
-                storage.update_code_redemption(
-                    row["code"], claimed, res.reward if res.success else None
                 )
                 storage.add_redemption_log(
                     code=row["code"],

@@ -15,11 +15,13 @@ HoYoverse games regularly release time-limited promo codes — and they expire f
 1. The scheduler polls enabled sources, extracts codes (`[A-Z0-9]{8,14}`), stores new ones.
 2. For each account with auto-redeem ON: `GET webExchangeCdkey` with the account's cookies, 8s gap between redemptions.
 3. Result recorded: `success` → Done + reward; `-2017/-2018` → already claimed (counts as Done); `-2001` expired, `-2003` invalid/CN-only.
+4. Daily HoYoLAB check-ins run on their own schedule (default 04:00 + jitter): `info → sign → home` per account × game, same cookies, results on the Check-ins page.
 
 ## Features
 
 - **Background monitoring** — checks sources every N minutes (configurable, default 15)
 - **Auto-redeem** — redeems new codes via Hoyolab `webExchangeCdkey` API (opt-in, per account)
+- **Daily check-ins** — auto sign-in on HoYoLAB for Genshin + Star Rail (opt-in, per account, own schedule, idempotent)
 - **Multi-source** — Wiki, Wiki API, community JSON APIs, guide sites (16 presets, see table)
 - **Multi-account** — each account has its own encrypted cookies and redeem toggle
 - **Statistics** — total / redeemed / pending, per-source breakdown, redemption log
@@ -57,7 +59,7 @@ HoYoverse games regularly release time-limited promo codes — and they expire f
 
 Download the installer from [Releases](https://github.com/retvil/hoyo-code-monitor/releases):
 
-- **Windows** — `hoyo-code-monitor-1.0.0-beta.3-setup.exe` (per-user install, no admin rights needed)
+- **Windows** — `hoyo-code-monitor-1.1.6-setup.exe` (per-user install, no admin rights needed)
 
 Silent install: `setup.exe /S`. Optional components: desktop shortcut, Windows autostart.
 

@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import sqlite3
+import uuid
 from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
@@ -16,6 +17,7 @@ from typing import Any
 
 from cryptography.fernet import Fernet
 
+from src.checkin import STATUS_FAILED, CheckinResult
 from src.migrations import CURRENT_VERSION, run_migrations
 
 logger = logging.getLogger(__name__)
@@ -1091,6 +1093,122 @@ class Storage:
     def set_account_redeem(self, account_name: str, enabled: bool) -> None:
         """Set per-account auto-redeem flag."""
         self.set_config(f"account_redeem_{account_name}", "true" if enabled else "false")
+
+    # --- Check-in log CRUD ---
+
+    def add_checkin_log(self, account_id: int, result: CheckinResult) -> int:
+        """Persist one CheckinResult (one account x game x date).
+
+        Args:
+            account_id: Account row id.
+            result: Classified check-in outcome to store.
+
+        Returns:
+            The ID of the inserted row.
+
+        Raises:
+            sqlite3.IntegrityError: On duplicate (account_id, game, claimed_date).
+        """
+        error = result.message if result.status == STATUS_FAILED else None
+        with self._connection() as conn:
+            cursor = conn.execute(
+                """
+                INSERT INTO checkin_log
+                    (account_id, game, claimed_date, status,
+                     reward_name, reward_amount, error_message)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    account_id,
+                    result.game,
+                    result.claimed_date,
+                    result.status,
+                    result.reward_name,
+                    result.reward_amount,
+                    error,
+                ),
+            )
+            conn.commit()
+            return cursor.lastrowid
+
+    def get_checkin_logs(
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        account_id: int | None = None,
+        game: str | None = None,
+        status: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Get check-in logs with pagination and filters.
+
+        Args:
+            limit: Maximum number of entries to return.
+            offset: Number of entries to skip.
+            account_id: Filter by account row id.
+            game: Filter by game id.
+            status: Filter by status.
+
+        Returns:
+            List of check-in log dictionaries, newest first.
+        """
+        query = "SELECT * FROM checkin_log"
+        conds: list[str] = []
+        params: list[Any] = []
+        if account_id is not None:
+            conds.append("account_id = ?")
+            params.append(account_id)
+        if game:
+            conds.append("game = ?")
+            params.append(game)
+        if status:
+            conds.append("status = ?")
+            params.append(status)
+        if conds:
+            query += " WHERE " + " AND ".join(conds)
+        query += " ORDER BY claimed_date DESC, id DESC LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+        with self._connection() as conn:
+            rows = conn.execute(query, params).fetchall()
+            return [dict(row) for row in rows]
+
+    def last_checkin_status(self, account_id: int, game: str) -> dict[str, Any] | None:
+        """Get the most recent check-in entry for one account x game."""
+        with self._connection() as conn:
+            row = conn.execute(
+                """
+                SELECT * FROM checkin_log
+                WHERE account_id = ? AND game = ?
+                ORDER BY claimed_date DESC, id DESC LIMIT 1
+                """,
+                (account_id, game),
+            ).fetchone()
+            return dict(row) if row else None
+
+    def is_account_checkin_enabled(self, account_name: str) -> bool:
+        """Check per-account auto-check-in flag (falls back to global flag)."""
+        val = self.get_config(f"account_checkin_{account_name}")
+        if val is not None:
+            return val.lower() == "true"
+        fallback = self.get_config("checkin_enabled", "true")
+        return fallback is not None and fallback.lower() == "true"
+
+    def set_account_checkin(self, account_name: str, enabled: bool) -> None:
+        """Set per-account auto-check-in flag."""
+        self.set_config(f"account_checkin_{account_name}", "true" if enabled else "false")
+
+    def get_account_device_id(self, account_name: str) -> str:
+        """Get the stable per-account device id, generating it on first use.
+
+        HoYoLAB binds sessions to x-rpc-device_id; a stable id avoids re-login
+        prompts on every check-in run.
+        """
+        key = f"account_device_{account_name}"
+        existing = self.get_config(key)
+        if existing:
+            return existing
+        device_id = uuid.uuid4().hex
+        self.set_config(key, device_id)
+        return device_id
 
 
 if __name__ == "__main__":

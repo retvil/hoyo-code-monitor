@@ -5,18 +5,39 @@ and attempts redemption if enabled.
 """
 
 import asyncio
+import contextlib
 import logging
+import random
 import sqlite3
 import threading
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from typing import TYPE_CHECKING, Any
+
+import aiohttp
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+from src.checkin import (
+    GAME_CHECKIN_CONF,
+    STATUS_ALREADY_CLAIMED,
+    STATUS_FAILED,
+    STATUS_SUCCESS,
+    CheckinResult,
+    CheckinRunner,
+)
 from src.config import Config, load_config_from_storage
-from src.exceptions import ConfigError
+from src.constants import (
+    CHECKIN_FALLBACK_HOUR,
+    CHECKIN_FALLBACK_MINUTE,
+    DEFAULT_CHECKIN_JITTER_MINUTES,
+    DEFAULT_CHECKIN_TIME,
+    MAX_CHECKIN_HOUR,
+    MAX_CHECKIN_JITTER_MINUTES,
+    MAX_CHECKIN_MINUTE,
+)
+from src.exceptions import CheckinError, ConfigError
 from src.redeemer import Redeemer
 from src.sources import SourceFetcher, seed_default_sources
 from src.storage import Storage
@@ -36,6 +57,11 @@ class SchedulerStatus:
         last_run_codes_found: Number of codes found in last run.
         last_run_codes_redeemed: Number of codes successfully redeemed in last run.
         error_message: Error message from last run if failed.
+        last_checkin_run: Last daily check-in time (ISO format string) or None.
+        last_checkin_success: Whether the last check-in run had no failures.
+        last_checkin_claimed: Games claimed (fresh or earlier) in last check-in run.
+        last_checkin_failed: Failed slots in last check-in run.
+        next_checkin_run: Next scheduled check-in time (ISO format string) or None.
     """
 
     running: bool = False
@@ -45,6 +71,11 @@ class SchedulerStatus:
     last_run_codes_found: int = 0
     last_run_codes_redeemed: int = 0
     error_message: str | None = None
+    last_checkin_run: str | None = None
+    last_checkin_success: bool = True
+    last_checkin_claimed: int = 0
+    last_checkin_failed: int = 0
+    next_checkin_run: str | None = None
 
 
 class Scheduler:
@@ -65,6 +96,7 @@ class Scheduler:
         storage: Storage,
         config: Config | None = None,
         redeemer: Redeemer | None = None,
+        checkin_runner: CheckinRunner | None = None,
     ) -> None:
         """Initialize the scheduler.
 
@@ -72,10 +104,12 @@ class Scheduler:
             storage: Storage instance for database operations.
             config: Configuration instance. If None, loads from storage.
             redeemer: Redeemer instance for code redemption.
+            checkin_runner: Check-in runner for daily sign-ins.
         """
         self.storage = storage
         self.config = config or load_config_from_storage(storage)
         self.redeemer = redeemer or Redeemer()
+        self.checkin_runner = checkin_runner or CheckinRunner()
 
         self._thread: threading.Thread | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
@@ -84,6 +118,11 @@ class Scheduler:
         self._status_lock = threading.Lock()
         self._run_callback: Callable[[], None] | None = None
         self._seed_done = False
+        self._last_checkin_date: str | None = None
+        self._next_checkin_run: datetime | None = None
+        # Check-in progress tracking
+        self._checkin_progress: dict[str, Any] = {}
+        self._checkin_progress_lock = threading.Lock()
 
     @property
     def status(self) -> SchedulerStatus:
@@ -97,6 +136,11 @@ class Scheduler:
                 last_run_codes_found=self._status.last_run_codes_found,
                 last_run_codes_redeemed=self._status.last_run_codes_redeemed,
                 error_message=self._status.error_message,
+                last_checkin_run=self._status.last_checkin_run,
+                last_checkin_success=self._status.last_checkin_success,
+                last_checkin_claimed=self._status.last_checkin_claimed,
+                last_checkin_failed=self._status.last_checkin_failed,
+                next_checkin_run=self._status.next_checkin_run,
             )
 
     def _update_status(self, **kwargs) -> None:
@@ -111,6 +155,220 @@ class Scheduler:
         interval_seconds = getattr(self.config, "poll_interval_seconds", 900)
         next_run = datetime.now().timestamp() + interval_seconds
         return datetime.fromtimestamp(next_run).isoformat()
+
+    def _checkin_enabled(self) -> bool:
+        """Global daily check-in kill-switch (storage config, default on)."""
+        val = self.storage.get_config("checkin_enabled", "true")
+        return val is not None and val.lower() == "true"
+
+    def _parse_checkin_time(self) -> tuple[int, int]:
+        """Parse checkin_time config, falling back to 04:00 on bad values."""
+        raw = self.storage.get_config("checkin_time", DEFAULT_CHECKIN_TIME)
+        raw = raw if raw else DEFAULT_CHECKIN_TIME
+        try:
+            hour_str, minute_str = raw.strip().split(":")
+            hour, minute = int(hour_str), int(minute_str)
+        except (ValueError, IndexError, AttributeError):
+            logger.warning("Invalid checkin_time %r, falling back", raw)
+            return CHECKIN_FALLBACK_HOUR, CHECKIN_FALLBACK_MINUTE
+        if not (0 <= hour <= MAX_CHECKIN_HOUR and 0 <= minute <= MAX_CHECKIN_MINUTE):
+            logger.warning("Invalid checkin_time %r, falling back", raw)
+            return CHECKIN_FALLBACK_HOUR, CHECKIN_FALLBACK_MINUTE
+        return hour, minute
+
+    def _parse_checkin_jitter(self) -> int:
+        """Parse checkin_jitter_minutes config, clamped to a sane range."""
+        try:
+            jitter = int(
+                self.storage.get_config(
+                    "checkin_jitter_minutes", str(DEFAULT_CHECKIN_JITTER_MINUTES)
+                )
+                or DEFAULT_CHECKIN_JITTER_MINUTES
+            )
+        except (TypeError, ValueError):
+            return DEFAULT_CHECKIN_JITTER_MINUTES
+        return max(0, min(jitter, MAX_CHECKIN_JITTER_MINUTES))
+
+    def _next_checkin_datetime(self, now: datetime) -> datetime:
+        """Calculate the next daily check-in time (defensive against bad config)."""
+        hour, minute = self._parse_checkin_time()
+        jitter = self._parse_checkin_jitter()
+        candidate = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        candidate += timedelta(minutes=random.randint(0, jitter))
+        if candidate <= now:
+            candidate += timedelta(days=1)
+        return candidate
+
+    async def _run_checkin_slot(
+        self, acc: dict[str, Any], game: str, today: str, summary: dict[str, Any]
+    ) -> None:
+        """Run one account x game slot, folding the outcome into summary."""
+        cookies = self.storage.load_account_cookies(acc["name"]) or {}
+        device_id = self.storage.get_account_device_id(acc["name"])
+        lang = acc.get("lang", "en-us") or "en-us"
+        # Update progress
+        with self._checkin_progress_lock:
+            self._checkin_progress = {
+                "is_running": True,
+                "current_account": acc["name"],
+                "current_game": game,
+                "today": today,
+            }
+        try:
+            existing = self.storage.last_checkin_status(acc["id"], game)
+            if existing and existing.get("claimed_date") == today:
+                summary["already"] += 1
+                summary["games_claimed"] += 1
+                return
+            result = await self.checkin_runner.run(game, cookies, device_id, today, lang=lang)
+            try:
+                self.storage.add_checkin_log(acc["id"], result)
+            except sqlite3.IntegrityError:
+                summary["already"] += 1
+                summary["games_claimed"] += 1
+                return
+            self._tally_result(acc["name"], game, result, summary)
+        except (TimeoutError, aiohttp.ClientError, CheckinError) as e:
+            logger.exception("Check-in slot failed for %s/%s", acc["name"], game)
+            summary["failed"] += 1
+            summary["errors"].append(f"{acc['name']}/{game}: {e}")
+            with contextlib.suppress(sqlite3.IntegrityError):
+                self.storage.add_checkin_log(
+                    acc["id"], CheckinResult(game, today, STATUS_FAILED, message=str(e))
+                )
+
+    @staticmethod
+    def _tally_result(
+        account_name: str, game: str, result: CheckinResult, summary: dict[str, Any]
+    ) -> None:
+        """Fold one slot result into the pass summary."""
+        if result.status == STATUS_SUCCESS:
+            summary["success_count"] += 1
+            summary["games_claimed"] += 1
+        elif result.status == STATUS_ALREADY_CLAIMED:
+            summary["already"] += 1
+            summary["games_claimed"] += 1
+        elif result.status == STATUS_FAILED:
+            summary["failed"] += 1
+            summary["errors"].append(f"{account_name}/{game}: {result.message}")
+        else:
+            summary["skipped"] += 1
+
+    async def run_daily_checkins(self, claimed_date: str | None = None) -> dict[str, Any]:
+        """Run one daily check-in pass over enabled accounts x games.
+
+        Each slot is isolated: per-slot failures are logged and counted,
+        never aborting the pass. Re-running for the same date is a no-op
+        (slots already logged are skipped).
+
+        Args:
+            claimed_date: Local date YYYY-MM-DD (defaults to today).
+
+        Returns:
+            Summary dict with games_claimed / already / failed / skipped counts.
+        """
+        today = claimed_date or date.today().isoformat()
+        summary: dict[str, Any] = {
+            "success": True,
+            "claimed_date": today,
+            "games_claimed": 0,
+            "success_count": 0,
+            "already": 0,
+            "failed": 0,
+            "skipped": 0,
+            "errors": [],
+        }
+        if not self._checkin_enabled():
+            logger.info("Daily check-ins disabled, skipping")
+            return summary
+
+        accounts = [
+            a for a in self.storage.list_accounts()
+            if self.storage.is_account_checkin_enabled(a["name"])
+        ]
+        if not accounts:
+            logger.info("No accounts with auto-check-in enabled")
+            return summary
+
+        gap = getattr(self.config, "redemption_min_gap_seconds", 8)
+        for acc in accounts:
+            for game in GAME_CHECKIN_CONF:
+                await self._run_checkin_slot(acc, game, today, summary)
+                await asyncio.sleep(gap)
+
+        summary["success"] = summary["failed"] == 0
+        self._update_status(
+            last_checkin_run=datetime.now().isoformat(),
+            last_checkin_success=summary["success"],
+            last_checkin_claimed=summary["games_claimed"],
+            last_checkin_failed=summary["failed"],
+        )
+        # Clear progress when done
+        with self._checkin_progress_lock:
+            self._checkin_progress = {}
+        return summary
+
+    def get_checkin_progress(self) -> dict[str, Any]:
+        """Get current check-in progress (thread-safe).
+
+        Returns:
+            Dict with is_running, current_account, current_game, today.
+        """
+        with self._checkin_progress_lock:
+            return dict(self._checkin_progress)
+
+    def _maybe_run_daily_checkins(self) -> None:
+        """Fire the daily pass when due (called from the background loop)."""
+        try:
+            if not self._checkin_enabled():
+                return
+            today = date.today().isoformat()
+            if self._last_checkin_date == today:
+                return
+            now = datetime.now()
+            if self._next_checkin_run is None:
+                self._next_checkin_run = self._next_checkin_datetime(now)
+            self._update_status(next_checkin_run=self._next_checkin_run.isoformat())
+            if now < self._next_checkin_run:
+                return
+            if self._loop is None:
+                return
+            self._loop.run_until_complete(self.run_daily_checkins(today))
+            self._last_checkin_date = today
+            self._next_checkin_run = self._next_checkin_datetime(datetime.now())
+            self._update_status(next_checkin_run=self._next_checkin_run.isoformat())
+        except Exception:
+            logger.exception("Daily check-in pass failed")
+
+    async def catch_up_missed_checkins(self) -> dict[str, Any] | None:
+        """Run check-ins for today if the scheduled time has passed and no log exists.
+
+        Called on scheduler startup to handle the case where the PC was off during
+        the scheduled check-in time.
+
+        Returns:
+            Summary dict from run_daily_checkins if catch-up was needed, None otherwise.
+        """
+        if not self._checkin_enabled():
+            return None
+        today = date.today().isoformat()
+        if self._last_checkin_date == today:
+            return None
+        now = datetime.now()
+        # Check if scheduled time has already passed today
+        hour, minute = self._parse_checkin_time()
+        scheduled_today = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        if now < scheduled_today:
+            return None  # Scheduled time hasn't passed yet today
+        # Check if any log entry exists for today
+        logs = self.storage.get_checkin_logs(limit=1)
+        if logs and logs[0].get("claimed_date") == today:
+            self._last_checkin_date = today
+            return None
+        logger.info("Catch-up: running missed check-ins for %s", today)
+        result = await self.run_daily_checkins(today)
+        self._last_checkin_date = today
+        return result
 
     async def _run_check_cycle(self) -> dict[str, Any]:
         """Run a single check cycle: scrape sources, store codes, attempt redemption.
@@ -306,6 +564,12 @@ class Scheduler:
             interval_seconds = getattr(self.config, "poll_interval_seconds", 900)
             logger.info("Scheduler started with interval %d seconds", interval_seconds)
 
+            # Catch up on missed check-ins once at startup (same thread: no DB contention)
+            try:
+                self._loop.run_until_complete(self.catch_up_missed_checkins())
+            except Exception:
+                logger.exception("Check-in catch-up failed")
+
             while not self._stop_event.is_set():
                 # Run check cycle
                 cycle_start = datetime.now()
@@ -331,6 +595,9 @@ class Scheduler:
                 # Calculate next run
                 next_run = self._calculate_next_run()
                 self._update_status(next_run=next_run)
+
+                # Daily HoYoLAB check-ins (independent pipeline, own schedule)
+                self._maybe_run_daily_checkins()
 
                 # Wait for interval or stop event
                 wait_seconds = getattr(self.config, "poll_interval_seconds", 900)
@@ -403,7 +670,16 @@ class Scheduler:
 
         self._thread = None
         logger.info("Scheduler stopped gracefully")
+        # Close the check-in runner's HTTP session (best-effort, non-blocking)
+        try:
+            asyncio.run(self.close())
+        except Exception:
+            logger.debug("Failed to close check-in runner", exc_info=True)
         return True
+
+    async def close(self) -> None:
+        """Close the check-in runner's underlying HTTP session."""
+        await self.checkin_runner.close()
 
     def run_once(self) -> dict[str, Any]:
         """Run a single check cycle immediately (blocking).
@@ -415,6 +691,22 @@ class Scheduler:
         loop = asyncio.new_event_loop()
         try:
             return loop.run_until_complete(self._run_check_cycle())
+        finally:
+            loop.close()
+
+    def run_checkins_now(self, claimed_date: str | None = None) -> dict[str, Any]:
+        """Run a daily check-in pass immediately (blocking, for manual triggers).
+
+        Args:
+            claimed_date: Local date YYYY-MM-DD (defaults to today).
+
+        Returns:
+            Summary dict from run_daily_checkins.
+        """
+        logger.info("Running daily check-ins on demand...")
+        loop = asyncio.new_event_loop()
+        try:
+            return loop.run_until_complete(self.run_daily_checkins(claimed_date))
         finally:
             loop.close()
 

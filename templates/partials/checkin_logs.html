@@ -1,0 +1,25 @@
+{% if logs %}
+<div class="table-scroll">
+<table>
+    <thead><tr><th>{{ t('checkin_date') }}</th><th>{{ t('checkin_account') }}</th><th>{{ t('game') }}</th><th>{{ t('status') }}</th><th>{{ t('reward') }}</th></tr></thead>
+    <tbody>
+        {% for row in logs %}
+        <tr>
+            <td class="mono">{{ row.claimed_date }}</td>
+            <td>{{ row.account_name }}</td>
+            <td>{{ row.game }}</td>
+            <td>
+                {% if row.status == 'success' %}<span class="badge badge-ok">{{ row.status }}</span>
+                {% elif row.status == 'failed' %}<span class="badge badge-bad">{{ row.status }}</span>
+                {% else %}<span class="badge badge-info">{{ row.status }}</span>{% endif %}
+                {% if row.error_message %}<div class="muted" style="font-size: 0.8rem;">{{ row.error_message }}</div>{% endif %}
+            </td>
+            <td>{% if row.reward_name %}{{ row.reward_name }} x{{ row.reward_amount }}{% else %}—{% endif %}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+{% else %}
+<p class="muted">{{ t('checkin_no_logs') }}</p>
+{% endif %}

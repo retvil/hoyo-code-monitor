@@ -15,11 +15,13 @@ HoYoverse 游戏会定期发布限时兑换码 —— 而且很快过期。**HoY
 1. 调度器抓取已启用的来源，提取兑换码 (`[A-Z0-9]{8,14}`) 并保存新增。
 2. 对每个开启自动兑换的账号：携带账号 Cookie 调用 `GET webExchangeCdkey`，每次兑换间隔 8 秒。
 3. 记录结果：`success` → Done + 奖励；`-2017/-2018` → 已兑换过 (记为 Done)；`-2001` 已过期，`-2003` 无效/仅限国服。
+4. HoYoLAB 每日签到按独立计划执行 (默认 04:00 + 抖动)：每个账号 × 游戏 `info → sign → home`，使用相同 Cookie，结果见 Check-ins 页面。
 
 ## 功能
 
 - **后台监控** — 每 N 分钟检查来源 (可配置，默认 15 分钟)
 - **自动兑换** — 通过 HoYolab `webExchangeCdkey` API 兑换新码 (可选，按账号开关)
+- **每日签到** — HoYoLAB 自动签到 (原神 + 星铁，可选，按账号开关，独立计划，幂等)
 - **多来源** — Wiki、Wiki API、社区 JSON API、攻略站 (16 个预设)
 - **多账号** — 每个账号独立加密 Cookie 和兑换开关
 - **统计** — 总数 / 已兑换 / 待处理、按来源统计、兑换日志
@@ -57,7 +59,7 @@ HoYoverse 游戏会定期发布限时兑换码 —— 而且很快过期。**HoY
 
 从 [Releases](https://github.com/retvil/hoyo-code-monitor/releases) 下载安装程序：
 
-- **Windows** — `hoyo-code-monitor-1.0.0-beta.3-setup.exe` (按用户安装，无需管理员权限)
+- **Windows** — `hoyo-code-monitor-1.1.6-setup.exe` (按用户安装，无需管理员权限)
 
 静默安装：`setup.exe /S`。可选组件：桌面快捷方式、Windows 开机自启。
 
