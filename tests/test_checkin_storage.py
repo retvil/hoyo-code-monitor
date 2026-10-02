@@ -118,6 +118,13 @@ class TestCheckinLogCRUD:
         assert last is not None
         assert last["status"] == "already_claimed"
 
+    def test_delete_log(self, storage: Storage, account_id: int) -> None:
+        """Delete removes one entry; missing entry returns False."""
+        storage.add_checkin_log(account_id, success_result())
+        assert storage.delete_checkin_log(account_id, "genshin", "2026-09-24") is True
+        assert storage.get_checkin_logs() == []
+        assert storage.delete_checkin_log(account_id, "genshin", "2026-09-24") is False
+
 
 class TestCheckinToggles:
     """Tests for per-account check-in flags and device ids."""

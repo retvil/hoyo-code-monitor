@@ -121,6 +121,48 @@ async def test_run_daily_checkins_updates_status(storage: Storage, account_id: i
 
 
 @pytest.mark.asyncio
+async def test_failed_row_today_is_retried(storage: Storage, account_id: int) -> None:
+    """A failed entry for today does not block a retry (morning fail, noon cookies)."""
+    assert account_id > 0
+    storage.add_checkin_log(
+        account_id, CheckinResult("genshin", "2026-09-24", "failed", message="no cookies")
+    )
+    storage.add_checkin_log(
+        account_id, CheckinResult("hsr", "2026-09-24", "failed", message="no cookies")
+    )
+    transport = FakeTransport(sign=[make_sign(), make_sign()])
+    scheduler = make_scheduler(storage, transport)
+    result = await scheduler.run_daily_checkins("2026-09-24")
+
+    assert result["failed"] == 0
+    assert result["games_claimed"] == EXPECTED_GAMES_CLAIMED
+    assert transport.count("POST", "/sign") == EXPECTED_GAMES_CLAIMED
+    rows = storage.get_checkin_logs()
+    assert len(rows) == EXPECTED_LOG_COUNT
+    assert {row["status"] for row in rows} == {"success"}
+
+
+@pytest.mark.asyncio
+async def test_success_row_today_is_skipped(storage: Storage, account_id: int) -> None:
+    """A success entry for today is never re-claimed."""
+    assert account_id > 0
+    storage.add_checkin_log(
+        account_id,
+        CheckinResult("genshin", "2026-09-24", "success", "Primogem", 100),
+    )
+    storage.add_checkin_log(
+        account_id,
+        CheckinResult("hsr", "2026-09-24", "already_claimed"),
+    )
+    transport = FakeTransport(sign=[make_sign(), make_sign()])
+    scheduler = make_scheduler(storage, transport)
+    result = await scheduler.run_daily_checkins("2026-09-24")
+
+    assert result["already"] == EXPECTED_GAMES_CLAIMED
+    assert transport.calls == []
+
+
+@pytest.mark.asyncio
 async def test_run_daily_checkins_sign_failure_logged(
     storage: Storage, account_id: int
 ) -> None:
@@ -251,6 +293,23 @@ class TestCatchUpMissedCheckins:
         scheduler = make_scheduler(storage, FakeTransport())
         result = await scheduler.catch_up_missed_checkins()
         assert result is None
+
+    @pytest.mark.asyncio
+    async def test_catch_up_runs_with_failed_row_today(
+        self, storage: Storage, account_id: int
+    ) -> None:
+        """A failed entry for today does not block catch-up."""
+        assert account_id > 0
+        storage.set_config("checkin_time", "01:00")  # already passed
+        storage.set_config("checkin_jitter_minutes", "0")
+        storage.add_checkin_log(
+            account_id, CheckinResult("genshin", date.today().isoformat(), "failed")
+        )
+        transport = FakeTransport(sign=[make_sign(), make_sign()])
+        scheduler = make_scheduler(storage, transport)
+        result = await scheduler.catch_up_missed_checkins()
+        assert result is not None
+        assert result["failed"] == 0
 
     @pytest.mark.asyncio
     async def test_catch_up_skips_when_time_not_passed(self, storage: Storage) -> None:

@@ -216,10 +216,17 @@ class Scheduler:
             }
         try:
             existing = self.storage.last_checkin_status(acc["id"], game)
-            if existing and existing.get("claimed_date") == today:
+            if (
+                existing
+                and existing.get("claimed_date") == today
+                and existing.get("status") in (STATUS_SUCCESS, STATUS_ALREADY_CLAIMED)
+            ):
                 summary["already"] += 1
                 summary["games_claimed"] += 1
                 return
+            if existing and existing.get("claimed_date") == today:
+                # Stale failed/skipped row: clear it so the retry can insert fresh.
+                self.storage.delete_checkin_log(acc["id"], game, today)
             result = await self.checkin_runner.run(game, cookies, device_id, today, lang=lang)
             try:
                 self.storage.add_checkin_log(acc["id"], result)
@@ -360,9 +367,17 @@ class Scheduler:
         scheduled_today = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
         if now < scheduled_today:
             return None  # Scheduled time hasn't passed yet today
-        # Check if any log entry exists for today
-        logs = self.storage.get_checkin_logs(limit=1)
-        if logs and logs[0].get("claimed_date") == today:
+        # Skip only if today already has terminal (claimed) entries and nothing
+        # failed/skipped waiting for a retry.
+        today_rows = [
+            row
+            for row in self.storage.get_checkin_logs(limit=500)
+            if row.get("claimed_date") == today
+        ]
+        if today_rows and all(
+            row.get("status") in (STATUS_SUCCESS, STATUS_ALREADY_CLAIMED)
+            for row in today_rows
+        ):
             self._last_checkin_date = today
             return None
         logger.info("Catch-up: running missed check-ins for %s", today)

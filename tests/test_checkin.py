@@ -202,6 +202,22 @@ class TestRunSuccess:
         assert transport.count("GET", "/info") == 1
         assert transport.count("POST", "/sign") == 1
 
+    @pytest.mark.asyncio
+    async def test_run_success_with_full_date(self, cookies: dict) -> None:
+        """Real API returns today as YYYY-MM-DD, not a day number."""
+        home = make_home()
+        home["data"]["awards"] = [
+            {"name": "Mora", "cnt": 5000},
+            {"name": "Primogem", "cnt": 100},
+        ]
+        transport = FakeTransport(info=make_info(today="2026-10-02"), home=home)
+        runner = CheckinRunner(transport=transport, retry_base_delay=0.0)
+        result = await runner.run("genshin", cookies, "dev-1", "2026-10-02")
+
+        assert result.status == "success"
+        assert result.reward_name == "Primogem"
+        assert result.reward_amount == EXPECTED_REWARD_AMOUNT
+
 
 class TestRunAlreadyClaimed:
     """Already-signed paths never call /sign."""

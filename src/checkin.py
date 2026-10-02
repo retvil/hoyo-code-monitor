@@ -59,6 +59,18 @@ STATUS_SKIPPED: str = "skipped"
 # DS salt for overseas HoYoLAB (public constant, cf. genshin.py utility/ds.py, MIT).
 OS_DS_SALT: str = "6s25p5ox5y14umn1a8aafuwvlvogknd"
 
+
+def _parse_today(raw: object) -> int:
+    """Parse the /info `today` field into a day-of-month number.
+
+    The API returns either a day number ("3") or a full date ("2026-10-02");
+    both are accepted, anything else yields 0.
+    """
+    try:
+        return int(str(raw).split("-")[-1])
+    except (TypeError, ValueError):
+        return 0
+
 # Length of the random part in the DS signature.
 DS_RANDOM_LENGTH: int = 6
 
@@ -371,7 +383,7 @@ class CheckinRunner:
         return {
             "retcode": data.get("retcode", -1),
             "message": data.get("message", "Unknown error"),
-            "today": int(payload.get("today") or 0),
+            "today": _parse_today(payload.get("today")),
             "total_sign_day": int(payload.get("total_sign_day") or 0),
             "is_sign": bool(payload.get("is_sign", False)),
             "first_bind": bool(payload.get("first_bind", False)),

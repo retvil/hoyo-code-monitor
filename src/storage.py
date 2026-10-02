@@ -1171,6 +1171,23 @@ class Storage:
             rows = conn.execute(query, params).fetchall()
             return [dict(row) for row in rows]
 
+    def delete_checkin_log(self, account_id: int, game: str, claimed_date: str) -> bool:
+        """Delete one check-in entry (used to clear failed/skipped rows before retry).
+
+        Returns:
+            True if a row was deleted.
+        """
+        with self._connection() as conn:
+            cursor = conn.execute(
+                """
+                DELETE FROM checkin_log
+                WHERE account_id = ? AND game = ? AND claimed_date = ?
+                """,
+                (account_id, game, claimed_date),
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+
     def last_checkin_status(self, account_id: int, game: str) -> dict[str, Any] | None:
         """Get the most recent check-in entry for one account x game."""
         with self._connection() as conn:

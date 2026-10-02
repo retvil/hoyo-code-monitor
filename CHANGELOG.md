@@ -17,6 +17,11 @@
   legacy hardcoded list instead of the full `SOURCE_PRESETS` (25 presets). Now seeds
   all presets with name/URL dedup (upgrades never duplicate) and seeds on app startup,
   so the Sources page is populated before the first scheduler cycle
+- **Check-in retries were silently skipped**: slots with a `failed`/`skipped` entry for
+  today were treated as done, so pressing "Claim now" after fixing cookies did nothing.
+  Only `success`/`already_claimed` now count as done; failed rows are cleared and retried.
+  Also fixed `/info` `today` parsing (real API returns `YYYY-MM-DD`, not a day number),
+  which crashed claims with `ValueError`
 
 ### Fixed
 - **Account auto-login crashed with bare 500 in frozen builds**: Playwright looked for
