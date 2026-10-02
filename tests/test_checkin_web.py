@@ -136,6 +136,23 @@ class TestRunNow:
         assert "checkin-progress" in page
 
 
+class TestAccountCookieBadge:
+    """Accounts page warns about missing cookies."""
+
+    def test_badge_without_cookies(self, client: TestClient, temp_db: str) -> None:
+        """Account without cookies shows the warning badge."""
+        Storage(temp_db).add_account("nocookies", "1", "os_euro")
+        page = client.get("/accounts").text
+        assert "nocookies</strong> <span" in page
+        assert "badge-bad" in page
+
+    def test_no_badge_with_cookies(self, client: TestClient, account: str) -> None:
+        """Account with cookies shows no warning badge."""
+        assert account == "traveler"
+        page = client.get("/accounts").text
+        assert "traveler</strong> <span" not in page
+
+
 class TestCheckinProgress:
     """Tests for check-in progress tracking."""
 

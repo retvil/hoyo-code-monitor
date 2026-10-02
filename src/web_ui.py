@@ -380,6 +380,9 @@ async def accounts_page(request: Request):
     """Accounts management page."""
     storage = Storage()
     accounts = storage.list_accounts()
+    for acc in accounts:
+        cookies = storage.load_account_cookies(acc["name"]) or {}
+        acc["has_cookies"] = bool(cookies.get("ltuid") and cookies.get("ltoken"))
     return templates.TemplateResponse(
         request,
         "accounts.html",

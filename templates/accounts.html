@@ -14,7 +14,7 @@
         <tbody>
             {% for acc in accounts %}
             <tr>
-                <td><strong>{{ acc.name }}</strong></td>
+                <td><strong>{{ acc.name }}</strong>{% if not acc.has_cookies %} <span class="badge badge-bad" title="{{ t('checkin_cookie_hint') }}">{{ t('no_cookies') }}</span>{% endif %}</td>
                 <td class="mono">{{ acc.uid }}</td>
                 <td>{{ acc.region }}</td>
                 <td>{% if acc.game in game_accents %}<span class="badge" style="background: {{ game_accents[acc.game].accent }}22; color: {{ game_accents[acc.game].accent }};">{{ game_accents[acc.game].short }}</span>{% else %}<span class="badge badge-info">{{ acc.game or 'genshin' }}</span>{% endif %}</td>
