@@ -13,6 +13,12 @@
   41 new tests (runner, storage, scheduler, web UI)
 
 ### Fixed
+- **Fresh installs showed an incomplete sources list**: `seed_default_sources` used a
+  legacy hardcoded list instead of the full `SOURCE_PRESETS` (25 presets). Now seeds
+  all presets with name/URL dedup (upgrades never duplicate) and seeds on app startup,
+  so the Sources page is populated before the first scheduler cycle
+
+### Fixed
 - **Account auto-login crashed with bare 500 in frozen builds**: Playwright looked for
   browsers inside the bundle temp dir (`_MEI...\playwright\driver\package\.local-browsers`).
   Now `PLAYWRIGHT_BROWSERS_PATH` points to `%LOCALAPPDATA%\HoYoCodeMonitor\ms-playwright`
