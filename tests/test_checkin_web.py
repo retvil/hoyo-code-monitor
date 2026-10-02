@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from test_checkin import FakeTransport, make_sign
 
 from src import web_ui
-from src.checkin import CheckinRunner
+from src.checkin import GAME_CHECKIN_CONF, CheckinRunner
 from src.scheduler import Scheduler
 from src.storage import Storage
 
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 HTTP_OK: int = 200
 HTTP_BAD_REQUEST: int = 400
 HTTP_NOT_FOUND: int = 404
-EXPECTED_GAMES_CLAIMED: int = 2
+EXPECTED_GAMES_CLAIMED: int = len(GAME_CHECKIN_CONF)
 
 
 @pytest.fixture
@@ -120,7 +120,7 @@ class TestRunNow:
         """Manual run performs claims via injected fake transport."""
         assert account == "traveler"
         storage = Storage(temp_db)
-        fake = FakeTransport(sign=[make_sign(), make_sign()])
+        fake = FakeTransport(sign=[make_sign() for _ in GAME_CHECKIN_CONF])
         runner = CheckinRunner(transport=fake, retry_base_delay=0.0)
         config = SimpleNamespace(redemption_min_gap_seconds=0)
         sched = Scheduler(storage=storage, config=config, checkin_runner=runner)
@@ -168,7 +168,7 @@ class TestCheckinProgress:
         """Progress endpoint returns current account/game during a pass."""
         assert account == "traveler"
         storage = Storage(temp_db)
-        fake = FakeTransport(sign=[make_sign(), make_sign()])
+        fake = FakeTransport(sign=[make_sign() for _ in GAME_CHECKIN_CONF])
         runner = CheckinRunner(transport=fake, retry_base_delay=0.0)
         config = SimpleNamespace(redemption_min_gap_seconds=0)
         web_ui.scheduler = Scheduler(storage=storage, config=config, checkin_runner=runner)

@@ -28,8 +28,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# --- Per-game check-in configuration (MVP: genshin + hsr, overseas) ---
-# act_id / base_url values mirror genshin.py REWARD_URL (MIT, seriaati/genshin.py).
+# --- Per-game check-in configuration (overseas) ---
+# act_id / base_url values mirror SIMNet REWARD_URL (MIT, PaiGramTeam/SIMNet).
+# signgame: "hk4e" (genshin) and "zzz" are required by HoYoLAB; hsr/hi3 work
+# without it (matches reference clients). ToT pending: no verified OS act_id.
 GAME_CHECKIN_CONF: dict[str, dict[str, str]] = {
     "genshin": {
         "name": "Genshin Impact",
@@ -42,6 +44,18 @@ GAME_CHECKIN_CONF: dict[str, dict[str, str]] = {
         "base_url": "https://sg-public-api.hoyolab.com/event/luna/os",
         "act_id": "e202303301540311",
         "sign_game": "hkrpg",
+    },
+    "zzz": {
+        "name": "Zenless Zone Zero",
+        "base_url": "https://sg-act-nap-api.hoyolab.com/event/luna/zzz/os",
+        "act_id": "e202406031448091",
+        "sign_game": "zzz",
+    },
+    "hi3": {
+        "name": "Honkai Impact 3rd",
+        "base_url": "https://sg-public-api.hoyolab.com/event/mani",
+        "act_id": "e202110291205111",
+        "sign_game": "",
     },
 }
 
@@ -303,19 +317,21 @@ class CheckinRunner:
         """
         conf = self._conf(ctx.game)
         cookie_parts = [f"{k}={v}" for k, v in cookies.items() if v]
-        return {
+        headers = {
             "Cookie": "; ".join(cookie_parts),
             "User-Agent": self.DEFAULT_USER_AGENT,
             "Accept": "application/json, text/plain, */*",
             "Referer": self.DEFAULT_REFERER,
             "Origin": "https://act.hoyolab.com",
-            "x-rpc-signgame": conf["sign_game"],
             "x-rpc-client_type": "4",
             "x-rpc-app_version": "2.34.1",
             "x-rpc-device_id": ctx.device_id,
             "x-rpc-language": ctx.lang,
             "DS": self.generate_ds(body=body, query=query),
         }
+        if conf["sign_game"]:
+            headers["x-rpc-signgame"] = conf["sign_game"]
+        return headers
 
     async def _call_with_retry(
         self, label: str, fn: Callable[[], Coroutine[Any, Any, dict[str, Any]]]

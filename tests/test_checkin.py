@@ -127,21 +127,24 @@ class TestGameCheckinConf:
     """Tests for the per-game check-in configuration table."""
 
     def test_mvp_games_present(self) -> None:
-        """MVP covers genshin + hsr."""
+        """MVP covers genshin + hsr; wave 2 adds zzz + hi3."""
         assert "genshin" in GAME_CHECKIN_CONF
         assert "hsr" in GAME_CHECKIN_CONF
+        assert "zzz" in GAME_CHECKIN_CONF
+        assert "hi3" in GAME_CHECKIN_CONF
 
     def test_entries_have_required_fields(self) -> None:
-        """Each entry carries base_url, act_id and sign_game."""
+        """Each entry carries base_url and act_id (sign_game may be empty = omit)."""
         for game, conf in GAME_CHECKIN_CONF.items():
             assert conf["base_url"].startswith("https://"), game
             assert conf["act_id"].startswith("e"), game
-            assert conf["sign_game"], game
+            assert "sign_game" in conf, game
 
     def test_sign_game_mapping(self) -> None:
         """x-rpc-signgame values match HoYoLAB expectations."""
         assert GAME_CHECKIN_CONF["genshin"]["sign_game"] == "hk4e"
         assert GAME_CHECKIN_CONF["hsr"]["sign_game"] == "hkrpg"
+        assert GAME_CHECKIN_CONF["zzz"]["sign_game"] == "zzz"
 
 
 class TestGenerateDs:
@@ -181,6 +184,11 @@ class TestBuildHeaders:
         """HSR uses the hkrpg signgame."""
         headers = runner.build_headers(cookies, CheckinContext("hsr", "dev-1"))
         assert headers["x-rpc-signgame"] == "hkrpg"
+
+    def test_headers_hi3_omits_signgame(self, runner: CheckinRunner, cookies: dict) -> None:
+        """HI3 sends no signgame header (matches reference clients)."""
+        headers = runner.build_headers(cookies, CheckinContext("hi3", "dev-1"))
+        assert "x-rpc-signgame" not in headers
 
 
 class TestRunSuccess:

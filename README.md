@@ -21,7 +21,7 @@ HoYoverse games regularly release time-limited promo codes — and they expire f
 
 - **Background monitoring** — checks sources every N minutes (configurable, default 15)
 - **Auto-redeem** — redeems new codes via Hoyolab `webExchangeCdkey` API (opt-in, per account)
-- **Daily check-ins** — auto sign-in on HoYoLAB for Genshin + Star Rail (opt-in, per account, own schedule, idempotent)
+- **Daily check-ins** — auto sign-in on HoYoLAB for Genshin, Star Rail, ZZZ + HI3 (opt-in, per account, own schedule, idempotent)
 - **Multi-source** — Wiki, Wiki API, community JSON APIs, guide sites (16 presets, see table)
 - **Multi-account** — each account has its own encrypted cookies and redeem toggle
 - **Statistics** — total / redeemed / pending, per-source breakdown, redemption log

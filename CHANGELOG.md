@@ -11,6 +11,9 @@
   (migration v13, `checkin_log` table); stable per-account `device_id` avoids re-logins.
   Retcode `-5003` treated as already-claimed, expired cookies surface a refresh hint.
   41 new tests (runner, storage, scheduler, web UI)
+- **Check-in wave 2**: Zenless Zone Zero and Honkai Impact 3rd (endpoints verified
+  against SIMNet/MihoyoBBSTools references; ToT pending — no verified OS act_id).
+  HI3 sends no `x-rpc-signgame`, like the reference clients
 
 ### Fixed
 - **Fresh installs showed an incomplete sources list**: `seed_default_sources` used a

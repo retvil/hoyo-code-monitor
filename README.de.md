@@ -21,7 +21,7 @@ HoYoverse-Spiele veröffentlichen regelmäßig zeitlich begrenzte Promocodes —
 
 - **Hintergrundüberwachung** — prüft Quellen alle N Minuten (konfigurierbar, Standard 15)
 - **Auto-Einlösung** — löst neue Codes über die Hoyolab `webExchangeCdkey` API ein (opt-in, pro Konto)
-- **Tägliche Check-ins** — automatische Anmeldung bei HoYoLAB für Genshin + Star Rail (opt-in, pro Konto, eigener Zeitplan, idempotent)
+- **Tägliche Check-ins** — automatische Anmeldung bei HoYoLAB für Genshin, Star Rail, ZZZ + HI3 (opt-in, pro Konto, eigener Zeitplan, idempotent)
 - **Multi-Source** — Wiki, Wiki-API, Community-JSON-APIs, Guide-Seiten (16 Presets)
 - **Multi-Account** — jedes Konto hat eigene verschlüsselte Cookies und eigenen Schalter
 - **Statistik** — gesamt / eingelöst / ausstehend, pro Quelle, Einlöseprotokoll

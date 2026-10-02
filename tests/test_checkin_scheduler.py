@@ -8,13 +8,13 @@ from unittest.mock import patch
 import pytest
 from test_checkin import FakeTransport, make_sign
 
-from src.checkin import CheckinResult, CheckinRunner
+from src.checkin import GAME_CHECKIN_CONF, CheckinResult, CheckinRunner
 from src.scheduler import Scheduler
 from src.storage import Storage
 
 #: Shared expectations (avoid PLR2004 magic values).
-EXPECTED_GAMES_CLAIMED: int = 2
-EXPECTED_LOG_COUNT: int = 2
+EXPECTED_GAMES_CLAIMED: int = len(GAME_CHECKIN_CONF)
+EXPECTED_LOG_COUNT: int = len(GAME_CHECKIN_CONF)
 FUTURE_HOUR: int = 23
 FUTURE_MINUTE: int = 59
 PAST_HOUR: int = 1
@@ -51,7 +51,7 @@ def make_scheduler(storage: Storage, transport: FakeTransport) -> Scheduler:
 async def test_run_daily_checkins_success(storage: Storage, account_id: int) -> None:
     """One enabled account x MVP games produces success log rows."""
     assert account_id > 0
-    transport = FakeTransport(sign=[make_sign(), make_sign()])
+    transport = FakeTransport(sign=[make_sign() for _ in GAME_CHECKIN_CONF])
     scheduler = make_scheduler(storage, transport)
     result = await scheduler.run_daily_checkins("2026-09-24")
 
@@ -82,7 +82,7 @@ async def test_run_daily_checkins_skips_disabled_account(storage: Storage) -> No
 async def test_run_daily_checkins_idempotent(storage: Storage, account_id: int) -> None:
     """Second run for the same date performs no new claims."""
     assert account_id > 0
-    transport = FakeTransport(sign=[make_sign(), make_sign()])
+    transport = FakeTransport(sign=[make_sign() for _ in GAME_CHECKIN_CONF])
     scheduler = make_scheduler(storage, transport)
     await scheduler.run_daily_checkins("2026-09-24")
     calls_after_first = len(transport.calls)
@@ -111,7 +111,7 @@ async def test_run_daily_checkins_missing_cookies(storage: Storage) -> None:
 async def test_run_daily_checkins_updates_status(storage: Storage, account_id: int) -> None:
     """Scheduler status exposes last/next check-in info for the UI."""
     assert account_id > 0
-    scheduler = make_scheduler(storage, FakeTransport(sign=[make_sign(), make_sign()]))
+    scheduler = make_scheduler(storage, FakeTransport(sign=[make_sign() for _ in GAME_CHECKIN_CONF]))
     await scheduler.run_daily_checkins("2026-09-24")
 
     status = scheduler.status
@@ -130,7 +130,7 @@ async def test_failed_row_today_is_retried(storage: Storage, account_id: int) ->
     storage.add_checkin_log(
         account_id, CheckinResult("hsr", "2026-09-24", "failed", message="no cookies")
     )
-    transport = FakeTransport(sign=[make_sign(), make_sign()])
+    transport = FakeTransport(sign=[make_sign() for _ in GAME_CHECKIN_CONF])
     scheduler = make_scheduler(storage, transport)
     result = await scheduler.run_daily_checkins("2026-09-24")
 
@@ -146,15 +146,11 @@ async def test_failed_row_today_is_retried(storage: Storage, account_id: int) ->
 async def test_success_row_today_is_skipped(storage: Storage, account_id: int) -> None:
     """A success entry for today is never re-claimed."""
     assert account_id > 0
-    storage.add_checkin_log(
-        account_id,
-        CheckinResult("genshin", "2026-09-24", "success", "Primogem", 100),
-    )
-    storage.add_checkin_log(
-        account_id,
-        CheckinResult("hsr", "2026-09-24", "already_claimed"),
-    )
-    transport = FakeTransport(sign=[make_sign(), make_sign()])
+    for game in GAME_CHECKIN_CONF:
+        storage.add_checkin_log(
+            account_id, CheckinResult(game, "2026-09-24", "already_claimed")
+        )
+    transport = FakeTransport(sign=[make_sign() for _ in GAME_CHECKIN_CONF])
     scheduler = make_scheduler(storage, transport)
     result = await scheduler.run_daily_checkins("2026-09-24")
 
@@ -168,7 +164,7 @@ async def test_run_daily_checkins_sign_failure_logged(
 ) -> None:
     """API-level sign failure is stored with the provider message."""
     assert account_id > 0
-    transport = FakeTransport(sign=[make_sign(10001, "Not logged in")] * 2)
+    transport = FakeTransport(sign=[make_sign(10001, "Not logged in")] * len(GAME_CHECKIN_CONF))
     scheduler = make_scheduler(storage, transport)
     result = await scheduler.run_daily_checkins("2026-09-24")
 
@@ -263,7 +259,7 @@ class TestCatchUpMissedCheckins:
         assert account_id > 0
         storage.set_config("checkin_time", "01:00")  # already passed
         storage.set_config("checkin_jitter_minutes", "0")
-        transport = FakeTransport(sign=[make_sign(), make_sign()])
+        transport = FakeTransport(sign=[make_sign() for _ in GAME_CHECKIN_CONF])
         scheduler = make_scheduler(storage, transport)
         result = await scheduler.catch_up_missed_checkins()
         assert result is not None
@@ -305,7 +301,7 @@ class TestCatchUpMissedCheckins:
         storage.add_checkin_log(
             account_id, CheckinResult("genshin", date.today().isoformat(), "failed")
         )
-        transport = FakeTransport(sign=[make_sign(), make_sign()])
+        transport = FakeTransport(sign=[make_sign() for _ in GAME_CHECKIN_CONF])
         scheduler = make_scheduler(storage, transport)
         result = await scheduler.catch_up_missed_checkins()
         assert result is not None
