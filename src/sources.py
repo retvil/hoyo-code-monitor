@@ -971,9 +971,20 @@ def list_presets() -> list[str]:
 
 
 async def seed_default_sources(storage: Storage) -> int:
-    """Seed database with default sources if not present."""
+    """Seed database with all known presets if not present (idempotent).
+
+    Seeds from SOURCE_PRESETS (the full researched list). Presets whose name
+    or URL already exists (e.g. legacy names from older versions) are skipped,
+    so upgrades never create duplicates.
+    """
     count = 0
-    for source in create_default_sources():
+    existing = storage.list_sources()
+    existing_names = {s["name"] for s in existing}
+    existing_urls = {s["url"] for s in existing}
+    for source in SOURCE_PRESETS.values():
+        if source.name in existing_names or source.url in existing_urls:
+            logger.debug("Source already exists: %s", source.name)
+            continue
         try:
             storage.add_source(
                 name=source.name,
@@ -991,13 +1002,15 @@ async def seed_default_sources(storage: Storage) -> int:
                 retry_base_delay=source.retry_base_delay,
                 game=source.game,
             )
+            existing_names.add(source.name)
+            existing_urls.add(source.url)
             count += 1
             logger.info("Seeded source: %s", source.name)
         except Exception as e:
             if "UNIQUE constraint failed" in str(e):
                 logger.debug("Source already exists: %s", source.name)
             else:
-                logger.error("Failed to seed source %s: %s", source.name, e)
+                logger.exception("Failed to seed source %s", source.name)
     return count
 
 

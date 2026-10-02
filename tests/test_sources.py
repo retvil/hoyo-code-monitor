@@ -10,6 +10,7 @@ import pytest
 
 from src.sources import (
     EXTRACTORS,
+    SOURCE_PRESETS,
     CSSExtractor,
     JSONExtractor,
     RegexExtractor,
@@ -18,6 +19,7 @@ from src.sources import (
     XPathExtractor,
     create_default_sources,
     get_extractor,
+    list_presets,
     register_extractor,
     seed_default_sources,
 )
@@ -369,18 +371,32 @@ class TestSeedDefaultSources:
     @pytest.mark.asyncio
     async def test_seed_creates_sources(self, storage: Storage) -> None:
         count = await seed_default_sources(storage)
-        assert count >= 2
+        assert count == len(SOURCE_PRESETS)
 
         sources = storage.list_sources()
         names = {s["name"] for s in sources}
-        assert "wiki" in names
-        assert "wiki_api" in names
+        for preset in list_presets():
+            assert preset in names
 
     @pytest.mark.asyncio
     async def test_seed_idempotent(self, storage: Storage) -> None:
         await seed_default_sources(storage)
         count = await seed_default_sources(storage)
         assert count == 0  # No new sources added
+
+    @pytest.mark.asyncio
+    async def test_seed_skips_existing_url(self, storage: Storage) -> None:
+        # Legacy installs use old names for the same URLs — no duplicates.
+        storage.add_source(
+            "wiki",
+            "https://genshin-impact.fandom.com/wiki/Promotional_Code",
+            "css",
+            "code",
+        )
+        count = await seed_default_sources(storage)
+        urls = [s["url"] for s in storage.list_sources()]
+        assert len(urls) == len(set(urls))
+        assert count == len(SOURCE_PRESETS) - 1
 
 
 if __name__ == "__main__":

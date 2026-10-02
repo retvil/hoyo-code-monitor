@@ -26,7 +26,7 @@ from src.constants import (
 )
 from src.i18n import SUPPORTED, get_lang, make_t
 from src.scheduler import create_scheduler_from_storage
-from src.sources import SOURCE_PRESETS, SourceConfig, SourceFetcher
+from src.sources import SOURCE_PRESETS, SourceConfig, SourceFetcher, seed_default_sources
 from src.storage import Storage
 
 logger = logging.getLogger(__name__)
@@ -43,6 +43,12 @@ scheduler = None
 async def lifespan(app: FastAPI):
     global scheduler
     # Startup
+
+    # Seed sources first so the UI is never empty before the first cycle.
+    try:
+        await seed_default_sources(Storage())
+    except Exception:
+        logger.exception("Failed to seed default sources on startup")
 
     scheduler = create_scheduler_from_storage()
     yield
