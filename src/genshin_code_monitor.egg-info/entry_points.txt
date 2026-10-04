@@ -1,2 +1,0 @@
-[console_scripts]
-genshin-code-monitor = src.cli:cli

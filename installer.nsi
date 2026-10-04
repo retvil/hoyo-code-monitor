@@ -21,7 +21,7 @@ RequestExecutionLevel user
 ; Modern UI
 !define MUI_ICON "F:\SDProject\GIPromoCode\assets\icon.ico"
 !define MUI_UNICON "F:\SDProject\GIPromoCode\assets\icon.ico"
-!define MUI_WELCOMEFINISHPAGE_BITMAP "F:\SDProject\GIPromoCode\assets\installer_banner.bmp"
+!define MUI_WELCOMEFINISHPAGE_BITMAP "assets\installer_banner.bmp"
 !define MUI_WELCOMEPAGE_TITLE "Welcome to ${APP_NAME} Setup"
 !define MUI_WELCOMEPAGE_TEXT "This wizard will guide you through the installation of ${APP_NAME} ${APP_VERSION}.\n\nClick Next to continue."
 !define MUI_FINISHPAGE_TITLE "Setup Complete"

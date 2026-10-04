@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}HoYo Code Monitor{% endblock %}</title>
+    <meta name="description" content="HoYo Code Monitor - Track and redeem HoYoverse promo codes">
+    
+    <!-- Favicon -->
+    <link rel="icon" href="{{ url_for('static', path='favicon.ico') }}" type="image/x-icon">
+    
+    <!-- Experiment CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', path='css/experiment.css') }}">
+    
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    
+    <!-- Alpine.js for interactive components -->
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <!-- Custom JS -->
+    <script defer src="{{ url_for('static', path='js/experiment.js') }}"></script>
+    
+    {% block head %}{% endblock %}
+</head>
+<body class="flex flex-col min-h-screen">
+    {% block header %}
+    <header class="border-b border-strong">
+        <div class="container flex flex-col sm:flex-row sm:items-center sm:justify-between py-4">
+            <div class="flex items-center gap-3 mb-3 sm:mb-0">
+                <img src="{{ url_for('static', path='assets/icon.ico') }}" alt="HoYo Code Monitor" class="h-8 w-8">
+                <div>
+                    <h1 class="text-xl font-bold">HoYo Code Monitor</h1>
+                    <p class="text-sm text-muted">Track and redeem HoYoverse promo codes</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-3">
+                <div class="relative">
+                    <input type="text" id="search-input" placeholder="Search codes..." class="input w-64 sm:w-80" hx-get="/api/search" hx-trigger="keyup changed delay:300ms" hx-target="#codes-table-body" hx-indicator="#search-spinner">
+                    <span id="search-spinner" class="spinner inline-block hidden absolute left-2 top-1/2 -mt-2"></span>
+                </div>
+                
+                <div class="relative">
+                    <button id="theme-toggle" class="btn btn-outline p-2" aria-label="Toggle theme">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                        </svg>
+                    </button>
+                </div>
+                
+                <div class="dropdown relative">
+                    <button class="btn btn-outline p-2" id="user-menu-button" aria-haspopup="true">
+                        <span class="hidden sm:inline">User</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                    <div class="dropdown-menu hidden absolute right-0 mt-2 w-56 bg-card border border-strong rounded-lg shadow-lg z-50">
+                        <div class="py-2">
+                            <a href="/accounts" class="block px-4 py-2 text-sm text-muted hover:bg-elevated">Accounts</a>
+                            <a href="/settings" class="block px-4 py-2 text-sm text-muted hover:bg-elevated">Settings</a>
+                            <a href="/author" class="block px-4 py-2 text-sm text-muted hover:bg-elevated">About</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+    {% endblock %}
+
+    <main class="flex-1">
+        <div class="container">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    {% block footer %}
+    <footer class="border-t border-strong">
+        <div class="container text-center text-sm text-muted py-4">
+            &copy; HoYo Code Monitor. All rights reserved.
+            <br>
+            <a href="https://github.com/yourusername/hoyo-code-monitor" class="text-muted hover:text-accent-gold">GitHub</a>
+            |
+            <a href="#" class="text-muted hover:text-accent-gold">Privacy</a>
+            |
+            <a href="#" class="text-muted hover:text-accent-gold">Terms</a>
+        </div>
+    </footer>
+    {% endblock %}
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50"></div>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>
