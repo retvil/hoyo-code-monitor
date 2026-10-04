@@ -19,8 +19,8 @@ InstallDirRegKey HKCU "Software\${APP_NAME}" ""
 RequestExecutionLevel user
 
 ; Modern UI
-!define MUI_ICON "F:\SDProject\GIPromoCode\assets\icon.ico"
-!define MUI_UNICON "F:\SDProject\GIPromoCode\assets\icon.ico"
+!define MUI_ICON "assets\icon.ico"
+!define MUI_UNICON "assets\icon.ico"
 !define MUI_WELCOMEFINISHPAGE_BITMAP "assets\installer_banner.bmp"
 !define MUI_WELCOMEPAGE_TITLE "Welcome to ${APP_NAME} Setup"
 !define MUI_WELCOMEPAGE_TEXT "This wizard will guide you through the installation of ${APP_NAME} ${APP_VERSION}.\n\nClick Next to continue."
@@ -85,7 +85,7 @@ Section "Desktop shortcut" SEC_DESKTOP
     CreateShortcut "$DESKTOP\${APP_NAME}.lnk" "$INSTDIR\${APP_EXE}" "tray" "$INSTDIR\assets\icon.ico"
 SectionEnd
 
-Section /o "Autostart on Windows login" SEC_AUTOSTART
+Section "Autostart on Windows login" SEC_AUTOSTART
     WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "HoYoCodeMonitor" '"$INSTDIR\${APP_EXE}" tray'
 SectionEnd
 
