@@ -10,6 +10,7 @@ import pytest
 
 from src.redeemer import RedemptionResult
 from src.scheduler import Scheduler, create_scheduler_from_storage
+from src.sources import list_presets
 from src.storage import Storage
 
 
@@ -342,13 +343,13 @@ class TestSchedulerCheckCycle:
             mock_fetcher_class.return_value = mock_fetcher
 
             result = await scheduler._run_check_cycle()
+            assert result["success"] is True
 
-        # Should have seeded default sources
+        # Should have seeded all presets
         sources = storage.list_sources()
-        assert len(sources) >= 2
         names = {s["name"] for s in sources}
-        assert "wiki" in names
-        assert "wiki_api" in names
+        for preset in list_presets():
+            assert preset in names
 
     @pytest.mark.asyncio
     async def test_check_cycle_handles_fetch_errors(self, storage: Storage) -> None:

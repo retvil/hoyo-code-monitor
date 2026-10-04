@@ -17,10 +17,13 @@
 - Один логический шаг — один коммит, сразу после зелёных тестов.
 - Никогда `git restore`/`checkout -- <файл>` без бэкапа незакоммиченных правок.
 - Параллельные исполнители не трогают одни и те же файлы.
-- `data/`, `*.db`, `.key`, `logs/`, `__pycache__/` — никогда в коммит (см. `.gitignore`).
+- `data/`, `*.db`, `.key`, `logs/`, `__pycache__/`, `*.exe`, `dist/`, `server*.log` — никогда в коммит (см. `.gitignore`).
+- Staging только явным списком файлов, никогда `git add -A` (цепляет мусор).
 
 ## Проверка перед сдачей шага
 
 - `python -m py_compile <файлы>`
-- `python -m pytest tests -q` → 199 passed
-- Эндпоинты Web UI (`/ /sources /accounts /config /health /metrics`) → 200
+- `python -m pytest tests -q` → 280+ passed, 0 failed
+  (teardown-`PermissionError` на Windows — фоновый шум старых фикстур, не failure)
+- Эндпоинты Web UI (`/ /sources /accounts /config /checkins /health /metrics`) → 200
+- ruff/mypy чисты по новым/изменённым строкам (бейзлайн старого кода красный — не трогать без нужды)
