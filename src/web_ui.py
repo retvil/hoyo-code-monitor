@@ -13,8 +13,6 @@ from typing import Any
 
 from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, Response
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from src.config import ConfigManager
@@ -28,6 +26,7 @@ from src.i18n import SUPPORTED, get_lang, make_t
 from src.scheduler import create_scheduler_from_storage
 from src.sources import SOURCE_PRESETS, SourceConfig, SourceFetcher, seed_default_sources
 from src.storage import Storage
+from src.templates import templates
 
 logger = logging.getLogger(__name__)
 
@@ -63,19 +62,6 @@ app = FastAPI(
     version=APP_VERSION,
     lifespan=lifespan,
 )
-
-from src.templates import templates
-
-def _static_dir() -> str:
-    import sys
-    from pathlib import Path
-
-    if getattr(sys, "frozen", False):
-        return str(Path(sys._MEIPASS) / "static")
-    return str(Path(__file__).resolve().parent.parent / "static")
-
-
-app.mount("/static", StaticFiles(directory=_static_dir()), name="static")
 
 
 # Pydantic models for API
@@ -556,17 +542,6 @@ async def update_config(
         raise HTTPException(status_code=400, detail=str(e)) from e
 
 
-@app.get("/dashboard/experiment", response_class=HTMLResponse)
-async def dashboard_experiment(request: Request):
-    """Experimental dashboard with new design."""
-    storage = Storage()
-    return templates.TemplateResponse(
-        request,
-        "dashboard_experiment.html",
-        page_ctx(storage, {"request": request}),
-    )
-
-
 @app.get("/author", response_class=HTMLResponse)
 async def author_page(request: Request):
     """Author page with contacts and support options."""
@@ -704,21 +679,6 @@ async def api_stats():
     """Get statistics as JSON."""
     storage = Storage()
     return storage.get_stats()
-
-
-@app.get("/api/dashboard/stats")
-async def api_dashboard_stats(game: str = ""):
-    """Get dashboard stats for a specific game or overall."""
-    storage = Storage()
-    stats = storage.get_stats(game=game if game else None)
-
-    # Add game-specific info if game is specified
-    if game and game in ["genshin", "hsr", "zzz", "hi3", "tot"]:
-        from src.constants import GAME_CONF
-        stats["game_name"] = GAME_CONF.get(game, {}).get("name", game.upper())
-        stats["game_accent"] = GAME_CONF.get(game, {}).get("accent", "#c9a832")
-
-    return stats
 
 
 def _is_source_stale(last_checked: str | None) -> bool:
