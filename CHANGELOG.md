@@ -25,6 +25,10 @@
   Only `success`/`already_claimed` now count as done; failed rows are cleared and retried.
   Also fixed `/info` `today` parsing (real API returns `YYYY-MM-DD`, not a day number),
   which crashed claims with `ValueError`
+- **Two app instances could run at once**: `portalocker` is missing from the frozen
+  build, silently disabling the single-instance guard. The guard now falls back to
+  stdlib `msvcrt` locking (5 new tests). Also the tray dashboard showed a dead
+  scheduler instance — tray now shares its live scheduler with the embedded web UI
 
 ### Fixed
 - **Account auto-login crashed with bare 500 in frozen builds**: Playwright looked for

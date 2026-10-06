@@ -7,6 +7,7 @@ import sys
 
 import click
 
+from src import web_ui as web_ui_module
 from src.autostart import disable as autostart_disable
 from src.autostart import enable as autostart_enable
 from src.autostart import is_enabled as autostart_is_enabled
@@ -612,6 +613,9 @@ def tray():
 
     _ensure_single_instance()
     scheduler = create_scheduler_from_storage()
+    # Share the live scheduler with the embedded web UI so the dashboard
+    # shows and controls the real instance (lifespan won't replace it).
+    web_ui_module.scheduler = scheduler
     config_manager = ConfigManager()
     web_url = f"http://{WEB_HOST}:{WEB_PORT}"
 

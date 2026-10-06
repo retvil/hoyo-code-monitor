@@ -9,7 +9,6 @@ a = Analysis(
     binaries=[],
     datas=[
         ('templates', 'templates'),
-        ('static', 'static'),
         ('config.toml', '.'),
     ],
     hiddenimports=[

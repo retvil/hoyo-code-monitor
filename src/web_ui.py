@@ -49,7 +49,10 @@ async def lifespan(app: FastAPI):
     except Exception:
         logger.exception("Failed to seed default sources on startup")
 
-    scheduler = create_scheduler_from_storage()
+    # Tray mode injects its own already-running scheduler; only create one
+    # when standalone (otherwise the dashboard would show a dead scheduler).
+    if scheduler is None:
+        scheduler = create_scheduler_from_storage()
     yield
     # Shutdown
     if scheduler and scheduler.is_running():
