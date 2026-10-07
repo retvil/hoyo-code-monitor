@@ -162,6 +162,12 @@ class TestCheckinProgress:
         assert r.status_code == HTTP_OK
         assert r.json() == {}
 
+    def test_progress_partial_empty_when_idle(self, client: TestClient) -> None:
+        """Progress partial renders empty (no stray JSON) when idle."""
+        r = client.get("/partials/checkin-progress")
+        assert r.status_code == HTTP_OK
+        assert "{}" not in r.text
+
     def test_progress_tracks_current_slot(
         self, client: TestClient, temp_db: str, account: str
     ) -> None:

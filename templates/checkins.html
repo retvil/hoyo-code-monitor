@@ -7,8 +7,7 @@
         <div class="card-title">{{ t('checkins_title') }}</div>
         <button class="btn btn-primary" hx-post="/checkins/run-now" hx-swap="none" hx-on::after-request="location.reload()">{{ t('checkin_run_now') }}</button>
     </div>
-    <div id="checkin-progress" hx-get="/api/checkins/progress" hx-trigger="load, every 2s" hx-swap="innerHTML">
-        <p class="muted">{{ t('checkin_no_logs') }}</p>
+    <div id="checkin-progress" hx-get="/partials/checkin-progress" hx-trigger="load, every 2s" hx-swap="innerHTML">
     </div>
     <p class="muted" style="margin-bottom: 14px;">
         {{ t('checkin_last') }}: {{ checkin_status.last_checkin_run or '—' }} ·

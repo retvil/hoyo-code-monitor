@@ -22,13 +22,13 @@ HoYoverse games regularly release time-limited promo codes — and they expire f
 - **Background monitoring** — checks sources every N minutes (configurable, default 15)
 - **Auto-redeem** — redeems new codes via Hoyolab `webExchangeCdkey` API (opt-in, per account)
 - **Daily check-ins** — auto sign-in on HoYoLAB for Genshin, Star Rail, ZZZ + HI3 (opt-in, per account, own schedule, idempotent)
-- **Multi-source** — Wiki, Wiki API, community JSON APIs, guide sites (16 presets, see table)
+- **Multi-source** — Wiki, Wiki API, community JSON APIs, guide sites (25 presets, see table)
 - **Multi-account** — each account has its own encrypted cookies and redeem toggle
 - **Statistics** — total / redeemed / pending, per-source breakdown, redemption log
 - **Web UI** — local dashboard at `http://127.0.0.1:8000` in 6 languages
 - **System tray** — icon with enable/disable, scan-interval submenu, one-click settings
 - **Encrypted cookies** — Fernet (AES-128), key in env / OS keyring / local file
-- **Autostart** — optional Windows login autostart
+- **Autostart** — Windows login autostart (on by default)
 
 ## Screenshots
 
@@ -61,7 +61,7 @@ Download the installer from [Releases](https://github.com/retvil/hoyo-code-monit
 
 - **Windows** — `hoyo-code-monitor-1.1.6-setup.exe` (per-user install, no admin rights needed)
 
-Silent install: `setup.exe /S`. Optional components: desktop shortcut, Windows autostart.
+Silent install: `setup.exe /S`. Components: desktop shortcut, Windows autostart (both on by default).
 
 > **Note:** On first browser login the app downloads Chromium (~170MB, one-time).
 

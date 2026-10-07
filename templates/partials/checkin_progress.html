@@ -1,0 +1,3 @@
+{% if progress and progress.is_running %}
+<p><span class="spinner" aria-hidden="true"></span> {{ t('running') }}: {{ progress.current_account }} / {{ progress.current_game }}</p>
+{% endif %}

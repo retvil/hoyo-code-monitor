@@ -923,6 +923,20 @@ async def api_checkins_progress() -> dict[str, Any]:
     return scheduler.get_checkin_progress()
 
 
+@app.get("/partials/checkin-progress")
+async def partial_checkin_progress(request: Request) -> HTMLResponse:
+    """HTMX partial for live check-in progress (empty when idle)."""
+    storage = Storage()
+    progress: dict[str, Any] = {}
+    if scheduler is not None:
+        progress = scheduler.get_checkin_progress()
+    return templates.TemplateResponse(
+        request,
+        "partials/checkin_progress.html",
+        page_ctx(storage, {"request": request, "progress": progress}),
+    )
+
+
 def _account_redeem_switch_html(name: str, enabled: bool) -> str:
     """Render per-account auto-redeem toggle switch (full span for outerHTML swap)."""
     checked = "checked" if enabled else ""

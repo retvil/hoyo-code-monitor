@@ -8,7 +8,7 @@
 
 ## Was ist das?
 
-HoYoverse-Spiele veröffentlichen regelmäßig zeitlich begrenzte Promocodes — und sie laufen schnell ab. **HoYo Code Monitor** überwacht 16 Code-Quellen in 5 Spielen (Genshin Impact, Honkai: Star Rail, Zenless Zone Zero, Honkai Impact 3rd, Tears of Themis) und löst neue Codes automatisch auf Ihren Konten ein. Alles läuft lokal auf Ihrem PC: SQLite-Datenbank, verschlüsselte Cookies, keine Telemetrie, keine Cloud.
+HoYoverse-Spiele veröffentlichen regelmäßig zeitlich begrenzte Promocodes — und sie laufen schnell ab. **HoYo Code Monitor** überwacht 25 Code-Quellen in 5 Spielen (Genshin Impact, Honkai: Star Rail, Zenless Zone Zero, Honkai Impact 3rd, Tears of Themis) und löst neue Codes automatisch auf Ihren Konten ein. Alles läuft lokal auf Ihrem PC: SQLite-Datenbank, verschlüsselte Cookies, keine Telemetrie, keine Cloud.
 
 ### So funktioniert es
 
@@ -22,13 +22,13 @@ HoYoverse-Spiele veröffentlichen regelmäßig zeitlich begrenzte Promocodes —
 - **Hintergrundüberwachung** — prüft Quellen alle N Minuten (konfigurierbar, Standard 15)
 - **Auto-Einlösung** — löst neue Codes über die Hoyolab `webExchangeCdkey` API ein (opt-in, pro Konto)
 - **Tägliche Check-ins** — automatische Anmeldung bei HoYoLAB für Genshin, Star Rail, ZZZ + HI3 (opt-in, pro Konto, eigener Zeitplan, idempotent)
-- **Multi-Source** — Wiki, Wiki-API, Community-JSON-APIs, Guide-Seiten (16 Presets)
+- **Multi-Source** — Wiki, Wiki-API, Community-JSON-APIs, Guide-Seiten (25 Presets)
 - **Multi-Account** — jedes Konto hat eigene verschlüsselte Cookies und eigenen Schalter
 - **Statistik** — gesamt / eingelöst / ausstehend, pro Quelle, Einlöseprotokoll
 - **Web UI** — lokales Dashboard unter `http://127.0.0.1:8000` in 6 Sprachen
 - **System Tray** — Symbol mit Ein/Aus, Scanintervall-Menü, Einstellungen per Klick
 - **Verschlüsselte Cookies** — Fernet (AES-128), Schlüssel in env / OS-Keyring / lokaler Datei
-- **Autostart** — optionaler Windows-Login-Autostart
+- **Autostart** — Windows-Login-Autostart (standardmäßig an)
 
 ## Screenshots
 
@@ -61,7 +61,7 @@ Installer aus [Releases](https://github.com/retvil/hoyo-code-monitor/releases) h
 
 - **Windows** — `hoyo-code-monitor-1.1.6-setup.exe` (Installation pro Benutzer, keine Adminrechte nötig)
 
-Stille Installation: `setup.exe /S`. Optionale Komponenten: Desktop-Verknüpfung, Windows-Autostart.
+Stille Installation: `setup.exe /S`. Komponenten: Desktop-Verknüpfung, Windows-Autostart (beide standardmäßig an).
 
 > **Hinweis:** Beim ersten Browser-Login lädt die App Chromium herunter (~170MB, einmalig).
 

@@ -8,7 +8,7 @@
 
 ## De quoi s'agit-il ?
 
-Les jeux HoYoverse publient régulièrement des codes promo à durée limitée — et ils expirent vite. **HoYo Code Monitor** surveille 16 sources de codes dans 5 jeux (Genshin Impact, Honkai: Star Rail, Zenless Zone Zero, Honkai Impact 3rd, Tears of Themis) et échange automatiquement les nouveaux codes sur vos comptes. Tout fonctionne en local sur votre PC : base SQLite, cookies chiffrés, aucune télémétrie, aucun cloud.
+Les jeux HoYoverse publient régulièrement des codes promo à durée limitée — et ils expirent vite. **HoYo Code Monitor** surveille 25 sources de codes dans 5 jeux (Genshin Impact, Honkai: Star Rail, Zenless Zone Zero, Honkai Impact 3rd, Tears of Themis) et échange automatiquement les nouveaux codes sur vos comptes. Tout fonctionne en local sur votre PC : base SQLite, cookies chiffrés, aucune télémétrie, aucun cloud.
 
 ### Comment ça marche
 
@@ -22,13 +22,13 @@ Les jeux HoYoverse publient régulièrement des codes promo à durée limitée �
 - **Surveillance en arrière-plan** — vérifie les sources toutes les N minutes (configurable, 15 par défaut)
 - **Échange auto** — échange les nouveaux codes via l'API Hoyolab `webExchangeCdkey` (opt-in, par compte)
 - **Check-ins quotidiens** — connexion auto sur HoYoLAB pour Genshin, Star Rail, ZZZ + HI3 (opt-in, par compte, planning dédié, idempotent)
-- **Multi-sources** — Wiki, Wiki API, API JSON communautaires, sites de guides (16 préréglages)
+- **Multi-sources** — Wiki, Wiki API, API JSON communautaires, sites de guides (25 préréglages)
 - **Multi-comptes** — chaque compte a ses cookies chiffrés et son interrupteur
 - **Statistiques** — total / échangés / en attente, par source, journal d'échange
 - **Web UI** — tableau de bord local sur `http://127.0.0.1:8000` en 6 langues
 - **Barre système** — icône avec activer/désactiver, menu d'intervalle, réglages en un clic
 - **Cookies chiffrés** — Fernet (AES-128), clé dans env / trousseau OS / fichier local
-- **Démarrage auto** — démarrage Windows optionnel
+- **Démarrage auto** — démarrage Windows (activé par défaut)
 
 ## Captures d'écran
 
@@ -61,7 +61,7 @@ Téléchargez l'installeur depuis [Releases](https://github.com/retvil/hoyo-code
 
 - **Windows** — `hoyo-code-monitor-1.1.6-setup.exe` (installation par utilisateur, sans droits admin)
 
-Installation silencieuse : `setup.exe /S`. Composants optionnels : raccourci bureau, démarrage Windows.
+Installation silencieuse : `setup.exe /S`. Composants : raccourci bureau, démarrage Windows (tous deux activés par défaut).
 
 > **Note :** à la première connexion via navigateur, l'appli télécharge Chromium (~170 Mo, une seule fois).
 

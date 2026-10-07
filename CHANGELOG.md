@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.2.0] - 2026-10-07
+
+### Fixed
+- **Autostart actually installs**: the NSIS section was off by default and skipped
+  on silent installs (no Run entry). Now default-on (opt-out in GUI), plus relative
+  icon paths so the installer builds on CI/other machines
+
+### Removed
+- Unfinished `dashboard_experiment` slice (routes, templates, static mount, assets),
+  internal design notes and stray logs — minus 1172 lines
+
+### Docs
+- Planning docs refreshed to v1.1.6 reality; README feature lists cover check-ins
+  in all 6 languages
+
 ## [1.1.6] - 2026-09-30
 
 ### Added
