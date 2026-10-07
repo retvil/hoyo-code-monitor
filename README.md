@@ -33,7 +33,7 @@ HoYoverse games regularly release time-limited promo codes — and they expire f
 ## Screenshots
 
 <details>
-<summary>Dashboard / Sources / Config / Author</summary>
+<summary>Dashboard / Sources / Config / Check-ins / Accounts / Author</summary>
 
 | Dashboard | Sources | Config |
 |---|---|---|
@@ -42,6 +42,10 @@ HoYoverse games regularly release time-limited promo codes — and they expire f
 | Author |
 |---|
 | ![Author](docs/screenshots/author_en.png) |
+
+| Check-ins | Accounts |
+|---|---|
+| ![Check-ins](docs/screenshots/checkins_en.png) | ![Accounts](docs/screenshots/accounts_en.png) |
 
 </details>
 

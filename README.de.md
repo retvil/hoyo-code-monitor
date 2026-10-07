@@ -33,7 +33,7 @@ HoYoverse-Spiele veröffentlichen regelmäßig zeitlich begrenzte Promocodes —
 ## Screenshots
 
 <details>
-<summary>Dashboard / Quellen / Config / Autor</summary>
+<summary>Dashboard / Quellen / Config / Check-ins / Konten / Autor</summary>
 
 | Dashboard | Quellen | Config |
 |---|---|---|
@@ -42,6 +42,10 @@ HoYoverse-Spiele veröffentlichen regelmäßig zeitlich begrenzte Promocodes —
 | Autor |
 |---|
 | ![Autor](docs/screenshots/author_de.png) |
+
+| Check-ins | Konten |
+|---|---|
+| ![Check-ins](docs/screenshots/checkins_de.png) | ![Konten](docs/screenshots/accounts_de.png) |
 
 </details>
 

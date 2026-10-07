@@ -33,7 +33,7 @@ Les jeux HoYoverse publient régulièrement des codes promo à durée limitée �
 ## Captures d'écran
 
 <details>
-<summary>Tableau de bord / Sources / Config / Auteur</summary>
+<summary>Tableau de bord / Sources / Config / Check-ins / Comptes / Auteur</summary>
 
 | Tableau de bord | Sources | Config |
 |---|---|---|
@@ -42,6 +42,10 @@ Les jeux HoYoverse publient régulièrement des codes promo à durée limitée �
 | Auteur |
 |---|
 | ![Auteur](docs/screenshots/author_fr.png) |
+
+| Check-ins | Comptes |
+|---|---|
+| ![Check-ins](docs/screenshots/checkins_fr.png) | ![Comptes](docs/screenshots/accounts_fr.png) |
 
 </details>
 

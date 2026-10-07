@@ -33,7 +33,7 @@ HoYoverseのゲームでは期限付きプロモコードが定期的に配布�
 ## スクリーンショット
 
 <details>
-<summary>ダッシュボード / ソース / 設定 / 作者</summary>
+<summary>ダッシュボード / ソース / 設定 / チェックイン / アカウント / 作者</summary>
 
 | ダッシュボード | ソース | 設定 |
 |---|---|---|
@@ -42,6 +42,10 @@ HoYoverseのゲームでは期限付きプロモコードが定期的に配布�
 | 作者 |
 |---|
 | ![作者](docs/screenshots/author_ja.png) |
+
+| チェックイン | アカウント |
+|---|---|
+| ![チェックイン](docs/screenshots/checkins_ja.png) | ![アカウント](docs/screenshots/accounts_ja.png) |
 
 </details>
 

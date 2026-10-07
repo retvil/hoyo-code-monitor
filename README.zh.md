@@ -33,7 +33,7 @@ HoYoverse 游戏会定期发布限时兑换码 —— 而且很快过期。**HoY
 ## 截图
 
 <details>
-<summary>仪表盘 / 来源 / 设置 / 作者</summary>
+<summary>仪表盘 / 来源 / 设置 / 签到 / 账号 / 作者</summary>
 
 | 仪表盘 | 来源 | 设置 |
 |---|---|---|
@@ -42,6 +42,10 @@ HoYoverse 游戏会定期发布限时兑换码 —— 而且很快过期。**HoY
 | 作者 |
 |---|
 | ![作者](docs/screenshots/author_zh.png) |
+
+| 签到 | 账号 |
+|---|---|
+| ![签到](docs/screenshots/checkins_zh.png) | ![账号](docs/screenshots/accounts_zh.png) |
 
 </details>
 
