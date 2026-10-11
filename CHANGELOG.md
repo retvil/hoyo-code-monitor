@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1] - 2026-10-08
+
+### Fixed
+- **Tests broke on modern asyncio**: `signals._stop_scheduler()` used the deprecated
+  `loop.run_in_executor(None, ...)` path; updated to `asyncio.to_thread(...)` and
+  aligned all related test assertions accordingly
+
 ## [1.2.0] - 2026-10-07
 
 ### Fixed
