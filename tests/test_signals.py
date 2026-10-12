@@ -128,21 +128,18 @@ class TestGracefulShutdown:
         self, shutdown_manager: GracefulShutdown, mock_scheduler: MagicMock
     ) -> None:
         """Test that shutdown() stops the scheduler."""
-        # Mock run_in_executor to avoid event loop issues
-        with patch.object(shutdown_manager.loop, "run_in_executor") as mock_run_in_executor:
-            mock_run_in_executor.return_value = asyncio.Future()
-            mock_run_in_executor.return_value.set_result(None)
+        # Mock asyncio.to_thread to avoid event loop issues in tests
+        with patch("asyncio.to_thread") as mock_to_thread:
+            mock_to_thread.return_value = None
 
             await shutdown_manager.shutdown()
 
             mock_scheduler.pause.assert_called_once()
-            # Verify run_in_executor was called with scheduler.shutdown
-            mock_run_in_executor.assert_called_once()
-            call_args = mock_run_in_executor.call_args[0]
-            assert call_args[0] is None  # executor
-            assert callable(call_args[1])  # function to call
-            # The function should be scheduler.shutdown with wait=True
-            # We can't easily test the partial, so just verify it was scheduled
+            # Verify asyncio.to_thread was called with scheduler.shutdown
+            mock_to_thread.assert_called_once()
+            call_args = mock_to_thread.call_args[0]
+            assert callable(call_args[0])  # function to call (scheduler.shutdown)
+            assert call_args[1] is True   # wait=True
 
     @pytest.mark.asyncio
     async def test_shutdown_waits_for_jobs(
@@ -380,7 +377,7 @@ class TestSchedulerShutdownInExecutor:
     async def test_scheduler_shutdown_runs_in_executor(
         self, event_loop: asyncio.AbstractEventLoop
     ) -> None:
-        """Test that blocking scheduler.shutdown runs in executor."""
+        """Test that blocking scheduler.shutdown runs in a worker thread."""
         mock_scheduler = MagicMock()
         mock_scheduler.pause = MagicMock()
         mock_scheduler.get_jobs = MagicMock(return_value=[])
@@ -388,18 +385,16 @@ class TestSchedulerShutdownInExecutor:
 
         manager = GracefulShutdown(scheduler=mock_scheduler, loop=event_loop)
 
-        with patch.object(event_loop, "run_in_executor") as mock_run_in_executor:
-            mock_run_in_executor.return_value = asyncio.Future()
-            mock_run_in_executor.return_value.set_result(None)
+        with patch("asyncio.to_thread") as mock_to_thread:
+            mock_to_thread.return_value = None
 
             await manager.shutdown()
 
-            # Should call run_in_executor for scheduler.shutdown
-            mock_run_in_executor.assert_called()
-            # First arg should be None (default executor), second should be shutdown func
-            call_args = mock_run_in_executor.call_args[0]
-            assert call_args[0] is None
-            assert callable(call_args[1])
+            # Should call asyncio.to_thread for scheduler.shutdown
+            mock_to_thread.assert_called_once()
+            call_args = mock_to_thread.call_args[0]
+            assert callable(call_args[0])
+            assert call_args[1] is True
 
 
 if __name__ == "__main__":

@@ -1,7 +1,9 @@
 """Unit tests for the Storage class."""
 
+import gc
 import os
 import tempfile
+import time
 
 import pytest
 
@@ -14,8 +16,18 @@ def temp_db() -> str:
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
         db_path = f.name
     yield db_path
+    # Drop strong references to any Storage instances that might still hold
+    # the sqlite3 connection open (Windows locks the file until the handle is closed).
+    gc.collect()
     if os.path.exists(db_path):
-        os.unlink(db_path)
+        for _ in range(10):
+            try:
+                os.unlink(db_path)
+                break
+            except PermissionError:
+                time.sleep(0.25)
+        else:
+            os.unlink(db_path)
 
 
 @pytest.fixture

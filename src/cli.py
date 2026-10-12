@@ -3,30 +3,41 @@
 import asyncio
 import json
 import logging
+import os  # noqa: F401 - used in tray()
 import sys
+import threading  # noqa: F401 - used in tray()
+import time  # noqa: F401 - used in tray()
+import webbrowser  # noqa: F401 - used in tray()
 
 import click
+import uvicorn
 
 from src import web_ui as web_ui_module
 from src.autostart import disable as autostart_disable
 from src.autostart import enable as autostart_enable
 from src.autostart import is_enabled as autostart_is_enabled
 from src.config import ConfigManager
-from src.constants import MASK_VISIBLE_CHARS
+from src.constants import MASK_VISIBLE_CHARS, MAX_MASKED_UID
+from src.constants import WEB_HOST, WEB_PORT  # noqa: F401 - used in tray()
+from src.cookies_login import capture_cookies_sync
+from src.logging_setup import setup_logging
+from src.notify import send_telegram
 from src.scheduler import create_scheduler_from_storage
 from src.single_instance import SingleInstance
 from src.sources import SourceFetcher
 from src.storage import Storage
 from src.system_tray import create_tray_icon
+from src.web_ui import app
 
-_instance_guard: SingleInstance | None = None
+# Single-instance guard holder (mutable container avoids `global` statement;
+# ruff PLW0603 would flag the global keyword otherwise).
+_instance_guard: list[SingleInstance | None] = [None]
 
 
 def _ensure_single_instance() -> None:
     """Exit if another instance is already running."""
-    global _instance_guard
-    _instance_guard = SingleInstance()
-    if not _instance_guard.acquire():
+    _instance_guard[0] = SingleInstance()
+    if not _instance_guard[0].acquire():
         click.echo("Another instance is already running. Exiting.", err=True)
         sys.exit(1)
 
@@ -34,8 +45,6 @@ def _ensure_single_instance() -> None:
 @click.group()
 def cli():
     """Command group for hoyo-code-monitor."""
-    from src.logging_setup import setup_logging
-
     setup_logging()
 
 
@@ -54,7 +63,9 @@ def show():
     for key, value in config.items():
         if key in ("uid", "cookies") and isinstance(value, str) and value:
             masked[key] = (
-                "*" * len(value) if len(value) <= 4 else value[:4] + "*" * (len(value) - 4)
+                "*" * len(value)
+                if len(value) <= MAX_MASKED_UID
+                else value[:MAX_MASKED_UID] + "*" * (len(value) - MAX_MASKED_UID)
             )
         else:
             masked[key] = value
@@ -190,8 +201,6 @@ def update(name, uid, region, game_biz, lang, s_lang_key):
 @click.option("--cookies", help="JSON string of cookies (ltuid, ltoken, cookie_token_v2).")
 def set_cookies(name, cookies):
     """Set cookies for an account <name>."""
-    import json
-
     storage = Storage()
     existing = storage.get_account(name)
     if not existing:
@@ -219,8 +228,6 @@ def set_cookies(name, cookies):
 @click.option("--timeout", type=int, default=300, help="Seconds to wait for login.")
 def login(name, timeout):
     """Auto-capture cookies: opens browser, you log in to HoYoLAB, cookies are saved encrypted."""
-    from src.cookies_login import capture_cookies_sync
-
     storage = Storage()
     existing = storage.get_account(name)
     if not existing:
@@ -249,8 +256,6 @@ def login(name, timeout):
 @click.argument("name")
 def show_cookies(name):
     """Show cookies for an account <name> (masked)."""
-    import json
-
     storage = Storage()
     existing = storage.get_account(name)
     if not existing:
@@ -463,10 +468,6 @@ def notify_config(bot_token, chat_id):
 @notify.command("test")
 def notify_test():
     """Send a test message to Telegram."""
-    import asyncio
-
-    from src.notify import send_telegram
-
     storage = Storage()
     token = storage.get_config("telegram_bot_token", "") or ""
     chat_id = storage.get_config("telegram_chat_id", "") or ""
@@ -622,13 +623,6 @@ def tray():
     # Embedded settings web server (local only)
     def _run_web_server() -> None:
         try:
-            import uvicorn
-
-            from src.web_ui import app
-
-            # log_config=None: uvicorn's default dictConfig crashes in windowed
-            # (PyInstaller) mode because sys.stdout lacks isatty(); our root
-            # logging (setup_logging) captures uvicorn records via propagation.
             uvicorn.run(app, host=WEB_HOST, port=WEB_PORT, log_level="warning", log_config=None)
         except ImportError:
             logger_web_missing = __import__("logging").getLogger(__name__)

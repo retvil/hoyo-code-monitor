@@ -1,5 +1,39 @@
 # Changelog
 
+## [1.2.2] - 2026-10-10
+
+### Added
+- **CSRF protection for Web UI**: all state-changing routes (POST/PUT/PATCH/DELETE)
+  require a valid `X-CSRF-Token` header; token served via `/api/csrf-token` endpoint
+  and double-submit cookie pattern; same-origin check blocks cross-origin mutations
+- **Scheduler health in `/health`**: endpoint now reports DB status, active source count,
+  scheduler state (running/stopped/missing), and external connectivity probe
+- **Config schema migrations**: `ConfigManager.MIGRATIONS` framework with `schema_version`
+  field for forward-compatible config upgrades
+- **`MAX_MASKED_UID` constant**: configurable UID masking width in CLI `config show`
+
+### Fixed
+- **Scheduler leaked HTTP/Playwright sessions on stop**: added async `_cleanup()` that
+  closes `checkin_runner` and `redeemer` sessions in the scheduler loop before thread
+  exit; removed the unsafe `asyncio.run(self.close())` call from the sync `stop()` path
+- **Telegram notifications failed silently on transient errors**: `send_telegram()` now
+  retries up to 3 times with exponential backoff (1s/2s/4s); logs HTTP status and
+  exception details per attempt
+- **Duplicate source-building boilerplate**: extracted `SourceConfig.from_row()` class
+  method to normalize legacy JSON-stringified headers and apply safe defaults in one place
+- **Win32 registry imports were inside functions**: moved `winreg` imports to module level
+  in `autostart.py` (linting/readability)
+- **Single-instance guard used `global`**: replaced with mutable list container to avoid
+  ruff `PLW0603` (global statement) warning
+- **Error messages leaked raw exception strings in API responses**: wrapped all
+  `HTTPException(detail=str(e))` with `_safe_detail()` that masks secret values
+
+### Changed
+- Test fixtures (`temp_db`, `storage`) moved from individual test classes to shared
+  `tests/conftest.py` (DRY, 6 test classes cleaned up)
+- Removed inline `import uvicorn`/`import app` from `cli.py` tray() — imported at
+  module level with `# noqa: F401` annotations
+
 ## [1.2.1] - 2026-10-08
 
 ### Fixed

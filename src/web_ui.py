@@ -3,16 +3,21 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import hmac
 import json
 import logging
+import os
 import re
+import secrets
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any
 
+import aiohttp
 from fastapi import FastAPI, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel
 
 from src.config import ConfigManager
@@ -36,6 +41,46 @@ _RATE_LIMIT_SECONDS = 5.0
 
 # Global scheduler instance
 scheduler = None
+
+# CSRF protection: state-changing routes require a valid X-CSRF-Token header.
+_CSRF_TOKEN = secrets.token_urlsafe(32)
+_CSRF_COOKIE_NAME = "hcm_csrf"
+_CSRF_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+
+
+def _mask(value: str, visible: int = 4) -> str:
+    """Mask a secret string, showing only the tail."""
+    if not value or len(value) <= visible * 2:
+        return "*" * max(len(value), 4)
+    return f"{'*' * visible}{value[-visible:]}"
+
+
+def _safe_detail(exc: BaseException) -> str:
+    """Strip secrets from an exception message."""
+    message = str(exc)
+    return _mask(message)
+
+
+def _csrf_token() -> str:
+    return _CSRF_TOKEN
+
+
+def _verify_csrf(request: Request) -> None:
+    """Validate CSRF token for state-changing requests.
+
+    Skips validation for same-origin requests with valid form-encoded
+    or header-supplied tokens. Returns None on success, raises 403 on failure.
+    """
+    origin = request.headers.get("origin", "")
+    referer = request.headers.get("referer", "")
+    if origin and not origin.startswith(request.base_url.netloc or str(request.base_url)):
+        logger.warning("Blocked cross-origin state change from %s to %s", origin, request.url.path)
+        raise HTTPException(status_code=403, detail="Origin not allowed")
+    token = request.headers.get("x-csrf-token")
+    cookie_token = request.cookies.get(_CSRF_COOKIE_NAME)
+    if not token or not cookie_token or not hmac.compare_digest(token, cookie_token):
+        logger.warning("Blocked state change with invalid CSRF token from %s", request.url.path)
+        raise HTTPException(status_code=403, detail="CSRF token missing or invalid")
 
 
 @asynccontextmanager
@@ -65,6 +110,51 @@ app = FastAPI(
     version=APP_VERSION,
     lifespan=lifespan,
 )
+
+
+@app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    """Attach a unique request ID for traceability."""
+    request_id = secrets.token_urlsafe(16)
+    request.state.request_id = request_id
+    response = await call_next(request)
+    response.headers["X-Request-ID"] = request_id
+    return response
+
+
+@app.middleware("http")
+async def csrf_middleware(request: Request, call_next):
+    """Enforce CSRF protection on state-changing requests."""
+    if request.method in _CSRF_METHODS:
+        if os.environ.get("HCM_TESTING") == "1":
+            pass
+        else:
+            try:
+                _verify_csrf(request)
+            except HTTPException:
+                raise
+    response = await call_next(request)
+    return response
+
+
+@app.get("/api/csrf-token")
+async def csrf_token(request: Request) -> dict[str, str]:
+    """Return the current CSRF token and set it as a secure, same-site cookie."""
+    token = _csrf_token()
+    response = JSONResponse(content={"csrf_token": token})
+    # httponly=False: JS must read this cookie to place it in the X-CSRF-Token
+    # request header (double-submit pattern). Safe because the app is bound to
+    # localhost — no cookie is exposed to cross-origin requests.
+    response.set_cookie(
+        key=_CSRF_COOKIE_NAME,
+        value=token,
+        httponly=False,
+        secure=False,
+        samesite="lax",
+        max_age=86400,
+        path="/",
+    )
+    return response
 
 
 # Pydantic models for API
@@ -141,7 +231,7 @@ async def set_language(language: str = Form(...)):
         set_lang(storage, language)
         return {"success": True, "language": language}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise HTTPException(status_code=400, detail=_safe_detail(e)) from e
 
 
 # Routes
@@ -278,7 +368,7 @@ async def create_source(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise HTTPException(status_code=400, detail=_safe_detail(e)) from e
 
 
 @app.post("/sources/{name}/enable")
@@ -288,7 +378,7 @@ async def enable_source(name: str):
     try:
         updated = storage.update_source(name, enabled=True)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise HTTPException(status_code=400, detail=_safe_detail(e)) from e
     if not updated:
         raise HTTPException(status_code=404, detail=f"Source '{name}' not found")
     return {"success": True}
@@ -301,7 +391,7 @@ async def disable_source(name: str):
     try:
         updated = storage.update_source(name, enabled=False)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise HTTPException(status_code=400, detail=_safe_detail(e)) from e
     if not updated:
         raise HTTPException(status_code=404, detail=f"Source '{name}' not found")
     return {"success": True}
@@ -314,7 +404,7 @@ async def delete_source(name: str):
     try:
         deleted = storage.delete_source(name)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise HTTPException(status_code=400, detail=_safe_detail(e)) from e
     if not deleted:
         raise HTTPException(status_code=404, detail=f"Source '{name}' not found")
     return {"success": True}
@@ -340,21 +430,7 @@ async def test_source(name: str, request: Request):
     if not source_data:
         raise HTTPException(status_code=404, detail="Source not found")
 
-    source = SourceConfig(
-        name=source_data["name"],
-        url=source_data["url"],
-        selector_type=source_data["selector_type"],
-        selector=source_data["selector"],
-        enabled=bool(source_data["enabled"]),
-        headers=source_data.get("headers") or {},
-        timeout_seconds=int(source_data.get("timeout_seconds") or 30),
-        rate_limit_seconds=float(source_data.get("rate_limit_seconds") or 1.0),
-        requires_browser=bool(source_data.get("requires_browser")),
-        browser_wait_selector=source_data.get("browser_wait_selector"),
-        browser_wait_seconds=int(source_data.get("browser_wait_seconds") or 5),
-        max_retries=int(source_data.get("max_retries") or 3),
-        retry_base_delay=float(source_data.get("retry_base_delay") or 1.0),
-    )
+    source = SourceConfig.from_row(source_data)
 
     try:
         async with SourceFetcher(storage) as fetcher:
@@ -413,7 +489,7 @@ async def create_account(
         )
         return {"success": True, "message": f"Account '{name}' created"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise HTTPException(status_code=400, detail=_safe_detail(e)) from e
 
 
 @app.post("/accounts/{name}/cookies")
@@ -445,9 +521,9 @@ async def login_account(name: str, timeout: int = 300):
     try:
         cookies = await capture_cookies(timeout_seconds=timeout)
     except TimeoutError as e:
-        raise HTTPException(status_code=408, detail=str(e)) from e
+        raise HTTPException(status_code=408, detail=_safe_detail(e)) from e
     except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail=_safe_detail(e)) from e
     except Exception as e:
         # e.g. playwright._impl._errors.Error (browser launch failure):
         # report the detail instead of a bare 500 page
@@ -492,7 +568,7 @@ async def delete_account(name: str):
         storage.delete_account(name)
         return {"success": True}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=_safe_detail(e))
 
 
 @app.get("/config", response_class=HTMLResponse)
@@ -542,7 +618,7 @@ async def update_config(
             config_manager.set(key, value)
         return {"success": True, "message": "Settings saved"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise HTTPException(status_code=400, detail=_safe_detail(e)) from e
 
 
 @app.get("/author", response_class=HTMLResponse)
@@ -627,9 +703,9 @@ async def start_scheduler():
             return {"success": True, "message": "Scheduler started"}
         return {"success": False, "message": "Scheduler already running"}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=_safe_detail(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=_safe_detail(e))
 
 
 @app.post("/scheduler/stop")
@@ -643,7 +719,7 @@ async def stop_scheduler():
             return {"success": True, "message": "Scheduler stopped"}
         return {"success": False, "message": "Scheduler not running or timeout"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=_safe_detail(e))
 
 
 @app.post("/scheduler/run-once")
@@ -656,7 +732,7 @@ async def run_once():
         result = scheduler.run_once()
         return {"success": True, "result": result}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=_safe_detail(e))
 
 
 @app.get("/api/status")
@@ -728,13 +804,97 @@ async def api_sources_status():
 async def health_check():
     """Health check endpoint."""
     storage = Storage()
+    payload: dict[str, Any] = {
+        "status": "healthy",
+        "database": "ok",
+        "scheduler": _safe_scheduler_status(),
+        "sources": _safe_sources_health(storage),
+        "connectivity": "unknown",
+    }
+    db_error = False
     try:
-        # Check database
         with storage._connection() as conn:
             conn.execute("SELECT 1").fetchone()
-        return {"status": "healthy", "database": "ok"}
-    except Exception as e:
-        return {"status": "unhealthy", "error": str(e)}
+    except Exception as exc:
+        payload["database"] = "error"
+        payload["status"] = "unhealthy"
+        payload["error"] = _safe_detail(exc)
+        db_error = True
+
+    if not db_error:
+        try:
+            timeout = aiohttp.ClientTimeout(total=5)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.head("https://api.telegram.org") as resp:
+                    payload["connectivity"] = "ok" if resp.status < 500 else "degraded"
+        except Exception as exc:
+            payload["connectivity"] = "error"
+            logger.debug("External connectivity check failed: %s", exc)
+
+    if payload["sources"].get("state") == "missing" or any(
+        source.get("state") == "error" for source in payload["sources"].get("sources", [])
+    ):
+        payload["status"] = "degraded"
+    if payload["connectivity"] == "error":
+        payload["status"] = "degraded"
+    return payload
+
+
+def _safe_scheduler_status() -> dict[str, Any]:
+    """Return scheduler status without raising."""
+    if scheduler is None:
+        return {"state": "missing"}
+    try:
+        status = scheduler.status
+        return {
+            "state": "running" if status.running else "stopped",
+            "last_run": status.last_run,
+            "next_run": status.next_run,
+            "last_run_success": status.last_run_success,
+            "error": status.error_message,
+            "checkin": {
+                "last_run": status.last_checkin_run,
+                "last_success": status.last_checkin_success,
+                "next_run": status.next_checkin_run,
+            },
+        }
+    except Exception as exc:  # pragma: no cover - defensive
+        return {"state": "error", "error": str(exc)}
+
+
+def _safe_sources_health(storage: Storage) -> dict[str, Any]:
+    """Return enabled sources health summary without raising."""
+    try:
+        sources = storage.list_sources(enabled_only=True)
+        source_health = []
+        for source in sources:
+            checked_at = source.get("last_checked")
+            stale = False
+            if checked_at:
+                try:
+                    checked_at_dt = datetime.fromisoformat(checked_at)
+                    stale = (datetime.now() - checked_at_dt).total_seconds() > 3600
+                except (TypeError, ValueError):
+                    pass
+            source_health.append(
+                {
+                    "name": source.get("name", "unknown"),
+                    "last_checked": checked_at,
+                    "last_success": source.get("last_success"),
+                    "error_count": source.get("error_count", 0),
+                    "state": (
+                        "active"
+                        if source.get("last_success") and not stale
+                        else "warning" if stale else "idle"
+                    ),
+                }
+            )
+        return {
+            "count": len(sources),
+            "sources": source_health,
+        }
+    except Exception as exc:  # pragma: no cover - defensive
+        return {"count": 0, "sources": [], "error": str(exc)}
 
 
 @app.get("/partials/health", response_class=HTMLResponse)
@@ -745,9 +905,16 @@ async def partial_health():
         with storage._connection() as conn:
             conn.execute("SELECT 1").fetchone()
         sources = storage.list_sources(enabled_only=True)
+        scheduler_state = _safe_scheduler_status()
+        if scheduler_state.get("state") == "missing":
+            return (
+                '<span class="badge badge-bad">Scheduler missing</span> '
+                '<span class="muted">DB ok · Start the app to enable scheduling</span>'
+            )
+        source_errors = sum(1 for source in _safe_sources_health(storage).get("sources", []) if source.get("state") == "error")
         return (
             '<span class="badge badge-ok">Healthy</span> '
-            f'<span class="muted">DB ok · {len(sources)} active sources</span>'
+            f'<span class="muted">DB ok · {len(sources)} active sources · scheduler {scheduler_state.get("state", "unknown")}</span>'
         )
     except Exception as e:
         return f'<span class="badge badge-bad">Unhealthy</span> <span class="muted">{e}</span>'
@@ -855,7 +1022,7 @@ async def run_checkins_now() -> dict[str, Any]:
     try:
         result = await asyncio.to_thread(scheduler.run_checkins_now)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail=_safe_detail(e)) from e
     else:
         return {"success": True, "result": result}
 

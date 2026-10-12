@@ -195,7 +195,6 @@ class Storage:
                     "INSERT INTO code_sources (code_id, source) VALUES (?, ?)",
                     (code_id, source),
                 )
-                conn.commit()
                 return code_id
 
             # Insert new code
@@ -722,6 +721,15 @@ class Storage:
             )
             conn.commit()
             return cursor.rowcount > 0
+
+    def increment_source_error(self, name: str) -> None:
+        """Increment the error counter for a source."""
+        with self._connection() as conn:
+            conn.execute(
+                "UPDATE sources SET error_count = error_count + 1 WHERE name = ?",
+                (name,),
+            )
+            conn.commit()
 
     def delete_source(self, name: str) -> bool:
         """Delete a source by name.

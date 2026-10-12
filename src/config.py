@@ -43,6 +43,7 @@ def _default(fn_name: str):
 class Settings:
     """Typed application settings. All durations are in seconds."""
 
+    schema_version: int = 1
     poll_interval_seconds: int = 900
     source_timeout_seconds: int = 30
     redemption_enabled: bool = False
@@ -72,6 +73,11 @@ class ConfigManager:
 
     DEFAULTS = Settings()
 
+    # Backward-compat migrations keyed by target version.
+    # Each callable receives the raw dict loaded from disk and returns
+    # an updated dict. Migrations run in ascending order.
+    MIGRATIONS: ClassVar[dict[int, Any]] = {1: lambda d: d}  # baseline
+
     def __init__(self, config_path: str | Path | None = None) -> None:
         if config_path is None:
             from src.paths import default_config_path
@@ -88,11 +94,13 @@ class ConfigManager:
                 try:
                     with self.config_path.open("rb") as f:
                         raw = tomllib.load(f)
+                    raw = self._migrate(raw)
                     self._settings = Settings.from_dict({**self.DEFAULTS.to_dict(), **raw})
                 except Exception:
                     try:
                         if _toml_legacy:
                             raw = _toml_legacy.load(str(self.config_path))
+                            raw = self._migrate(raw)
                             self._settings = Settings.from_dict({**self.DEFAULTS.to_dict(), **raw})
                         else:
                             raise
@@ -104,6 +112,16 @@ class ConfigManager:
             self._validate()
             self._loaded = True
             return self._settings
+
+    def _migrate(self, raw: dict[str, Any]) -> dict[str, Any]:
+        """Run backward-compat migrations on raw config dict."""
+        current = raw.get("schema_version", 0)
+        for version in sorted(self.MIGRATIONS):
+            if version > current:
+                raw = self.MIGRATIONS[version](raw)
+                current = version
+        raw.setdefault("schema_version", max(self.MIGRATIONS) if self.MIGRATIONS else 1)
+        return raw
 
     def save(self) -> None:
         with self._lock:

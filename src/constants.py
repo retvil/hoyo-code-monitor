@@ -67,7 +67,7 @@ WEB_HOST: str = "127.0.0.1"
 WEB_PORT: int = 8000
 
 # --- App identity ---
-APP_VERSION: str = "1.2.0"
+APP_VERSION: str = "1.2.1"
 APP_AUTHOR: str = "Nod33Eset"
 
 # --- Games (multi-game support, Phase 2) ---
@@ -135,6 +135,7 @@ def gift_url(code: str) -> str:
 # --- CLI / Display ---
 MAX_DISPLAY_CODES: int = 5
 MAX_DISPLAY_SOURCES: int = 10
+MAX_MASKED_UID: int = 4  # visible chars when masking UIDs in CLI output
 
 # --- Tests helpers ---
 TEST_VISIBLE_CHARS: int = 4  # same as MASK_VISIBLE, used in tests masking assertions

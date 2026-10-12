@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import os
-import tempfile
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -270,18 +268,6 @@ class TestSourceFetcher:
     """Tests for SourceFetcher."""
 
     @pytest.fixture
-    def temp_db(self) -> str:
-        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
-            db_path = f.name
-        yield db_path
-        if os.path.exists(db_path):
-            os.unlink(db_path)
-
-    @pytest.fixture
-    def storage(self, temp_db: str) -> Storage:
-        return Storage(temp_db)
-
-    @pytest.fixture
     def source_config(self) -> SourceConfig:
         return SourceConfig(
             name="test",
@@ -355,18 +341,6 @@ class TestSourceFetcher:
 
 class TestSeedDefaultSources:
     """Tests for seeding default sources."""
-
-    @pytest.fixture
-    def temp_db(self) -> str:
-        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
-            db_path = f.name
-        yield db_path
-        if os.path.exists(db_path):
-            os.unlink(db_path)
-
-    @pytest.fixture
-    def storage(self, temp_db: str) -> Storage:
-        return Storage(temp_db)
 
     @pytest.mark.asyncio
     async def test_seed_creates_sources(self, storage: Storage) -> None:

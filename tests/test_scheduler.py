@@ -17,18 +17,6 @@ from src.storage import Storage
 class TestSchedulerInitialization:
     """Tests for Scheduler initialization."""
 
-    @pytest.fixture
-    def temp_db(self) -> str:
-        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
-            db_path = f.name
-        yield db_path
-        if os.path.exists(db_path):
-            os.unlink(db_path)
-
-    @pytest.fixture
-    def storage(self, temp_db: str) -> Storage:
-        return Storage(temp_db)
-
     def test_init_with_storage(self, storage: Storage) -> None:
         scheduler = Scheduler(storage=storage)
         assert scheduler.storage is storage
@@ -50,18 +38,6 @@ class TestSchedulerInitialization:
 class TestSchedulerStatus:
     """Tests for Scheduler status."""
 
-    @pytest.fixture
-    def temp_db(self) -> str:
-        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
-            db_path = f.name
-        yield db_path
-        if os.path.exists(db_path):
-            os.unlink(db_path)
-
-    @pytest.fixture
-    def storage(self, temp_db: str) -> Storage:
-        return Storage(temp_db)
-
     def test_initial_status(self, storage: Storage) -> None:
         scheduler = Scheduler(storage=storage)
         status = scheduler.status
@@ -80,18 +56,6 @@ class TestSchedulerStatus:
 
 class TestSchedulerRunOnce:
     """Tests for run_once method."""
-
-    @pytest.fixture
-    def temp_db(self) -> str:
-        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
-            db_path = f.name
-        yield db_path
-        if os.path.exists(db_path):
-            os.unlink(db_path)
-
-    @pytest.fixture
-    def storage(self, temp_db: str) -> Storage:
-        return Storage(temp_db)
 
     def test_run_once_no_sources(self, storage: Storage) -> None:
         scheduler = Scheduler(storage=storage)
@@ -148,18 +112,6 @@ class TestSchedulerRunOnce:
 
 class TestSchedulerRedemption:
     """Tests for redemption logic in scheduler."""
-
-    @pytest.fixture
-    def temp_db(self) -> str:
-        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
-            db_path = f.name
-        yield db_path
-        if os.path.exists(db_path):
-            os.unlink(db_path)
-
-    @pytest.fixture
-    def storage(self, temp_db: str) -> Storage:
-        return Storage(temp_db)
 
     def test_redemption_disabled_by_default(self, storage: Storage) -> None:
         storage.add_source("test", "https://example.com", "css", ".code")
@@ -267,18 +219,6 @@ class TestSchedulerRedemption:
 class TestSchedulerStartStop:
     """Tests for scheduler start/stop."""
 
-    @pytest.fixture
-    def temp_db(self) -> str:
-        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
-            db_path = f.name
-        yield db_path
-        if os.path.exists(db_path):
-            os.unlink(db_path)
-
-    @pytest.fixture
-    def storage(self, temp_db: str) -> Storage:
-        return Storage(temp_db)
-
     def test_start_stop(self, storage: Storage) -> None:
         scheduler = Scheduler(storage=storage)
         assert scheduler.start() is True
@@ -300,15 +240,8 @@ class TestSchedulerStartStop:
 class TestCreateSchedulerFromStorage:
     """Tests for create_scheduler_from_storage factory."""
 
-    @pytest.fixture
-    def temp_db(self) -> str:
-        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
-            db_path = f.name
-        yield db_path
-        if os.path.exists(db_path):
-            os.unlink(db_path)
-
     def test_create_scheduler(self, temp_db: str) -> None:
+        """Factory returns a fully-initialised Scheduler with all deps wired."""
         scheduler = create_scheduler_from_storage(temp_db)
         assert isinstance(scheduler, Scheduler)
         assert scheduler.storage is not None
@@ -320,16 +253,16 @@ class TestSchedulerCheckCycle:
     """Tests for _run_check_cycle internal method."""
 
     @pytest.fixture
+    def storage(self, temp_db: str) -> Storage:
+        return Storage(temp_db)
+
+    @pytest.fixture
     def temp_db(self) -> str:
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
             db_path = f.name
         yield db_path
         if os.path.exists(db_path):
             os.unlink(db_path)
-
-    @pytest.fixture
-    def storage(self, temp_db: str) -> Storage:
-        return Storage(temp_db)
 
     @pytest.mark.asyncio
     async def test_check_cycle_seeds_default_sources(self, storage: Storage) -> None:

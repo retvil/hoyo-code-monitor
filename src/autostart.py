@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import sys
+import winreg
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -29,8 +30,6 @@ def _tray_command() -> str:
 
 
 def _open_key(write: bool = False):
-    import winreg
-
     access = winreg.KEY_SET_VALUE if write else winreg.KEY_READ
     return winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY, 0, access)
 
@@ -38,8 +37,6 @@ def _open_key(write: bool = False):
 def is_enabled() -> bool:
     """Check if autostart is enabled."""
     try:
-        import winreg
-
         with _open_key() as key:
             winreg.QueryValueEx(key, APP_NAME)
             return True
@@ -52,8 +49,6 @@ def is_enabled() -> bool:
 
 def enable() -> None:
     """Enable autostart on login."""
-    import winreg
-
     with _open_key(write=True) as key:
         winreg.SetValueEx(key, APP_NAME, 0, winreg.REG_SZ, _tray_command())
     logger.info("Autostart enabled: %s", _tray_command())
@@ -61,8 +56,6 @@ def enable() -> None:
 
 def disable() -> None:
     """Disable autostart on login."""
-    import winreg
-
     try:
         with _open_key(write=True) as key:
             winreg.DeleteValue(key, APP_NAME)

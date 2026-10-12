@@ -9,6 +9,7 @@ import logging
 import signal
 import sys
 from collections.abc import Callable
+from functools import partial
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -132,11 +133,9 @@ class GracefulShutdown:
             # Shutdown the scheduler
             if hasattr(self.scheduler, "shutdown"):
                 logger.debug("Shutting down scheduler...")
-                # APScheduler's shutdown can be blocking, run in executor
-                if hasattr(self.scheduler.shutdown, "__call__"):
-                    await self.loop.run_in_executor(None, self.scheduler.shutdown, wait=True)
-                else:
-                    self.scheduler.shutdown(wait=True)
+                # APScheduler's shutdown can be blocking, run in a worker thread.
+                # asyncio.to_thread is preferred over the deprecated loop.run_in_executor(None, ...)
+                await asyncio.to_thread(self.scheduler.shutdown, True)
 
             logger.info("Scheduler stopped")
         except Exception as e:

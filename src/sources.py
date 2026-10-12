@@ -199,6 +199,36 @@ class SourceConfig:
         if self.retry_base_delay <= 0:
             raise SourceValidationError("retry_base_delay must be positive")  # noqa: TRY003 -- validation message needs interpolation
 
+    @classmethod
+    def from_row(cls, row: dict[str, Any]) -> Self:
+        """Build a SourceConfig from a database row dict.
+
+        Normalizes legacy fields (JSON-stringified headers) and applies safe defaults
+        so callers don't repeat the same coercion logic in three places.
+        """
+        headers = row.get("headers") or {}
+        if isinstance(headers, str):
+            try:
+                headers = json.loads(headers)
+            except Exception:
+                headers = {}
+        return cls(
+            name=row["name"],
+            url=row["url"],
+            selector_type=row["selector_type"],
+            selector=row["selector"],
+            enabled=bool(row["enabled"]),
+            headers=headers,
+            timeout_seconds=int(row.get("timeout_seconds") or 30),
+            rate_limit_seconds=float(row.get("rate_limit_seconds") or 1.0),
+            requires_browser=bool(row.get("requires_browser")),
+            browser_wait_selector=row.get("browser_wait_selector"),
+            browser_wait_seconds=int(row.get("browser_wait_seconds") or 5),
+            max_retries=int(row.get("max_retries") or 3),
+            retry_base_delay=float(row.get("retry_base_delay") or 1.0),
+            game=row.get("game") or "genshin",
+        )
+
 
 class SourceFetcher:
     """Fetches and extracts codes from configured sources."""
@@ -231,6 +261,9 @@ class SourceFetcher:
         if self._browser:
             await self._browser.close()
             self._browser = None
+        if getattr(self, "_playwright", None):
+            await self._playwright.stop()
+            self._playwright = None
 
     async def _get_browser(self):
         """Lazy-initialize Playwright browser."""
@@ -357,36 +390,17 @@ class SourceFetcher:
         results = {}
 
         for source_data in sources:
-            headers = source_data.get("headers")
-            if isinstance(headers, str):
-                try:
-                    import json as _json
-
-                    headers = _json.loads(headers)
-                except Exception:
-                    headers = {}
-            source = SourceConfig(
-                name=source_data["name"],
-                url=source_data["url"],
-                selector_type=source_data["selector_type"],
-                selector=source_data["selector"],
-                enabled=bool(source_data["enabled"]),
-                headers=headers or {},
-                timeout_seconds=int(source_data.get("timeout_seconds") or 30),
-                rate_limit_seconds=float(source_data.get("rate_limit_seconds") or 1.0),
-                requires_browser=bool(source_data.get("requires_browser")),
-                browser_wait_selector=source_data.get("browser_wait_selector"),
-                browser_wait_seconds=int(source_data.get("browser_wait_seconds") or 5),
-                max_retries=int(source_data.get("max_retries") or 3),
-                retry_base_delay=float(source_data.get("retry_base_delay") or 1.0),
-                game=source_data.get("game") or "genshin",
-            )
+            source = SourceConfig.from_row(source_data)
             try:
                 codes = await self.fetch_source(source)
                 results[source.name] = codes
             except Exception as e:
                 logger.error("Failed to fetch from %s: %s", source.name, e)
                 results[source.name] = []
+                try:
+                    self.storage.increment_source_error(source.name)
+                except Exception:
+                    logger.debug("Could not increment error count for %s", source.name)
 
             # Rate limiting
             if source.rate_limit_seconds > 0:

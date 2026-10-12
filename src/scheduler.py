@@ -621,6 +621,10 @@ class Scheduler:
 
         finally:
             self._update_status(running=False, next_run=None)
+            try:
+                self._loop.run_until_complete(self._cleanup())
+            except Exception:
+                logger.debug("Cleanup failed", exc_info=True)
             if self._loop:
                 self._loop.close()
                 self._loop = None
@@ -662,6 +666,17 @@ class Scheduler:
         self._thread.start()
         return True
 
+    async def _cleanup(self) -> None:
+        """Async cleanup executed in the scheduler loop thread."""
+        tasks = [
+            self.checkin_runner.close(),
+            self.redeemer.close(),
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        for result in results:
+            if isinstance(result, Exception):
+                logger.debug("Cleanup task failed", exc_info=result)
+
     def stop(self, timeout: float = 10.0) -> bool:
         """Stop the scheduler gracefully.
 
@@ -685,11 +700,6 @@ class Scheduler:
 
         self._thread = None
         logger.info("Scheduler stopped gracefully")
-        # Close the check-in runner's HTTP session (best-effort, non-blocking)
-        try:
-            asyncio.run(self.close())
-        except Exception:
-            logger.debug("Failed to close check-in runner", exc_info=True)
         return True
 
     async def close(self) -> None:
