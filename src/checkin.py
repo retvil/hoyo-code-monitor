@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING, Any, Protocol, Self
 import aiohttp
 
 from src.exceptions import CheckinError
+from src.http_session import get_session
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Coroutine
@@ -123,18 +124,28 @@ class AiohttpCheckinTransport:
         """
         self.timeout = aiohttp.ClientTimeout(total=timeout)
         self._session: aiohttp.ClientSession | None = None
+        # True while ``_session`` was injected by a caller (tests): those must
+        # be closed by close(). A pooled session must not be, because other
+        # components borrow the same one — see src/http_session.py.
+        self._owns_session = True
 
     async def _get_session(self) -> aiohttp.ClientSession:
-        """Get or create the shared ClientSession."""
+        """Get the shared ClientSession from the process-wide pool.
+
+        ``self.timeout`` is applied per request rather than per session, since
+        the pooled session is shared with components using other budgets.
+        """
         if self._session is None or self._session.closed:
-            self._session = aiohttp.ClientSession(timeout=self.timeout)
+            self._session = get_session()
+            self._owns_session = False
         return self._session
 
     async def close(self) -> None:
-        """Close the underlying session."""
-        if self._session is not None and not self._session.closed:
-            await self._session.close()
-            self._session = None
+        """Close the underlying session only if this instance created it."""
+        session, self._session = self._session, None
+        if session is not None and not session.closed and self._owns_session:
+            await session.close()
+        self._owns_session = True
 
     async def get_json(
         self,
@@ -144,7 +155,9 @@ class AiohttpCheckinTransport:
     ) -> dict[str, Any]:
         """GET and parse JSON, raising on HTTP errors (retried by the runner)."""
         session = await self._get_session()
-        async with session.get(url, headers=headers, params=params) as response:
+        async with session.get(
+            url, headers=headers, params=params, timeout=self.timeout
+        ) as response:
             response.raise_for_status()
             data: dict[str, Any] = await response.json()
             return data
@@ -158,7 +171,9 @@ class AiohttpCheckinTransport:
     ) -> dict[str, Any]:
         """POST and parse JSON, raising on HTTP errors (retried by the runner)."""
         session = await self._get_session()
-        async with session.post(url, headers=headers, params=params, json=body or {}) as resp:
+        async with session.post(
+            url, headers=headers, params=params, json=body or {}, timeout=self.timeout
+        ) as resp:
             resp.raise_for_status()
             data: dict[str, Any] = await resp.json()
             return data

@@ -38,6 +38,7 @@ from src.constants import (
     MAX_CHECKIN_MINUTE,
 )
 from src.exceptions import CheckinError, ConfigError
+from src.http_session import close_current
 from src.redeemer import Redeemer
 from src.sources import SourceFetcher, seed_default_sources
 from src.storage import Storage
@@ -676,6 +677,12 @@ class Scheduler:
         for result in results:
             if isinstance(result, Exception):
                 logger.debug("Cleanup task failed", exc_info=result)
+        # checkin_runner/redeemer now *borrow* their sessions from the shared
+        # pool (see src/http_session.py), so their close() calls above are
+        # no-ops for the session itself. This loop owns the entry it created,
+        # and the loop is closed immediately after _cleanup() returns, so this
+        # is the only remaining chance to release the pool and its sockets.
+        await close_current()
 
     def stop(self, timeout: float = 10.0) -> bool:
         """Stop the scheduler gracefully.
@@ -717,6 +724,7 @@ class Scheduler:
         try:
             return loop.run_until_complete(self._run_check_cycle())
         finally:
+            self._release_loop_pool(loop)
             loop.close()
 
     def run_checkins_now(self, claimed_date: str | None = None) -> dict[str, Any]:
@@ -733,7 +741,25 @@ class Scheduler:
         try:
             return loop.run_until_complete(self.run_daily_checkins(claimed_date))
         finally:
+            self._release_loop_pool(loop)
             loop.close()
+
+    @staticmethod
+    def _release_loop_pool(loop: asyncio.AbstractEventLoop) -> None:
+        """Release the shared-session entry owned by ``loop`` before it closes.
+
+        Components borrow their sessions from :mod:`src.http_session`, keyed by
+        event loop, so a throwaway loop that has done any HTTP work has created
+        a pool entry that nothing else will ever close. Dropping it here keeps
+        ``loop.close()`` from emitting "Unclosed client session" warnings and
+        leaking a connection pool per one-shot invocation.
+        """
+        try:
+            if loop.is_running():
+                return
+            loop.run_until_complete(close_current())
+        except Exception:
+            logger.debug("Failed releasing shared session pool for loop", exc_info=True)
 
     def is_running(self) -> bool:
         """Check if scheduler is currently running."""

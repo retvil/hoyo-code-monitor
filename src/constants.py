@@ -21,6 +21,14 @@ DEFAULT_BROWSER_WAIT_SECONDS: int = 5
 DEFAULT_MAX_RETRIES: int = 3
 DEFAULT_RETRY_BASE_DELAY: float = 1.0
 
+# Max simultaneous in-flight requests to a single host. Sources are fetched in
+# parallel, but many presets share a host (8 point at api.ennead.cc, 8 at
+# hoyo-codes.seria.moe), so concurrency is gated per host rather than globally:
+# a global limit high enough to overlap unrelated hosts would let all 8
+# requests for one host fire at once, which is worse for that host than the
+# original sequential loop was.
+DEFAULT_SOURCE_HOST_CONCURRENCY: int = 2
+
 # --- Scheduler ---
 DEFAULT_POLL_INTERVAL_SECONDS: int = 900
 DEFAULT_REDEMPTION_MIN_GAP_SECONDS: int = 8

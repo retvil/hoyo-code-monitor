@@ -282,6 +282,20 @@ document.body.addEventListener('htmx:afterRequest', function(e) {
     } catch (err) { /* non-JSON swap, ignore */ }
 });
 </script>
+<script>
+// CSRF: echo the server-issued token on every state-changing request.
+// The server validates X-CSRF-Token against its own secret, so this header
+// is what allows POST/PUT/PATCH/DELETE through the CSRF middleware.
+//
+// The token rotates at the UTC day boundary. The value embedded at render time
+// can therefore be stale on a tab left open overnight, so prefer the cookie
+// that /api/csrf-token re-issues on the same rotation schedule.
+document.body.addEventListener('htmx:configRequest', function(e) {
+    var token = (document.cookie.match(/(?:^|;\s*)hcm_csrf=([^;]*)/) || [])[1];
+    if (!token) token = '{{ csrf_token() }}';
+    if (token) e.detail.headers['X-CSRF-Token'] = decodeURIComponent(token);
+});
+</script>
 {% block extra_js %}{% endblock %}
 </body>
 </html>

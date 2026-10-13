@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -337,6 +338,65 @@ class TestSourceFetcher:
         assert "source2" in results
         assert "source3" not in results  # Disabled
         assert mock_session.get.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_fetch_all_enabled_overlaps_different_hosts(self, storage: Storage) -> None:
+        """Unrelated hosts run concurrently instead of waiting sequentially."""
+        storage.add_source("one", "https://one.example", "css", ".code", rate_limit_seconds=0)
+        storage.add_source("two", "https://two.example", "css", ".code", rate_limit_seconds=0)
+        fetcher = SourceFetcher(storage, session=MagicMock())
+        started: list[str] = []
+        release = asyncio.Event()
+
+        async def fake_fetch(source: SourceConfig) -> list[str]:
+            started.append(source.name)
+            await release.wait()
+            return [source.name]
+
+        fetcher.fetch_source = fake_fetch
+        task = asyncio.create_task(fetcher.fetch_all_enabled())
+        for _ in range(20):
+            if len(started) == 2:
+                break
+            await asyncio.sleep(0)
+        assert set(started) == {"one", "two"}
+        release.set()
+        assert await task == {"one": ["one"], "two": ["two"]}
+
+    @pytest.mark.asyncio
+    async def test_fetch_all_enabled_spaces_same_host(self, storage: Storage) -> None:
+        """Sources sharing a host keep their configured minimum spacing."""
+        storage.add_source("one", "https://same.example/a", "css", ".code", rate_limit_seconds=0.03)
+        storage.add_source("two", "https://same.example/b", "css", ".code", rate_limit_seconds=0.03)
+        fetcher = SourceFetcher(storage, session=MagicMock())
+        starts: list[float] = []
+        loop = asyncio.get_running_loop()
+
+        async def fake_fetch(source: SourceConfig) -> list[str]:
+            starts.append(loop.time())
+            return [source.name]
+
+        fetcher.fetch_source = fake_fetch
+        result = await fetcher.fetch_all_enabled()
+        assert result == {"one": ["one"], "two": ["two"]}
+        assert len(starts) == 2
+        assert starts[1] - starts[0] >= 0.025
+
+    @pytest.mark.asyncio
+    async def test_fetch_all_enabled_failure_isolated(self, storage: Storage) -> None:
+        """One failed source returns [] while sibling results survive."""
+        storage.add_source("bad", "https://bad.example", "css", ".code", rate_limit_seconds=0)
+        storage.add_source("good", "https://good.example", "css", ".code", rate_limit_seconds=0)
+        fetcher = SourceFetcher(storage, session=MagicMock())
+
+        async def fake_fetch(source: SourceConfig) -> list[str]:
+            if source.name == "bad":
+                raise RuntimeError("boom")
+            return ["GOODCODE"]
+
+        fetcher.fetch_source = fake_fetch
+        result = await fetcher.fetch_all_enabled()
+        assert result == {"bad": [], "good": ["GOODCODE"]}
 
 
 class TestSeedDefaultSources:

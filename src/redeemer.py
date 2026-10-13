@@ -10,6 +10,7 @@ from typing import Any, Self
 import aiohttp
 
 from src.exceptions import RedeemerError
+from src.http_session import get_session
 
 logger = logging.getLogger(__name__)
 
@@ -68,22 +69,39 @@ class Redeemer:
         self.referer = referer or self.DEFAULT_REFERER
         self.timeout = aiohttp.ClientTimeout(total=timeout)
         self._session: aiohttp.ClientSession | None = None
+        # True while ``_session`` was injected by a caller (tests, or a caller
+        # that manages its own session): those must be closed on ``close()``.
+        # Set to False when the session is borrowed from the shared pool,
+        # because a borrower must never close a session other components use.
+        self._owns_session = True
 
     async def _get_session(self) -> aiohttp.ClientSession:
-        """Get or create the aiohttp ClientSession.
+        """Get the shared aiohttp ClientSession.
+
+        The session comes from the process-wide pool (see ``http_session``),
+        so redemption no longer owns its own connection pool. ``self.timeout``
+        is applied per request rather than per session, because the pooled
+        session is shared with components that have different budgets.
 
         Returns:
             aiohttp.ClientSession: The shared session instance.
         """
         if self._session is None or self._session.closed:
-            self._session = aiohttp.ClientSession(timeout=self.timeout)
+            self._session = get_session()
+            self._owns_session = False
         return self._session
 
     async def close(self) -> None:
-        """Close the underlying aiohttp session."""
-        if self._session is not None and not self._session.closed:
-            await self._session.close()
-            self._session = None
+        """Release the underlying aiohttp session.
+
+        Only sessions this instance created (i.e. injected by a caller) are
+        closed. A pooled session is left open for the rest of the process and
+        is torn down at shutdown by ``http_session.close_all()``.
+        """
+        session, self._session = self._session, None
+        if session is not None and not session.closed and self._owns_session:
+            await session.close()
+        self._owns_session = True
 
     async def __aenter__(self) -> Self:
         """Async context manager entry."""
@@ -295,7 +313,9 @@ class Redeemer:
         # Hoyolab webExchangeCdkey accepts GET with query params (POST -> 405)
         params = dict(form_data)
         try:
-            async with session.get(self.endpoint, headers=headers, params=params) as response:
+            async with session.get(
+                self.endpoint, headers=headers, params=params, timeout=self.timeout
+            ) as response:
                 response.raise_for_status()
                 json_data = await response.json()
 
@@ -367,7 +387,7 @@ class Redeemer:
         logger.info("Attempting to redeem ZZZ code: %s", code[:4] + "****")
 
         try:
-            async with session.post(url, headers=headers, json=payload) as response:
+            async with session.post(url, headers=headers, json=payload, timeout=self.timeout) as response:
                 response.raise_for_status()
                 result = self._parse_response(await response.json())
                 if result.success:

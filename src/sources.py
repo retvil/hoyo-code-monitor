@@ -6,17 +6,21 @@ Provides pluggable source configuration and extraction strategies.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol, Self
+from urllib.parse import urlparse
 
 import aiohttp
 from bs4 import BeautifulSoup
 from lxml import html as lxml_html
 
+from src.constants import DEFAULT_SOURCE_HOST_CONCURRENCY
 from src.exceptions import SourceValidationError
+from src.http_session import get_session
 from src.storage import Storage
 
 logger = logging.getLogger(__name__)
@@ -230,6 +234,57 @@ class SourceConfig:
         )
 
 
+class _HostGate:
+    """Bounds in-flight requests to a single host and spaces out their starts.
+
+    Two knobs, because they solve different problems:
+
+    * ``concurrency`` (an ``asyncio.Semaphore``) caps how many requests to this
+      host are in flight at once, so a burst of sources sharing a host cannot
+      open every connection simultaneously.
+    * ``min_interval`` spaces the *start* of each request by at least that many
+      seconds, which is what ``SourceConfig.rate_limit_seconds`` asked for.
+
+    The next slot is reserved while holding a lock and then slept out, so
+    concurrent waiters receive distinct, ordered start times instead of racing
+    to the same timestamp.
+    """
+
+    __slots__ = ("_lock", "_next_slot", "_semaphore", "host", "min_interval")
+
+    def __init__(self, host: str, concurrency: int, min_interval: float) -> None:
+        self.host = host
+        self.min_interval = min_interval
+        self._semaphore = asyncio.Semaphore(max(1, concurrency))
+        self._lock = asyncio.Lock()
+        # ``None`` means "nothing queued yet", so the first request starts
+        # immediately. Without this, the leading request would wait out a full
+        # min_interval for no reason — the old sequential loop slept *between*
+        # requests, never before the first one.
+        self._next_slot: float | None = None
+
+    async def __aenter__(self) -> _HostGate:
+        await self._semaphore.acquire()
+        if self.min_interval > 0:
+            loop = asyncio.get_running_loop()
+            async with self._lock:
+                now = loop.time()
+                start = now if self._next_slot is None else max(now, self._next_slot)
+                self._next_slot = start + self.min_interval
+            delay = start - now
+            if delay > 0:
+                await asyncio.sleep(delay)
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: object | None,
+    ) -> None:
+        self._semaphore.release()
+
+
 class SourceFetcher:
     """Fetches and extracts codes from configured sources."""
 
@@ -244,20 +299,31 @@ class SourceFetcher:
         self._own_session = session is None
         self.user_agent = user_agent
         self._browser = None
+        # Serializes lazy browser creation. ``_get_browser`` awaits inside its
+        # init branch, so without this lock parallel browser fetches would each
+        # start their own Playwright instance and Chromium process.
+        self._browser_lock = asyncio.Lock()
+        # hostname -> _HostGate, built once per fetch_all_enabled() cycle. A
+        # per-cycle (not per-instance) registry keeps the spacing state from
+        # leaking between cycles, where a long-dead timestamp would stall the
+        # first request of every subsequent run.
+        self._host_gates: dict[str, _HostGate] = {}
 
     async def __aenter__(self) -> Self:
         if self._session is None:
-            timeout = aiohttp.ClientTimeout(total=30)
-            self._session = aiohttp.ClientSession(
-                timeout=timeout,
-                headers={"User-Agent": self.user_agent},
-            )
+            # Borrow from the process-wide pool instead of building a private
+            # pool: every scheduler cycle would otherwise open and tear down a
+            # fresh connection pool. See src/http_session.py.
+            self._session = get_session()
+            self._own_session = False
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        # A borrowed session is left open for the rest of the process; it is
+        # torn down at shutdown by http_session.close_all().
         if self._own_session and self._session:
             await self._session.close()
-            self._session = None
+        self._session = None
         if self._browser:
             await self._browser.close()
             self._browser = None
@@ -266,12 +332,17 @@ class SourceFetcher:
             self._playwright = None
 
     async def _get_browser(self):
-        """Lazy-initialize Playwright browser."""
-        if self._browser is None:
-            from playwright.async_api import async_playwright
+        """Lazy-initialize Playwright browser (single-flight)."""
+        if self._browser is not None:
+            return self._browser
+        async with self._browser_lock:
+            # Re-check under the lock: the first caller's await can suspend long
+            # enough for others to queue up behind it.
+            if self._browser is None:
+                from playwright.async_api import async_playwright
 
-            self._playwright = await async_playwright().start()
-            self._browser = await self._playwright.chromium.launch(headless=True)
+                self._playwright = await async_playwright().start()
+                self._browser = await self._playwright.chromium.launch(headless=True)
         return self._browser
 
     async def fetch_source(self, source: SourceConfig) -> list[str]:
@@ -384,29 +455,80 @@ class SourceFetcher:
         finally:
             await page.close()
 
-    async def fetch_all_enabled(self) -> dict[str, list[str]]:
-        """Fetch codes from all enabled sources."""
-        sources = self.storage.list_sources(enabled_only=True)
-        results = {}
+    def _host_of(self, url: str) -> str:
+        """Hostname used to group sources for per-host rate limiting."""
+        return urlparse(url).hostname or url
 
-        for source_data in sources:
-            source = SourceConfig.from_row(source_data)
+    def _build_host_gates(self, sources: list[SourceConfig]) -> dict[str, _HostGate]:
+        """Build one :class:`_HostGate` per hostname.
+
+        Sources sharing a host can carry different ``rate_limit_seconds``; the
+        most conservative one wins, so a 5s source is not crowded out by a 1s
+        neighbour on the same host. Building gates up front (rather than lazily
+        during the run) keeps the spacing independent of scheduling order, so
+        two runs over the same rows behave identically.
+        """
+        intervals: dict[str, float] = {}
+        for source in sources:
+            host = self._host_of(source.url)
+            interval = max(0.0, source.rate_limit_seconds)
+            intervals[host] = max(intervals.get(host, 0.0), interval)
+        return {
+            host: _HostGate(host, DEFAULT_SOURCE_HOST_CONCURRENCY, interval)
+            for host, interval in intervals.items()
+        }
+
+    async def fetch_all_enabled(self) -> dict[str, list[str]]:
+        """Fetch codes from every enabled source, overlapping unrelated hosts.
+
+        Requests to *different* hosts run concurrently. Requests sharing a host
+        are gated by a per-host :class:`_HostGate`, which caps in-flight
+        connections and spaces each start by that host's ``rate_limit_seconds``.
+        That preserves the politeness of the previous sequential loop — which
+        slept after every single source — without serialising hosts that never
+        talk to each other. A 46-source cycle is therefore no longer the sum of
+        every source's rate limit; it is roughly the heaviest single host.
+
+        Every enabled source appears in the result exactly once, in row order.
+        A source that fails yields an empty list and has its error counter
+        incremented, exactly as before.
+        """
+        rows = self.storage.list_sources(enabled_only=True)
+        if not rows:
+            return {}
+
+        # Parse first so a malformed row costs one error log instead of aborting
+        # the whole cycle.
+        parsed: list[tuple[str, SourceConfig | None]] = []
+        for row in rows:
+            name = str(row.get("name") or "?")
             try:
-                codes = await self.fetch_source(source)
-                results[source.name] = codes
+                parsed.append((name, SourceConfig.from_row(row)))
+            except Exception as e:
+                logger.error("Skipping malformed source %r: %s", name, e)
+                parsed.append((name, None))
+
+        self._host_gates = self._build_host_gates([s for _, s in parsed if s is not None])
+
+        async def run_one(name: str, source: SourceConfig | None) -> tuple[str, list[str]]:
+            if source is None:
+                return name, []
+            gate = self._host_gates[self._host_of(source.url)]
+            try:
+                async with gate:
+                    return name, await self.fetch_source(source)
             except Exception as e:
                 logger.error("Failed to fetch from %s: %s", source.name, e)
-                results[source.name] = []
                 try:
                     self.storage.increment_source_error(source.name)
                 except Exception:
                     logger.debug("Could not increment error count for %s", source.name)
+                return name, []
 
-            # Rate limiting
-            if source.rate_limit_seconds > 0:
-                await asyncio.sleep(source.rate_limit_seconds)
-
-        return results
+        # run_one swallows every exception, so gather never leaves a sibling
+        # coroutine with an unretrieved exception.
+        pairs = await asyncio.gather(*(run_one(n, s) for n, s in parsed))
+        return dict(pairs)
 
 
 def register_extractor(name: str, extractor: Extractor) -> None:

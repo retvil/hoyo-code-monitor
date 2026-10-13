@@ -12,7 +12,7 @@ import re
 import secrets
 import time
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 import aiohttp
@@ -27,6 +27,8 @@ from src.constants import (
     MASK_VISIBLE_CHARS,
     MAX_CHECKIN_JITTER_MINUTES,
 )
+from src.http_session import close_all as close_http_sessions
+from src.http_session import get_session
 from src.i18n import SUPPORTED, get_lang, make_t
 from src.scheduler import create_scheduler_from_storage
 from src.sources import SOURCE_PRESETS, SourceConfig, SourceFetcher, seed_default_sources
@@ -43,9 +45,24 @@ _RATE_LIMIT_SECONDS = 5.0
 scheduler = None
 
 # CSRF protection: state-changing routes require a valid X-CSRF-Token header.
-_CSRF_TOKEN = secrets.token_urlsafe(32)
-_CSRF_COOKIE_NAME = "hcm_csrf"
+#
+# The token rotates at every UTC day boundary. A token that never expires gives
+# anyone who ever observes it — a log line, a screenshot, a shared screen, a
+# stale browser tab — an unlimited window in which to replay it. Deriving the
+# token from the current UTC date bounds that window to a single day while
+# needing no server-side state: every render within the same day agrees, and a
+# restarted frozen build keeps working without re-seeding anything.
+#
+# Delivery is double-submit. The token is written to the non-HttpOnly
+# ``hcm_csrf`` cookie on ``/api/csrf-token`` *and* embedded in every rendered
+# page; the client echoes it back in the X-CSRF-Token header. Validation
+# compares the header against the server's own secret, never against the
+# cookie, so the cookie is a convenience for the client rather than the thing
+# being trusted. A self-consistent attacker-forged header+cookie pair still
+# fails, because the secret is only ever handed to a same-origin page.
+_CSRF_SEED = secrets.token_urlsafe(32)
 _CSRF_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+_CSRF_COOKIE = "hcm_csrf"
 
 
 def _mask(value: str, visible: int = 4) -> str:
@@ -61,24 +78,48 @@ def _safe_detail(exc: BaseException) -> str:
     return _mask(message)
 
 
+def _csrf_day() -> str:
+    """Return the current CSRF epoch as a UTC date string (YYYY-MM-DD)."""
+    return datetime.now(UTC).strftime("%Y-%m-%d")
+
+
 def _csrf_token() -> str:
-    return _CSRF_TOKEN
+    """Return the CSRF token for the current UTC day.
+
+    Deterministically derived from the process seed and the date, so the value
+    is stable across renders and restarts within a day and changes on its own
+    at the UTC boundary without a timer or a stored rotation timestamp.
+    """
+    material = f"{_CSRF_SEED}|{_csrf_day()}".encode()
+    return hashlib.sha256(material).hexdigest()[:43]
+
+
+# Expose the token to every template as a global so each rendered page can
+# embed it for the client-side HTMX listener, without touching each of the
+# 14 TemplateResponse call sites. Passed as the *function*, not its result:
+# Jinja calls it at render time, so the embedded token tracks rotation.
+templates.env.globals["csrf_token"] = _csrf_token
 
 
 def _verify_csrf(request: Request) -> None:
     """Validate CSRF token for state-changing requests.
 
-    Skips validation for same-origin requests with valid form-encoded
-    or header-supplied tokens. Returns None on success, raises 403 on failure.
+    The token is a single server-side secret exposed to the page at render
+    time; the browser echoes it back in the X-CSRF-Token header. The header
+    is compared against the server secret, not against a client-supplied
+    cookie, so a self-consistent header+cookie pair proves nothing.
+
+    Raises 403 on failure.
     """
     origin = request.headers.get("origin", "")
-    referer = request.headers.get("referer", "")
-    if origin and not origin.startswith(request.base_url.netloc or str(request.base_url)):
+    # Only compare scheme://host[:port]; a prefix match would let
+    # "http://127.0.0.1:8000.evil.com" pass as "127.0.0.1:8000".
+    expected_origin = f"{request.base_url.scheme}://{request.base_url.netloc}"
+    if origin and origin.rstrip("/") != expected_origin:
         logger.warning("Blocked cross-origin state change from %s to %s", origin, request.url.path)
         raise HTTPException(status_code=403, detail="Origin not allowed")
     token = request.headers.get("x-csrf-token")
-    cookie_token = request.cookies.get(_CSRF_COOKIE_NAME)
-    if not token or not cookie_token or not hmac.compare_digest(token, cookie_token):
+    if not token or not hmac.compare_digest(token, _csrf_token()):
         logger.warning("Blocked state change with invalid CSRF token from %s", request.url.path)
         raise HTTPException(status_code=403, detail="CSRF token missing or invalid")
 
@@ -102,6 +143,13 @@ async def lifespan(app: FastAPI):
     # Shutdown
     if scheduler and scheduler.is_running():
         scheduler.stop()
+    # Release every pooled aiohttp session. Components borrow rather than own
+    # their sessions, so nothing else closes them; skipping this leaks a
+    # connection pool (and its sockets) per event loop at shutdown.
+    try:
+        await close_http_sessions()
+    except Exception:
+        logger.debug("Error closing shared HTTP sessions", exc_info=True)
 
 
 app = FastAPI(
@@ -124,35 +172,46 @@ async def request_id_middleware(request: Request, call_next):
 
 @app.middleware("http")
 async def csrf_middleware(request: Request, call_next):
-    """Enforce CSRF protection on state-changing requests."""
-    if request.method in _CSRF_METHODS:
-        if os.environ.get("HCM_TESTING") == "1":
-            pass
-        else:
-            try:
-                _verify_csrf(request)
-            except HTTPException:
-                raise
+    """Enforce CSRF protection on state-changing requests.
+
+    HTTPException raised inside user middleware escapes Starlette's inner
+    ExceptionMiddleware, so it would surface as a 500 via ServerErrorMiddleware.
+    Return the rejection response directly instead of raising.
+    """
+    if request.method in _CSRF_METHODS and os.environ.get("HCM_TESTING") != "1":
+        try:
+            _verify_csrf(request)
+        except HTTPException as exc:
+            return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
     response = await call_next(request)
     return response
 
 
 @app.get("/api/csrf-token")
-async def csrf_token(request: Request) -> dict[str, str]:
-    """Return the current CSRF token and set it as a secure, same-site cookie."""
+async def csrf_token(request: Request) -> JSONResponse:
+    """Return the current CSRF token and re-issue the double-submit cookie.
+
+    The token is a server-side secret, embedded in each rendered page and
+    echoed back by the client in the X-CSRF-Token header. It is also written
+    to the non-HttpOnly ``hcm_csrf`` cookie so the client-side script can pick
+    it up on an already-open tab after rotation, without needing a re-render.
+    The header is still validated against the server secret, so the cookie is
+    a delivery channel rather than the thing being trusted.
+
+    The cookie is deliberately not HttpOnly: the page's own script must read
+    it to echo the value back in the header.
+    """
     token = _csrf_token()
     response = JSONResponse(content={"csrf_token": token})
-    # httponly=False: JS must read this cookie to place it in the X-CSRF-Token
-    # request header (double-submit pattern). Safe because the app is bound to
-    # localhost — no cookie is exposed to cross-origin requests.
+    # Re-issued on every call so a client that has been open across the UTC
+    # boundary refreshes its cookie from the same response that hands it the
+    # matching token, keeping header and cookie in agreement.
     response.set_cookie(
-        key=_CSRF_COOKIE_NAME,
-        value=token,
-        httponly=False,
-        secure=False,
-        samesite="lax",
+        _CSRF_COOKIE,
+        token,
         max_age=86400,
-        path="/",
+        samesite="strict",
+        secure=request.base_url.scheme == "https",
     )
     return response
 
@@ -823,10 +882,14 @@ async def health_check():
 
     if not db_error:
         try:
+            # Borrow the pooled session instead of building one per probe: the
+            # 5s budget is applied per request, so the shared session (and its
+            # connection pool) survives the probe. See src/http_session.py.
             timeout = aiohttp.ClientTimeout(total=5)
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.head("https://api.telegram.org") as resp:
-                    payload["connectivity"] = "ok" if resp.status < 500 else "degraded"
+            async with get_session().head(
+                "https://api.telegram.org", timeout=timeout
+            ) as resp:
+                payload["connectivity"] = "ok" if resp.status < 500 else "degraded"
         except Exception as exc:
             payload["connectivity"] = "error"
             logger.debug("External connectivity check failed: %s", exc)

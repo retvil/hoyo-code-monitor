@@ -10,9 +10,14 @@ from __future__ import annotations
 import asyncio
 import logging
 
+from src.http_session import get_session
+
 logger = logging.getLogger(__name__)
 
 API_URL = "https://api.telegram.org/bot{token}/sendMessage"
+
+# Telegram is chatty but small; a tighter bound than the pool default.
+SEND_TIMEOUT = 15.0
 
 
 async def send_telegram(bot_token: str, chat_id: str, text: str) -> bool:
@@ -23,29 +28,34 @@ async def send_telegram(bot_token: str, chat_id: str, text: str) -> bool:
         return False
     max_retries = 3
     base_delay = 1.0
+    timeout = aiohttp.ClientTimeout(total=SEND_TIMEOUT)
+    # Borrowed from the shared pool rather than built per call. The previous
+    # implementation constructed a ClientSession *inside* the retry loop, so a
+    # single failing send could burn up to three sessions (and their sockets).
+    session = get_session()
     for attempt in range(max_retries):
         try:
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as sess:
-                async with sess.post(
-                    API_URL.format(token=bot_token),
-                    json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
-                ) as r:
-                    if r.status != 200:
-                        logger.warning(
-                            "Telegram API HTTP %s (attempt %d/%d)",
-                            r.status,
-                            attempt + 1,
-                            max_retries,
-                        )
-                        if attempt < max_retries - 1:
-                            await asyncio.sleep(base_delay * (2**attempt))
-                            continue
-                        return False
-                    data = await r.json()
-                    ok = bool(data.get("ok"))
-                    if not ok:
-                        logger.warning("Telegram send failed: %s", data)
-                    return ok
+            async with session.post(
+                API_URL.format(token=bot_token),
+                json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
+                timeout=timeout,
+            ) as r:
+                if r.status != 200:
+                    logger.warning(
+                        "Telegram API HTTP %s (attempt %d/%d)",
+                        r.status,
+                        attempt + 1,
+                        max_retries,
+                    )
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(base_delay * (2**attempt))
+                        continue
+                    return False
+                data = await r.json()
+                ok = bool(data.get("ok"))
+                if not ok:
+                    logger.warning("Telegram send failed: %s", data)
+                return ok
         except Exception as e:
             logger.warning("Telegram send error (attempt %d/%d): %s", attempt + 1, max_retries, e)
             if attempt == max_retries - 1:
