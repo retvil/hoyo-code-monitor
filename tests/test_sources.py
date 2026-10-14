@@ -24,6 +24,9 @@ from src.sources import (
 )
 from src.storage import Storage
 
+#: Error count after a single failed fetch (avoids PLR2004 magic value).
+EXPECTED_SINGLE_ERROR_COUNT: int = 1
+
 
 class TestSourceConfig:
     """Tests for SourceConfig dataclass."""
@@ -397,6 +400,52 @@ class TestSourceFetcher:
         fetcher.fetch_source = fake_fetch
         result = await fetcher.fetch_all_enabled()
         assert result == {"bad": [], "good": ["GOODCODE"]}
+
+    @pytest.mark.asyncio
+    async def test_fetch_all_enabled_failure_increments_error_count(
+        self, storage: Storage
+    ) -> None:
+        """Regression: a failed fetch must bump ``sources.error_count``.
+
+        The increment used to raise ``OperationalError: no such column:
+        error_count`` because no migration created the column. The exception was
+        swallowed by the bare ``except Exception`` below, so the counter silently
+        stayed at 0 and the ``"error"`` source state in ``/health`` was dead code.
+        Asserting on the counter — not just on the returned value — is what keeps
+        this from regressing.
+        """
+        storage.add_source("bad", "https://bad.example", "css", ".code", rate_limit_seconds=0)
+        fetcher = SourceFetcher(storage, session=MagicMock())
+
+        async def fake_fetch(source: SourceConfig) -> list[str]:
+            raise RuntimeError("boom")
+
+        fetcher.fetch_source = fake_fetch
+        result = await fetcher.fetch_all_enabled()
+
+        assert result == {"bad": []}
+        source = storage.get_source("bad")
+        assert source is not None
+        assert source["error_count"] == EXPECTED_SINGLE_ERROR_COUNT
+
+    @pytest.mark.asyncio
+    async def test_fetch_all_enabled_success_does_not_increment_error_count(
+        self, storage: Storage
+    ) -> None:
+        """A healthy fetch must leave the error counter untouched."""
+        storage.add_source("good", "https://good.example", "css", ".code", rate_limit_seconds=0)
+        fetcher = SourceFetcher(storage, session=MagicMock())
+
+        async def fake_fetch(source: SourceConfig) -> list[str]:
+            return ["GOODCODE"]
+
+        fetcher.fetch_source = fake_fetch
+        result = await fetcher.fetch_all_enabled()
+
+        assert result == {"good": ["GOODCODE"]}
+        source = storage.get_source("good")
+        assert source is not None
+        assert source["error_count"] == 0
 
 
 class TestSeedDefaultSources:

@@ -9,6 +9,9 @@ import pytest
 
 from src.storage import Storage
 
+#: Number of times a source error counter is incremented in the tests below.
+EXPECTED_ERROR_COUNT: int = 2
+
 
 @pytest.fixture
 def temp_db() -> str:
@@ -234,6 +237,35 @@ class TestSourcesCRUD:
         """Test deleting non-existent source returns False."""
         result = storage.delete_source("nonexistent")
         assert result is False
+
+    def test_increment_source_error(self, storage: Storage) -> None:
+        """Test incrementing the error counter of a source."""
+        storage.add_source("wiki", "https://example.com", "css", ".code")
+
+        source = storage.get_source("wiki")
+        assert source["error_count"] == 0
+
+        storage.increment_source_error("wiki")
+        storage.increment_source_error("wiki")
+
+        source = storage.get_source("wiki")
+        assert source["error_count"] == EXPECTED_ERROR_COUNT
+
+    def test_increment_source_error_unknown_source_is_noop(self, storage: Storage) -> None:
+        """Test incrementing a missing source does not raise."""
+        storage.increment_source_error("nonexistent")
+
+    def test_increment_source_error_does_not_touch_check_count(
+        self, storage: Storage
+    ) -> None:
+        """Test that error counting is independent of check/success counts."""
+        storage.add_source("wiki", "https://example.com", "css", ".code")
+        storage.increment_source_error("wiki")
+
+        source = storage.get_source("wiki")
+        assert source["check_count"] == 0
+        assert source["success_count"] == 0
+        assert source["error_count"] == 1
 
 
 class TestConfigCRUD:

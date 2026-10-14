@@ -1,5 +1,18 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- **`increment_source_error()` crashed on every failed fetch**: the `sources.error_count`
+  column was referenced by `storage.increment_source_error()` (`src/storage.py:729`) and
+  by `web_ui`'s source-health payload (`error_count` / `"error"` state), but was never
+  created by any migration — every call raised `OperationalError: no such column:
+  error_count`. The exception was swallowed by a `try/except` in
+  `SourceFetcher.fetch_all_enabled()` (`src/sources.py:523`), so the failure was
+  invisible and the `"error"` source state in `/health` was dead code. Added migration
+  **v14** to create `sources.error_count INTEGER NOT NULL DEFAULT 0` and bumped
+  `CURRENT_VERSION` to 14
+
 ## [1.2.2] - 2026-10-10
 
 ### Added

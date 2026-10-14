@@ -404,9 +404,60 @@ MIGRATIONS: list[Migration] = [
         UPDATE schema_version SET version = 12;
         """,
     ),
+    (
+        14,
+        """
+        -- Migration v14: consecutive error counter for sources
+        -- increment_source_error() already referenced this column, but it was
+        -- never created: every failed fetch raised OperationalError instead of
+        -- recording the failure, and web_ui's "error" status was dead code.
+        ALTER TABLE sources ADD COLUMN error_count INTEGER NOT NULL DEFAULT 0;
+        UPDATE schema_version SET version = 14;
+        """,
+        """
+        -- Rollback v14: SQLite cannot drop columns before 3.35, so rebuild.
+        CREATE TABLE sources_old (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,
+            url TEXT NOT NULL,
+            selector_type TEXT NOT NULL,
+            selector TEXT NOT NULL,
+            enabled BOOLEAN NOT NULL DEFAULT 1,
+            last_checked TIMESTAMP,
+            last_error TEXT,
+            check_count INTEGER NOT NULL DEFAULT 0,
+            success_count INTEGER NOT NULL DEFAULT 0,
+            headers TEXT NOT NULL DEFAULT '{}',
+            timeout_seconds INTEGER NOT NULL DEFAULT 30,
+            rate_limit_seconds REAL NOT NULL DEFAULT 1.0,
+            requires_browser BOOLEAN NOT NULL DEFAULT 0,
+            browser_wait_selector TEXT,
+            browser_wait_seconds INTEGER NOT NULL DEFAULT 5,
+            max_retries INTEGER NOT NULL DEFAULT 3,
+            retry_base_delay REAL NOT NULL DEFAULT 1.0,
+            game TEXT NOT NULL DEFAULT 'genshin'
+        );
+        INSERT INTO sources_old (
+            id, name, url, selector_type, selector, enabled, last_checked, last_error,
+            check_count, success_count, headers, timeout_seconds, rate_limit_seconds,
+            requires_browser, browser_wait_selector, browser_wait_seconds, max_retries,
+            retry_base_delay, game
+        )
+        SELECT
+            id, name, url, selector_type, selector, enabled, last_checked, last_error,
+            check_count, success_count, headers, timeout_seconds, rate_limit_seconds,
+            requires_browser, browser_wait_selector, browser_wait_seconds, max_retries,
+            retry_base_delay, game
+        FROM sources;
+        DROP TABLE sources;
+        ALTER TABLE sources_old RENAME TO sources;
+        CREATE INDEX IF NOT EXISTS idx_sources_enabled ON sources(enabled);
+        UPDATE schema_version SET version = 13;
+        """,
+    ),
 ]
 
-CURRENT_VERSION = 13
+CURRENT_VERSION = 14
 
 
 def get_db_version(conn: sqlite3.Connection) -> int:
