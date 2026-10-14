@@ -165,3 +165,65 @@ class TestCheckForUpdate:
         assert result is not None
         assert len(result.release_notes) <= version_check.MAX_NOTES_CHARS
         assert "\n" not in result.release_notes
+
+    @pytest.mark.asyncio
+    async def test_notes_have_no_markdown_syntax(self, monkeypatch) -> None:
+        """Regression: raw markdown leaked into the banner as literal text.
+
+        The banner renders notes as plain text, so ``###`` headings and ``**``
+        emphasis used to show up verbatim. Found by driving a real browser, not
+        by the unit suite - assert on the rendered string, not just the length.
+        """
+        body = (
+            "### Added\n"
+            "- **In-app update check**: queries the Releases API.\n"
+            "- Updates are **manual** — you run the installer yourself.\n"
+        )
+        response = MagicMock(status=200)
+        response.json = AsyncMock(
+            return_value={
+                "tag_name": "v9.9.9",
+                "html_url": "https://x",
+                "body": body,
+                "prerelease": False,
+            }
+        )
+        response.__aenter__ = AsyncMock(return_value=response)
+        response.__aexit__ = AsyncMock(return_value=None)
+        session = MagicMock(get=MagicMock(return_value=response))
+        monkeypatch.setattr(version_check, "get_session", lambda: session)
+        monkeypatch.setattr(version_check, "APP_VERSION", "1.0.0")
+
+        result = await check_for_update(force=True)
+
+        assert result is not None
+        notes = result.release_notes
+        assert "###" not in notes
+        assert "**" not in notes
+        # Emphasis is unwrapped, not dropped: the words survive.
+        assert "In-app update check" in notes
+        assert "Updates are manual" in notes
+
+    def test_clean_notes_strips_inline_syntax(self) -> None:
+        """Every inline form GitHub emits must be stripped or unwrapped."""
+        cleaned = version_check._clean_notes(
+            "## Fixed\n"
+            "- `code` and [link](https://x) and ~~strike~~\n"
+            "> quoted\n"
+            "1. first\n"
+            "![alt](https://img.png) image\n"
+        )
+        for leftover in ("#", "**", "`", "](", "~~", "> "):
+            assert leftover not in cleaned, (leftover, cleaned)
+        # Link text survives; its URL does not.
+        assert "link" in cleaned
+        assert "quoted" in cleaned
+
+    def test_clean_notes_leaves_plain_text_alone(self) -> None:
+        plain = "Just a plain sentence with no markup at all."
+        assert version_check._clean_notes(plain) == plain
+
+    def test_clean_notes_handles_empty_and_none(self) -> None:
+        assert version_check._clean_notes("") == ""
+        assert version_check._clean_notes(None) == ""
+        assert version_check._clean_notes("   ") == ""

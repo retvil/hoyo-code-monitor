@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- **Release notes in the update banner showed raw Markdown**: the banner renders
+  notes as plain text, but `_clean_notes()` only collapsed whitespace, so a
+  GitHub release body arrived with literal `###` headings and `**bold**` markers
+  visible to the user. Inline syntax (headings, emphasis, strikethrough, code,
+  links, list markers, blockquotes, images) is now stripped, leaving readable
+  prose. Notes stay rendered as text rather than HTML, so upstream-authored
+  markdown has no injection surface. Caught by driving a real browser, not by the
+  unit suite
+
 ## [1.2.3] - 2026-10-11
 
 ### Added

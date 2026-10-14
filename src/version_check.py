@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import threading
 import time
 from dataclasses import dataclass
@@ -40,6 +41,19 @@ logger = logging.getLogger(__name__)
 
 # Release notes are shown verbatim in a banner; keep them banner-sized.
 MAX_NOTES_CHARS: int = 400
+
+# Inline Markdown syntax stripped from release notes before display. The banner
+# renders notes as plain text, so these only make the sentence readable.
+# MULTILINE so headings/lists/quotes are stripped on every line, not just the
+# first: notes are still multi-line at this point and are collapsed afterwards.
+_MD_HEADING = re.compile(r"^\s{0,3}#{1,6}\s+", re.MULTILINE)
+_MD_EMPHASIS = re.compile(r"(\*\*|__|\*)(.+?)\1", re.DOTALL)
+_MD_STRIKE = re.compile(r"~~(.+?)~~", re.DOTALL)
+_MD_INLINE_CODE = re.compile(r"`+([^`]*)`+")
+_MD_IMAGE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
+_MD_LINK = re.compile(r"\[([^\]]+)\]\([^)]*\)")
+_MD_LIST_MARKER = re.compile(r"^\s{0,3}(?:[-*+]|\d+[.)])\s+", re.MULTILINE)
+_MD_BLOCKQUOTE = re.compile(r"^\s{0,3}>\s?", re.MULTILINE)
 
 _REQUEST_HEADERS: dict[str, str] = {
     "Accept": "application/vnd.github+json",
@@ -110,11 +124,25 @@ def _is_prerelease(version: str) -> bool:
 
 
 def _clean_notes(raw: Any) -> str:
-    """Trim release notes to a banner-friendly single paragraph."""
+    """Trim release notes to a banner-friendly single paragraph.
+
+    Release notes are Markdown authored upstream, and the banner renders them
+    as plain text. Stripping the common inline syntax keeps the sentence
+    readable instead of showing literal ``###`` and ``**``. Rendering them as
+    text (never as HTML) also means no markdown-injection surface.
+    """
     text = str(raw or "").strip()
     if not text:
         return ""
-    text = " ".join(text.split())
+    text = _MD_HEADING.sub("", text)  # leading ### / ## / #
+    text = _MD_EMPHASIS.sub(r"\2", text)  # **bold** / *italic* / __bold__
+    text = _MD_STRIKE.sub(r"\1", text)  # ~~strike~~
+    text = _MD_INLINE_CODE.sub(r"\1", text)  # `code`
+    text = _MD_IMAGE.sub("", text)  # ![alt](url) - alt is redundant here
+    text = _MD_LINK.sub(r"\1", text)  # [text](url) -> text
+    text = _MD_LIST_MARKER.sub("", text)  # leading "- " / "* " / "1. "
+    text = _MD_BLOCKQUOTE.sub("", text)  # leading "> "
+    text = " ".join(text.split())  # collapse newlines and runs of spaces
     if len(text) <= MAX_NOTES_CHARS:
         return text
     return text[: MAX_NOTES_CHARS - 1].rstrip() + "…"
