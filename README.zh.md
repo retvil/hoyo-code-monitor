@@ -63,7 +63,7 @@ HoYoverse 游戏会定期发布限时兑换码 —— 而且很快过期。**HoY
 
 从 [Releases](https://github.com/retvil/hoyo-code-monitor/releases) 下载安装程序：
 
-- **Windows** — `hoyo-code-monitor-1.2.3-setup.exe` (按用户安装，无需管理员权限)
+- **Windows** — `hoyo-code-monitor-1.2.4-setup.exe` (按用户安装，无需管理员权限)
 
 静默安装：`setup.exe /S`。组件：桌面快捷方式、Windows 开机自启 (默认全部开启)。
 

@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [1.2.4] - 2026-10-14
 
 ### Fixed
 - **Release notes in the update banner showed raw Markdown**: the banner renders

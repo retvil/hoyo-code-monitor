@@ -63,7 +63,7 @@ HoYoverse games regularly release time-limited promo codes — and they expire f
 
 Download the installer from [Releases](https://github.com/retvil/hoyo-code-monitor/releases):
 
-- **Windows** — `hoyo-code-monitor-1.2.3-setup.exe` (per-user install, no admin rights needed)
+- **Windows** — `hoyo-code-monitor-1.2.4-setup.exe` (per-user install, no admin rights needed)
 
 Silent install: `setup.exe /S`. Components: desktop shortcut, Windows autostart (both on by default).
 
