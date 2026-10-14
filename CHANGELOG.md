@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [1.2.3] - 2026-10-11
 
 ### Added
 - **In-app update check with release banner**: the Web UI now queries the public

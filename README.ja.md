@@ -63,7 +63,7 @@ HoYoverseのゲームでは期限付きプロモコードが定期的に配布�
 
 [Releases](https://github.com/retvil/hoyo-code-monitor/releases) からインストーラをダウンロード:
 
-- **Windows** — `hoyo-code-monitor-1.2.2-setup.exe` (ユーザー単位インストール、管理者権限不要)
+- **Windows** — `hoyo-code-monitor-1.2.3-setup.exe` (ユーザー単位インストール、管理者権限不要)
 
 サイレントインストール: `setup.exe /S`。コンポーネント: デスクトップショートカット、Windows自動起動 (どちらもデフォルトでオン)。
 

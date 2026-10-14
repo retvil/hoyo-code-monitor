@@ -63,7 +63,7 @@ HoYoverse-Spiele veröffentlichen regelmäßig zeitlich begrenzte Promocodes —
 
 Installer aus [Releases](https://github.com/retvil/hoyo-code-monitor/releases) herunterladen:
 
-- **Windows** — `hoyo-code-monitor-1.2.2-setup.exe` (Installation pro Benutzer, keine Adminrechte nötig)
+- **Windows** — `hoyo-code-monitor-1.2.3-setup.exe` (Installation pro Benutzer, keine Adminrechte nötig)
 
 Stille Installation: `setup.exe /S`. Komponenten: Desktop-Verknüpfung, Windows-Autostart (beide standardmäßig an).
 
