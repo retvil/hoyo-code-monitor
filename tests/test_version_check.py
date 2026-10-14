@@ -204,6 +204,21 @@ class TestCheckForUpdate:
         assert "In-app update check" in notes
         assert "Updates are manual" in notes
 
+    def test_clean_notes_strips_heading_only_at_line_start(self) -> None:
+        """A heading marker is syntax; the same characters mid-sentence are not.
+
+        The banner text is prose, so "### Added" at the start of a line must
+        lose its marker. A sentence that merely mentions the characters (as
+        this changelog entry does) must keep them - stripping there would
+        corrupt legitimate text. Live-browser runs flagged exactly this.
+        """
+        heading = version_check._clean_notes("### Added\n- something")
+        assert "### Added" not in heading
+        assert "Added" in heading
+
+        mentioned = version_check._clean_notes("body arrived with literal ### markers")
+        assert "###" in mentioned, "mid-sentence ### is prose, not a heading"
+
     def test_clean_notes_strips_inline_syntax(self) -> None:
         """Every inline form GitHub emits must be stripped or unwrapped."""
         cleaned = version_check._clean_notes(
