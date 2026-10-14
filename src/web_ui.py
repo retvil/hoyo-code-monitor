@@ -13,27 +13,39 @@ import secrets
 import time
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import aiohttp
 from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
-from pydantic import BaseModel
 
 from src.config import ConfigManager
 from src.constants import (
-    APP_AUTHOR,
     APP_VERSION,
     MASK_VISIBLE_CHARS,
     MAX_CHECKIN_JITTER_MINUTES,
 )
 from src.http_session import close_all as close_http_sessions
 from src.http_session import get_session
-from src.i18n import SUPPORTED, get_lang, make_t
 from src.scheduler import create_scheduler_from_storage
 from src.sources import SOURCE_PRESETS, SourceConfig, SourceFetcher, seed_default_sources
 from src.storage import Storage
 from src.templates import templates
+from src.version_check import check_for_update
+from src.web_views import (
+    account_checkin_switch_html,
+    account_redeem_switch_html,
+    checkin_logs_with_names,
+    is_source_stale,
+    page_ctx,
+    source_health,
+)
+from src.web_views import (
+    safe_detail as _safe_detail,
+)
+
+if TYPE_CHECKING:
+    from collections.abc import Coroutine
 
 logger = logging.getLogger(__name__)
 
@@ -63,19 +75,6 @@ scheduler = None
 _CSRF_SEED = secrets.token_urlsafe(32)
 _CSRF_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 _CSRF_COOKIE = "hcm_csrf"
-
-
-def _mask(value: str, visible: int = 4) -> str:
-    """Mask a secret string, showing only the tail."""
-    if not value or len(value) <= visible * 2:
-        return "*" * max(len(value), 4)
-    return f"{'*' * visible}{value[-visible:]}"
-
-
-def _safe_detail(exc: BaseException) -> str:
-    """Strip secrets from an exception message."""
-    message = str(exc)
-    return _mask(message)
 
 
 def _csrf_day() -> str:
@@ -124,6 +123,26 @@ def _verify_csrf(request: Request) -> None:
         raise HTTPException(status_code=403, detail="CSRF token missing or invalid")
 
 
+#: Strong refs for fire-and-forget tasks. asyncio only keeps weak references
+#: to running tasks, so an unreferenced one can be garbage-collected mid-flight.
+_background_tasks: set[asyncio.Task] = set()
+
+
+def _spawn_background(coro: Coroutine[Any, Any, None]) -> None:
+    """Run a coroutine to completion in the background, keeping a strong ref."""
+    task = asyncio.create_task(coro)
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+
+
+async def _prime_update_cache() -> None:
+    """Warm the GitHub Releases cache without ever blocking startup."""
+    try:
+        await check_for_update()
+    except Exception:  # pragma: no cover - check_for_update already swallows
+        logger.debug("Update check failed", exc_info=True)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global scheduler
@@ -139,6 +158,12 @@ async def lifespan(app: FastAPI):
     # when standalone (otherwise the dashboard would show a dead scheduler).
     if scheduler is None:
         scheduler = create_scheduler_from_storage()
+
+    # Prime the update cache in the background so the first page render reads
+    # a warm cache instead of paying for a GitHub round-trip. Deliberately not
+    # awaited: a slow or unreachable GitHub must never delay startup.
+    _spawn_background(_prime_update_cache())
+
     yield
     # Shutdown
     if scheduler and scheduler.is_running():
@@ -187,6 +212,25 @@ async def csrf_middleware(request: Request, call_next):
     return response
 
 
+@app.get("/api/update", response_class=JSONResponse)
+async def api_update() -> JSONResponse:
+    """Return the latest release, checking GitHub only when the cache is stale.
+
+    Non-forcing reads are free; a cold cache costs one GitHub round-trip, which
+    the lifespan task has usually already paid by the time anyone asks.
+    """
+    update = await check_for_update()
+    return JSONResponse(
+        {
+            "current": APP_VERSION,
+            "latest": update.latest_version if update else APP_VERSION,
+            "update_available": update is not None,
+            "url": update.url if update else "",
+            "release_notes": update.release_notes if update else "",
+        }
+    )
+
+
 @app.get("/api/csrf-token")
 async def csrf_token(request: Request) -> JSONResponse:
     """Return the current CSRF token and re-issue the double-submit cookie.
@@ -214,70 +258,6 @@ async def csrf_token(request: Request) -> JSONResponse:
         secure=request.base_url.scheme == "https",
     )
     return response
-
-
-# Pydantic models for API
-class SourceCreate(BaseModel):
-    name: str
-    url: str
-    selector_type: str
-    selector: str
-    enabled: bool = True
-    headers: dict[str, str] = {}
-    timeout_seconds: int = 30
-    rate_limit_seconds: float = 1.0
-    requires_browser: bool = False
-    browser_wait_selector: str | None = None
-    browser_wait_seconds: int = 5
-    max_retries: int = 3
-    retry_base_delay: float = 1.0
-
-
-class AccountCreate(BaseModel):
-    name: str
-    uid: str
-    region: str
-    game_biz: str = "hk4e_global"
-    lang: str = "en-us"
-    s_lang_key: str = "en-us"
-
-
-class ConfigUpdate(BaseModel):
-    key: str
-    value: Any
-
-
-def page_ctx(storage: Storage, extra: dict | None = None) -> dict:
-    """Build template context with i18n + hardcoded author info (release build)."""
-    from src import author as author_module
-    from src.constants import GAME_CONF
-
-    lang = get_lang(storage)
-    accounts = storage.list_accounts()
-    games_with_account = {a.get("game") or "genshin" for a in accounts}
-    ctx: dict = {
-        "t": make_t(lang),
-        "lang": lang,
-        "langs": SUPPORTED,
-        "app_version": APP_VERSION,
-        "app_author": APP_AUTHOR,
-        "current_game": "",
-        "game_accents": {
-            gid: {
-                "accent": conf["accent"],
-                "accent_soft": conf.get("accent_soft", "#ede9fe"),
-                "short": conf.get("short", gid.upper()),
-                "name": conf.get("name", gid),
-            }
-            for gid, conf in GAME_CONF.items()
-        },
-        "games_with_account": games_with_account,
-        "gift_urls": {gid: conf["gift_url"] for gid, conf in GAME_CONF.items()},
-    }
-    ctx.update(author_module.as_dict())
-    if extra:
-        ctx.update(extra)
-    return ctx
 
 
 @app.post("/language")
@@ -819,21 +799,6 @@ async def api_stats():
     return storage.get_stats()
 
 
-def _is_source_stale(last_checked: str | None) -> bool:
-    """Check if a source is stale (not checked for over an hour).
-
-    Returns False on missing or malformed timestamps instead of raising.
-    """
-    if not last_checked:
-        return False
-    try:
-        checked_at = datetime.fromisoformat(last_checked)
-    except (TypeError, ValueError):
-        logger.warning("Ignoring malformed last_checked %r", last_checked)
-        return False
-    return (datetime.now() - checked_at).total_seconds() > 3600
-
-
 @app.get("/api/sources/status")
 async def api_sources_status():
     """Get status of all sources."""
@@ -852,7 +817,7 @@ async def api_sources_status():
             "error_count": source.get("error_count", 0),
             "status": "active" if source["enabled"] and source.get("last_success") else
                      "error" if source.get("error_count", 0) > 3 else
-                     "warning" if _is_source_stale(source.get("last_checked"))
+                     "warning" if is_source_stale(source.get("last_checked"))
                      else "unknown"
     })
 
@@ -867,7 +832,7 @@ async def health_check():
         "status": "healthy",
         "database": "ok",
         "scheduler": _safe_scheduler_status(),
-        "sources": _safe_sources_health(storage),
+        "sources": source_health(storage),
         "connectivity": "unknown",
     }
     db_error = False
@@ -925,41 +890,6 @@ def _safe_scheduler_status() -> dict[str, Any]:
         return {"state": "error", "error": str(exc)}
 
 
-def _safe_sources_health(storage: Storage) -> dict[str, Any]:
-    """Return enabled sources health summary without raising."""
-    try:
-        sources = storage.list_sources(enabled_only=True)
-        source_health = []
-        for source in sources:
-            checked_at = source.get("last_checked")
-            stale = False
-            if checked_at:
-                try:
-                    checked_at_dt = datetime.fromisoformat(checked_at)
-                    stale = (datetime.now() - checked_at_dt).total_seconds() > 3600
-                except (TypeError, ValueError):
-                    pass
-            source_health.append(
-                {
-                    "name": source.get("name", "unknown"),
-                    "last_checked": checked_at,
-                    "last_success": source.get("last_success"),
-                    "error_count": source.get("error_count", 0),
-                    "state": (
-                        "active"
-                        if source.get("last_success") and not stale
-                        else "warning" if stale else "idle"
-                    ),
-                }
-            )
-        return {
-            "count": len(sources),
-            "sources": source_health,
-        }
-    except Exception as exc:  # pragma: no cover - defensive
-        return {"count": 0, "sources": [], "error": str(exc)}
-
-
 @app.get("/partials/health", response_class=HTMLResponse)
 async def partial_health():
     """HTMX partial: pretty health badge (machine JSON stays at /health)."""
@@ -974,7 +904,6 @@ async def partial_health():
                 '<span class="badge badge-bad">Scheduler missing</span> '
                 '<span class="muted">DB ok · Start the app to enable scheduling</span>'
             )
-        source_errors = sum(1 for source in _safe_sources_health(storage).get("sources", []) if source.get("state") == "error")
         return (
             '<span class="badge badge-ok">Healthy</span> '
             f'<span class="muted">DB ok · {len(sources)} active sources · scheduler {scheduler_state.get("state", "unknown")}</span>'
@@ -989,7 +918,7 @@ async def account_redeem_state(name: str):
     storage = Storage()
     if not storage.get_account(name):
         raise HTTPException(status_code=404, detail="Account not found")
-    return _account_redeem_switch_html(name, storage.is_account_redeem_enabled(name))
+    return account_redeem_switch_html(name, storage.is_account_redeem_enabled(name))
 
 
 @app.post("/accounts/{name}/redeem/toggle", response_class=HTMLResponse)
@@ -1000,30 +929,7 @@ async def toggle_account_redeem(name: str):
         raise HTTPException(status_code=404, detail="Account not found")
     new_value = not storage.is_account_redeem_enabled(name)
     storage.set_account_redeem(name, new_value)
-    return _account_redeem_switch_html(name, new_value)
-
-
-def _checkin_logs_with_names(storage: Storage, **filters: Any) -> list[dict[str, Any]]:
-    """Check-in logs with account names attached for templates."""
-    logs = storage.get_checkin_logs(**filters)
-    names = {a["id"]: a["name"] for a in storage.list_accounts()}
-    for row in logs:
-        row["account_name"] = names.get(row["account_id"], f"id:{row['account_id']}")
-    return logs
-
-
-def _account_checkin_switch_html(name: str, enabled: bool) -> str:
-    """Render per-account auto-check-in toggle switch (full span for outerHTML swap)."""
-    checked = "checked" if enabled else ""
-    label = "ON" if enabled else "OFF"
-    cls = "badge-ok" if enabled else "badge-bad"
-    return (
-        f"<span id='checkin-{name}'>"
-        f"<label style='display: flex; align-items: center; gap: 8px; cursor: pointer;'>"
-        f"<input type='checkbox' {checked} style='width: 18px; height: 18px;' "
-        f"hx-post='/accounts/{name}/checkin/toggle' hx-target='#checkin-{name}' hx-swap='outerHTML'>"
-        f"<span class='badge {cls}'>{label}</span></label></span>"
-    )
+    return account_redeem_switch_html(name, new_value)
 
 
 @app.get("/accounts/{name}/checkin-state", response_class=HTMLResponse)
@@ -1032,7 +938,7 @@ async def account_checkin_state(name: str) -> str:
     storage = Storage()
     if not storage.get_account(name):
         raise HTTPException(status_code=404, detail="Account not found")
-    return _account_checkin_switch_html(name, storage.is_account_checkin_enabled(name))
+    return account_checkin_switch_html(name, storage.is_account_checkin_enabled(name))
 
 
 @app.post("/accounts/{name}/checkin/toggle", response_class=HTMLResponse)
@@ -1043,14 +949,14 @@ async def toggle_account_checkin(name: str) -> str:
         raise HTTPException(status_code=404, detail="Account not found")
     new_value = not storage.is_account_checkin_enabled(name)
     storage.set_account_checkin(name, new_value)
-    return _account_checkin_switch_html(name, new_value)
+    return account_checkin_switch_html(name, new_value)
 
 
 @app.get("/checkins", response_class=HTMLResponse)
 async def checkins_page(request: Request) -> HTMLResponse:
     """Daily check-ins page: schedule settings, manual run, history."""
     storage = Storage()
-    logs = _checkin_logs_with_names(storage, limit=50)
+    logs = checkin_logs_with_names(storage, limit=50)
     sched = scheduler.status if scheduler else None
     settings = {
         "enabled": storage.get_config("checkin_enabled", "true") == "true",
@@ -1114,7 +1020,7 @@ async def partial_checkin_logs(
 ) -> HTMLResponse:
     """HTMX partial for check-in history with filters."""
     storage = Storage()
-    logs = _checkin_logs_with_names(
+    logs = checkin_logs_with_names(
         storage, limit=50, game=game or None, status=status or None
     )
     return templates.TemplateResponse(
@@ -1164,20 +1070,6 @@ async def partial_checkin_progress(request: Request) -> HTMLResponse:
         request,
         "partials/checkin_progress.html",
         page_ctx(storage, {"request": request, "progress": progress}),
-    )
-
-
-def _account_redeem_switch_html(name: str, enabled: bool) -> str:
-    """Render per-account auto-redeem toggle switch (full span for outerHTML swap)."""
-    checked = "checked" if enabled else ""
-    label = "ON" if enabled else "OFF"
-    cls = "badge-ok" if enabled else "badge-bad"
-    return (
-        f"<span id='redeem-{name}'>"
-        f"<label style='display: flex; align-items: center; gap: 8px; cursor: pointer;'>"
-        f"<input type='checkbox' {checked} style='width: 18px; height: 18px;' "
-        f"hx-post='/accounts/{name}/redeem/toggle' hx-target='#redeem-{name}' hx-swap='outerHTML'>"
-        f"<span class='badge {cls}'>{label}</span></label></span>"
     )
 
 

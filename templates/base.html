@@ -235,6 +235,37 @@ function copyText(txt, el) {
     </div>
 </aside>
 <main>
+    {% if update_available %}
+    <div id="update-banner" data-latest="{{ update_latest }}" class="card" style="margin-bottom: 16px; border-left: 4px solid var(--accent); display: flex; justify-content: space-between; gap: 16px; align-items: flex-start;">
+        <div>
+            <strong>{{ update_message }}</strong>
+            {% if update_notes_text %}
+            <div class="muted" style="margin-top: 6px; max-width: 780px;">{{ update_notes_text }}</div>
+            {% else %}
+            <div class="muted" style="margin-top: 6px;">{{ t('update_notes_none') }}</div>
+            {% endif %}
+            <a class="btn btn-primary" style="display: inline-block; margin-top: 10px;" href="{{ update_url }}" target="_blank" rel="noopener noreferrer">{{ t('update_download') }}</a>
+        </div>
+        <button class="btn" type="button" aria-label="{{ t('update_later') }}" onclick="dismissUpdateBanner()">×</button>
+    </div>
+    <script>
+        // Dismissal is per release: a newer build re-arms the banner, an already
+        // dismissed one stays hidden across reloads on the same browser.
+        (function () {
+            var banner = document.getElementById("update-banner");
+            if (!banner) return;
+            var key = "hcm_update_dismissed_" + banner.dataset.latest;
+            if (localStorage.getItem(key)) {
+                banner.remove();
+            } else {
+                window.dismissUpdateBanner = function () {
+                    localStorage.setItem(key, "1");
+                    banner.remove();
+                };
+            }
+        })();
+    </script>
+    {% endif %}
     <div class="topbar">
         <h1>{% block page_title %}Dashboard{% endblock %}</h1>
         <div style="display: flex; gap: 8px; align-items: center;">

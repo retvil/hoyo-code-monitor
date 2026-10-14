@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import tempfile
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -106,6 +107,87 @@ class TestAccountsApi:
         assert "badge-bad" in client.get("/accounts/a3/redeem-state").text
         assert "badge-ok" in client.post("/accounts/a3/redeem/toggle").text
         assert "badge-bad" in client.post("/accounts/a3/redeem/toggle").text
+
+
+class TestCheckinsApi:
+    def test_checkins_page_and_partials(self, client: TestClient) -> None:
+        assert client.get("/checkins").status_code == 200
+        assert client.get("/partials/checkin-logs").status_code == 200
+        assert client.get("/partials/checkin-progress").status_code == 200
+        assert client.get("/api/checkins/status").status_code == 200
+        assert client.get("/api/checkins/progress").status_code == 200
+
+    def test_checkin_toggle(self, client: TestClient) -> None:
+        assert client.post("/accounts", data={"name": "ca", "uid": "4", "region": "os_usa"}).status_code == 200
+        assert "badge-ok" in client.get("/accounts/ca/checkin-state").text
+        assert "badge-bad" in client.post("/accounts/ca/checkin/toggle").text
+        assert "badge-ok" in client.post("/accounts/ca/checkin/toggle").text
+        assert client.get("/accounts/nope/checkin-state").status_code == 404
+        assert client.post("/accounts/nope/checkin/toggle").status_code == 404
+
+    def test_checkin_settings_validation(self, client: TestClient) -> None:
+        valid = {
+            "checkin_enabled": "true",
+            "checkin_time": "05:30",
+            "checkin_jitter_minutes": "10",
+        }
+        assert client.post("/checkins/settings", data=valid).status_code == 200
+        assert client.post(
+            "/checkins/settings",
+            data={**valid, "checkin_time": "25:99"},
+        ).status_code == 400
+        assert client.post(
+            "/checkins/settings",
+            data={**valid, "checkin_jitter_minutes": "121"},
+        ).status_code == 400
+
+
+class TestImportExportApi:
+    def test_export_import_round_trip(self, client: TestClient, temp_db: str) -> None:
+        source = Storage(temp_db)
+        source.add_code("EXPORTED1", "backup", game="hsr")
+        payload = client.get("/export").json()
+        assert payload["app"] == "genshin-code-monitor"
+        assert payload["codes"][0]["code"] == "EXPORTED1"
+
+        target_db = tempfile.NamedTemporaryFile(suffix=".db", delete=False).name
+        try:
+            import src.web_ui as web_ui
+
+            original_storage = web_ui.Storage
+            web_ui.Storage = lambda *a, **k: Storage(target_db)
+            imported = client.post("/import", data={"payload": json.dumps(payload)})
+            assert imported.status_code == 200
+            assert "Imported 1" in imported.json()["result"]
+            assert Storage(target_db).get_code("EXPORTED1", game="hsr") is not None
+        finally:
+            web_ui.Storage = original_storage
+            for suffix in ("", "-wal", "-shm", "-journal"):
+                try:
+                    os.unlink(target_db + suffix)
+                except OSError:
+                    pass
+
+    def test_import_rejects_invalid_json(self, client: TestClient) -> None:
+        response = client.post("/import", data={"payload": "not-json"})
+        assert response.status_code == 400
+
+
+class TestHealthAndSourceStatus:
+    def test_health_reports_component_shape(self, client: TestClient) -> None:
+        payload = client.get("/health").json()
+        assert {"status", "database", "scheduler", "sources", "connectivity"} <= payload.keys()
+        assert payload["database"] == "ok"
+        assert "state" in payload["scheduler"]
+        assert "count" in payload["sources"]
+
+    def test_sources_status_uses_error_count(self, client: TestClient, temp_db: str) -> None:
+        source = Storage(temp_db)
+        source.add_source("failing", "https://example.com", "css", ".code")
+        for _ in range(4):
+            source.increment_source_error("failing")
+        payload = client.get("/api/sources/status").json()
+        assert payload[0]["status"] == "error"
 
 
 class TestMiscApi:

@@ -59,6 +59,7 @@ HEALTH_RATE_LIMIT_SECONDS: float = 5.0
 TRAY_ICON_SIZE: int = 64
 
 # --- HTTP ---
+HTTP_OK: int = 200
 HTTP_TOO_MANY_REQUESTS: int = 429
 HTTP_INTERNAL_ERROR: int = 500
 HTTP_BAD_GATEWAY: int = 502
@@ -75,8 +76,15 @@ WEB_HOST: str = "127.0.0.1"
 WEB_PORT: int = 8000
 
 # --- App identity ---
-APP_VERSION: str = "1.2.1"
+APP_VERSION: str = "1.2.2"
 APP_AUTHOR: str = "Nod33Eset"
+
+# --- Update check (read-only GitHub Releases) ---
+GITHUB_REPO: str = "retvil/hoyo-code-monitor"
+RELEASES_API_URL: str = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+RELEASES_PAGE_URL: str = f"https://github.com/{GITHUB_REPO}/releases/latest"
+UPDATE_CHECK_INTERVAL_SECONDS: int = 21600  # 6h
+UPDATE_CHECK_TIMEOUT_SECONDS: int = 5
 
 # --- Games (multi-game support, Phase 2) ---
 DEFAULT_GAME: str = "genshin"
