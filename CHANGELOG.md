@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Added
+- **In-app update check with release banner**: the Web UI now queries the public
+  GitHub Releases API and shows a dismissible banner when a newer version exists,
+  with the release notes and a download link. This is the only outbound call the
+  app makes beyond the user-configured sources. The check is read-only (no token,
+  no telemetry, no device identifiers), cached for `UPDATE_CHECK_INTERVAL_SECONDS`
+  (6h, failed attempts included), never raises — every failure keeps the banner
+  hidden — and can be disabled with `update_check_enabled = false` in config or by
+  dismissing the banner (per release, so a newer build re-arms it)
+
 ### Fixed
 - **`increment_source_error()` crashed on every failed fetch**: the `sources.error_count`
   column was referenced by `storage.increment_source_error()` (`src/storage.py:729`) and
