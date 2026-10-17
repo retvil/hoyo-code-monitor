@@ -3,11 +3,11 @@
 import asyncio
 import json
 import logging
-import os  # noqa: F401 - used in tray()
+import os
 import sys
-import threading  # noqa: F401 - used in tray()
-import time  # noqa: F401 - used in tray()
-import webbrowser  # noqa: F401 - used in tray()
+import threading
+import time
+import webbrowser
 
 import click
 import uvicorn
@@ -18,7 +18,7 @@ from src.autostart import enable as autostart_enable
 from src.autostart import is_enabled as autostart_is_enabled
 from src.config import ConfigManager
 from src.constants import MASK_VISIBLE_CHARS, MAX_MASKED_UID
-from src.constants import WEB_HOST, WEB_PORT  # noqa: F401 - used in tray()
+from src.constants import WEB_HOST, WEB_PORT
 from src.cookies_login import capture_cookies_sync
 from src.logging_setup import setup_logging
 from src.notify import send_telegram
@@ -606,12 +606,6 @@ def autostart_status_cli():
 @cli.command()
 def tray():
     """Run in system tray with live menu and embedded settings server."""
-    import threading
-    import time
-    import webbrowser
-
-    from src.constants import WEB_HOST, WEB_PORT
-
     _ensure_single_instance()
     scheduler = create_scheduler_from_storage()
     # Share the live scheduler with the embedded web UI so the dashboard
@@ -655,7 +649,6 @@ def tray():
         click.echo("Shutting down...")
         if scheduler.is_running():
             scheduler.stop()
-        import os
 
         os._exit(0)
 
