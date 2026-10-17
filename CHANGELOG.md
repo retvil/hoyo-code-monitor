@@ -1,5 +1,21 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- **Flaky test in the shared-session pool suite**: `test_closes_session_owned_by_a_running_foreign_loop`
+  asserted that the session was *still open* immediately after `close_all()`,
+  which raced the schedule. `close_all()` hands the close back to the owning
+  loop via `call_soon_threadsafe`, and that call wakes the owning loop at once,
+  so the close landed before the caller regained control — the suite came back
+  `403 passed, 1 failed` while the code under test was correct (the contract
+  still held: the session ends up closed and the registry empties). The
+  assertion was replaced with the substantive check it was proxying for:
+  `_safe_close` is wrapped to record *which loop* ran the close, and the test
+  now asserts that close ran on the owning loop rather than the caller's.
+  Verified non-vacuous by mutation — awaiting the foreign session directly
+  (the bug this test guards) still fails it
+
 ## [1.2.4] - 2026-10-14
 
 ### Fixed

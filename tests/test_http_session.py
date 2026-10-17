@@ -134,13 +134,28 @@ class TestCloseAll:
         await close_all()  # must not raise
         assert len(hs._registry) == 0
 
-    async def test_closes_session_owned_by_a_running_foreign_loop(self) -> None:
+    async def test_closes_session_owned_by_a_running_foreign_loop(self, monkeypatch) -> None:
         """Cross-loop close must be scheduled on the owner loop, not awaited.
 
         Awaiting a session bound to a *different running* loop raises
         "attached to a different loop", so ``close_all()`` must hand the close
         back to the owning loop via ``call_soon_threadsafe``.
+
+        The substantive check is *which loop* ran the close, recorded by
+        wrapping ``_safe_close``. Asserting instead that the session is still
+        open when ``close_all()`` returns would be a race: the foreign loop is
+        woken the moment the close is scheduled, so it can land the close
+        before the caller regains control.
         """
+        closed_on: list[asyncio.AbstractEventLoop] = []
+        real_safe_close = hs._safe_close
+
+        async def _record_loop(session: aiohttp.ClientSession) -> None:
+            closed_on.append(asyncio.get_running_loop())
+            await real_safe_close(session)
+
+        monkeypatch.setattr(hs, "_safe_close", _record_loop)
+
         loop = asyncio.new_event_loop()
         thread = threading.Thread(target=loop.run_forever, daemon=True)
         thread.start()
@@ -156,12 +171,13 @@ class TestCloseAll:
             assert len(hs._registry) == 1
             assert hs._registry[id(loop)][0] is loop
 
+            # Must return without raising: an awaited cross-loop close would
+            # blow up here with "attached to a different loop".
             await close_all()
 
             # Registry is emptied eagerly, before the foreign loop has run
-            # the scheduled close — the session is still open at this point.
+            # the scheduled close.
             assert len(hs._registry) == 0
-            assert not session.closed
 
             # Drive the foreign loop until its scheduled close lands.
             async def _wait_closed() -> bool:
@@ -173,6 +189,9 @@ class TestCloseAll:
 
             closed = asyncio.run_coroutine_threadsafe(_wait_closed(), loop).result(timeout=5)
             assert closed is True
+
+            # The close ran on the owning loop, never on the caller's loop.
+            assert closed_on == [loop]
         finally:
             loop.call_soon_threadsafe(loop.stop)
             thread.join(timeout=5)
