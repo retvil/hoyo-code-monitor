@@ -480,8 +480,23 @@ def notify_test():
         sys.exit(1)
 
 
+@notify.command("test-toast")
+def notify_test_toast():
+    """Show a test Windows toast (no configuration needed)."""
+    from src.system_notify import is_configured, show_toast
+
+    if not is_configured():
+        click.echo("Toast unavailable. Install with: pip install .[toast]", err=True)
+        sys.exit(1)
+    ok = show_toast("HoYo Code Monitor", "Toast pipeline works.")
+    click.echo("Toast shown." if ok else "Toast failed to show.", err=not ok)
+    if not ok:
+        sys.exit(1)
+
+
 @cli.command()
 def status():
+
     """Show current status."""
     try:
         scheduler = create_scheduler_from_storage()

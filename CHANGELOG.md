@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Added
+- **Windows toast notifications**: new code batches and successful
+  redemptions now pop a native desktop toast alongside the Telegram channel.
+  Zero configuration and zero network - toasts are a local side channel, so
+  events are announced on the machine even when no Telegram bot is set up.
+  Backed by the optional `winotify` dependency (new `[toast]` extra;
+  Windows-only, `sys_platform == 'win32'` marker). Without it the app runs
+  unchanged and simply skips toasts. Best-effort by contract: the toast path
+  never raises into the scheduler loop (every failure logs at DEBUG and
+  returns False), runs the blocking WinRT call through `asyncio.to_thread`
+  so the event loop is never held up, and carries no secrets - only title
+  and message text. Smoke-test from the CLI with `notify test-toast`.
+  Verified live on the dev box: toast appears, exit code 0
+
 ### Fixed
 - **Flaky test in the shared-session pool suite**: `test_closes_session_owned_by_a_running_foreign_loop`
   asserted that the session was *still open* immediately after `close_all()`,

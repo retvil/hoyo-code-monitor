@@ -67,6 +67,11 @@ web = [
     "pydantic>=2.5.0",
     "httpx>=0.26.0",
 ]
+# Windows desktop toast notifications. Optional because it is Windows-only;
+# without it the app runs and simply skips toasts (see src/system_notify.py).
+toast = [
+    "winotify>=0.6.0; sys_platform == 'win32'",
+]
 
 [project.scripts]
 hoyo-code-monitor = "src.cli:cli"

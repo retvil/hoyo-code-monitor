@@ -462,6 +462,7 @@ class Scheduler:
             }
 
         from src.notify import notify_new_codes, notify_redeemed
+        from src.system_notify import notify_new_codes_toast, notify_redeemed_toast
 
         new_codes: list[str] = []
 
@@ -536,6 +537,11 @@ class Scheduler:
                                             )
                                         except Exception:
                                             pass
+                                        # Local toast: no config, no network; best-effort.
+                                        try:
+                                            await notify_redeemed_toast(code, acc["name"], res.reward or "claimed")
+                                        except Exception:
+                                            pass
                                 except Exception as e:
                                     logger.error(
                                         "Error redeeming code %s for %s: %s",
@@ -560,6 +566,11 @@ class Scheduler:
         if new_codes:
             try:
                 await notify_new_codes(self.storage, new_codes)
+            except Exception:
+                pass
+            # Local toast: no config, no network; best-effort.
+            try:
+                await notify_new_codes_toast(new_codes)
             except Exception:
                 pass
 
