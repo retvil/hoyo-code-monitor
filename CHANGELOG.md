@@ -3,6 +3,20 @@
 ## [Unreleased]
 
 ### Added
+- **Tears of Themis daily check-in**: ToT now joins the daily sign-in pass,
+  covering all 5 supported games. The OS `act_id` (`e202202281857121`) was
+  verified live rather than guessed: `/info` and `/home` answer `retcode 0`
+  with the Tears of Themis reward table (Intuition Impression, Oracle of
+  Justice, Home Deco Voucher), while a deliberately bogus `act_id` on the
+  same path is rejected with `retcode -500001` - so the activity is real,
+  not just well-formed. ToT runs on the `luna/os` event path shared with
+  Star Rail but under its own activity, and needs no `x-rpc-signgame`
+  header (confirmed live: the signed request is accepted without it).
+  Accounts without a ToT character get the same "Character info not found"
+  result ZZZ and HI3 already produce - no new failure mode.
+  Verified live: Genshin answers `already_claimed` and ToT answers
+  `Character info not found` on the same account, proving the act_id, path,
+  DS signature and error classification all behave as expected
 - **Windows toast notifications**: new code batches and successful
   redemptions now pop a native desktop toast alongside the Telegram channel.
   Zero configuration and zero network - toasts are a local side channel, so

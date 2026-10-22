@@ -31,8 +31,8 @@ logger = logging.getLogger(__name__)
 
 # --- Per-game check-in configuration (overseas) ---
 # act_id / base_url values mirror SIMNet REWARD_URL (MIT, PaiGramTeam/SIMNet).
-# signgame: "hk4e" (genshin) and "zzz" are required by HoYoLAB; hsr/hi3 work
-# without it (matches reference clients). ToT pending: no verified OS act_id.
+# signgame: "hk4e" (genshin) and "zzz" are required by HoYoLAB; hsr/hi3/tot
+# work without it (matches reference clients).
 GAME_CHECKIN_CONF: dict[str, dict[str, str]] = {
     "genshin": {
         "name": "Genshin Impact",
@@ -56,6 +56,18 @@ GAME_CHECKIN_CONF: dict[str, dict[str, str]] = {
         "name": "Honkai Impact 3rd",
         "base_url": "https://sg-public-api.hoyolab.com/event/mani",
         "act_id": "e202110291205111",
+        "sign_game": "",
+    },
+    # ToT shares the HSR "luna/os" event path but runs its own activity.
+    # act_id verified live against HoYoLAB: /info and /home return retcode 0
+    # with the Tears of Themis reward table (Intuition Impression, Oracle of
+    # Justice, Home Deco Voucher), while a deliberately bogus act_id on the
+    # same path is rejected with retcode -500001. Confirmed by MihoyoBBSTools
+    # (os_tearsofthemis_act_id) and several independent OS clients.
+    "tot": {
+        "name": "Tears of Themis",
+        "base_url": "https://sg-public-api.hoyolab.com/event/luna/os",
+        "act_id": "e202202281857121",
         "sign_game": "",
     },
 }

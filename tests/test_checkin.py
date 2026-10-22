@@ -127,11 +127,19 @@ class TestGameCheckinConf:
     """Tests for the per-game check-in configuration table."""
 
     def test_mvp_games_present(self) -> None:
-        """MVP covers genshin + hsr; wave 2 adds zzz + hi3."""
+        """MVP covers genshin + hsr; wave 2 adds zzz + hi3; tot adds ToT."""
         assert "genshin" in GAME_CHECKIN_CONF
         assert "hsr" in GAME_CHECKIN_CONF
         assert "zzz" in GAME_CHECKIN_CONF
         assert "hi3" in GAME_CHECKIN_CONF
+        assert "tot" in GAME_CHECKIN_CONF
+
+    def test_tot_conf_values(self) -> None:
+        """ToT uses the luna/os event path and the verified OS act_id."""
+        tot = GAME_CHECKIN_CONF["tot"]
+        assert tot["base_url"] == "https://sg-public-api.hoyolab.com/event/luna/os"
+        assert tot["act_id"] == "e202202281857121"
+        assert tot["sign_game"] == ""
 
     def test_entries_have_required_fields(self) -> None:
         """Each entry carries base_url and act_id (sign_game may be empty = omit)."""
@@ -190,6 +198,12 @@ class TestBuildHeaders:
         headers = runner.build_headers(cookies, CheckinContext("hi3", "dev-1"))
         assert "x-rpc-signgame" not in headers
 
+    def test_headers_tot_omits_signgame(self, runner: CheckinRunner, cookies: dict) -> None:
+        """ToT sends no signgame header (verified live against HoYoLAB)."""
+        headers = runner.build_headers(cookies, CheckinContext("tot", "dev-1"))
+        assert "x-rpc-signgame" not in headers
+        assert "act.hoyolab.com" in headers["Referer"]
+
 
 class TestRunSuccess:
     """Happy-path daily check-in."""
@@ -225,6 +239,42 @@ class TestRunSuccess:
         assert result.status == "success"
         assert result.reward_name == "Primogem"
         assert result.reward_amount == EXPECTED_REWARD_AMOUNT
+
+
+class TestRunTearsOfThemis:
+    """ToT runs the same info -> sign -> home cycle on the luna/os path."""
+
+    @pytest.mark.asyncio
+    async def test_run_tot_success(self, cookies: dict) -> None:
+        """Full cycle for ToT, reward parsed from the ToT award table."""
+        home = make_home()
+        home["data"]["awards"] = [
+            {"name": "Intuition Impression", "cnt": 1},
+            {"name": "Oracle of Justice", "cnt": 1},
+        ]
+        transport = FakeTransport(info=make_info(today="2"), home=home)
+        runner = CheckinRunner(transport=transport, retry_base_delay=0.0)
+        result = await runner.run("tot", cookies, "dev-1", "2026-09-24")
+
+        assert result.status == "success"
+        assert result.reward_name == "Oracle of Justice"
+        assert result.reward_amount == 1
+        assert transport.count("GET", "/info") == 1
+        assert transport.count("POST", "/sign") == 1
+        # ToT shares the HSR event host but runs its own activity.
+        assert transport.calls[0][1].startswith(
+            GAME_CHECKIN_CONF["tot"]["base_url"]
+        )
+
+    @pytest.mark.asyncio
+    async def test_run_tot_no_character_is_failure(self, cookies: dict) -> None:
+        """An account without a ToT role gets retcode -10002 -> failed."""
+        transport = FakeTransport(sign=[make_sign(-10002, "Character info not found")])
+        runner = CheckinRunner(transport=transport, retry_base_delay=0.0)
+        result = await runner.run("tot", cookies, "dev-1", "2026-09-24")
+
+        assert result.status == "failed"
+        assert "Character info not found" in (result.message or "")
 
 
 class TestRunAlreadyClaimed:
