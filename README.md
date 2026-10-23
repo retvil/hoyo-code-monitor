@@ -21,7 +21,7 @@ HoYoverse games regularly release time-limited promo codes — and they expire f
 
 - **Background monitoring** — checks sources every N minutes (configurable, default 15)
 - **Auto-redeem** — redeems new codes via Hoyolab `webExchangeCdkey` API (opt-in, per account)
-- **Daily check-ins** — auto sign-in on HoYoLAB for Genshin, Star Rail, ZZZ + HI3 (opt-in, per account, own schedule, idempotent)
+- **Daily check-ins** — auto sign-in on HoYoLAB for all 5 games: Genshin, Star Rail, ZZZ, HI3, Tears of Themis (opt-in, per account, own schedule, idempotent)
 - **Multi-source** — Wiki, Wiki API, community JSON APIs, guide sites (25 presets, see table)
 - **Multi-account** — each account has its own encrypted cookies and redeem toggle
 - **Statistics** — total / redeemed / pending, per-source breakdown, redemption log
@@ -63,7 +63,7 @@ HoYoverse games regularly release time-limited promo codes — and they expire f
 
 Download the installer from [Releases](https://github.com/retvil/hoyo-code-monitor/releases):
 
-- **Windows** — `hoyo-code-monitor-1.2.4-setup.exe` (per-user install, no admin rights needed)
+- **Windows** — `hoyo-code-monitor-1.3.0-setup.exe` (per-user install, no admin rights needed)
 
 Silent install: `setup.exe /S`. Components: desktop shortcut, Windows autostart (both on by default).
 

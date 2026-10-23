@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [1.3.0] - 2026-10-23
 
 ### Changed
 - **"No character in this game" is now `skipped`, not `failed`**: an account
