@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+- **Update banner notes follow the UI language**: release bodies can now
+  carry per-language sections under `##` headings (e.g.
+  `## Что нового (Русский)`); the banner picks the section matching the
+  language selected in the app, falling back to the English section, then
+  to the whole body. Single-language release notes keep working unchanged.
+
 ## [1.3.0] - 2026-10-23
 
 ### Changed

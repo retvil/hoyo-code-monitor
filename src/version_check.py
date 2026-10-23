@@ -69,6 +69,9 @@ class UpdateInfo:
     current_version: str
     url: str
     release_notes: str
+    # Untouched release body, so the presentation layer can pick a
+    # per-language section. Empty for UpdateInfo built by hand (tests).
+    release_notes_raw: str = ""
 
 
 def parse_version(raw: str) -> tuple[int, ...]:
@@ -253,6 +256,7 @@ async def _build_update_info() -> UpdateInfo | None:
         current_version=APP_VERSION,
         url=str(payload.get("html_url") or RELEASES_PAGE_URL),
         release_notes=_clean_notes(payload.get("body")),
+        release_notes_raw=str(payload.get("body") or ""),
     )
 
 

@@ -16,8 +16,8 @@ from pydantic import BaseModel
 
 from src import author as author_module
 from src.constants import APP_AUTHOR, APP_VERSION, GAME_CONF
-from src.i18n import SUPPORTED, get_lang, make_t
-from src.version_check import UpdateInfo, cached_update
+from src.i18n import DEFAULT_LANG, SUPPORTED, get_lang, make_t
+from src.version_check import UpdateInfo, _clean_notes, cached_update
 
 if TYPE_CHECKING:
     from src.storage import Storage
@@ -128,6 +128,51 @@ def is_source_stale(last_checked: str | None) -> bool:
     return age_seconds > SOURCE_STALE_SECONDS
 
 
+def _split_h2_sections(body: str) -> list[tuple[str, str]]:
+    """Split a markdown body into (heading, content) pairs at ``## `` lines.
+
+    ``###`` subheadings stay inside their parent section; text before the
+    first ``## `` heading is kept as a section with an empty heading.
+    """
+    sections: list[tuple[str, str]] = []
+    heading = ""
+    lines: list[str] = []
+    for line in body.splitlines():
+        if line.startswith("## "):
+            if heading or lines:
+                sections.append((heading, "\n".join(lines)))
+            heading = line
+            lines = []
+        else:
+            lines.append(line)
+    if heading or lines:
+        sections.append((heading, "\n".join(lines)))
+    return sections
+
+
+def pick_notes_lang(body: str, lang: str) -> str:
+    """Extract the release-notes section written for ``lang``.
+
+    Release bodies may carry per-language sections under ``##`` headings
+    (e.g. "## Что нового (Русский)"). Matching is by the language's native
+    name from :data:`src.i18n.SUPPORTED`, case-insensitive, with the English
+    section as fallback for languages without their own. A body with at most
+    one section is returned unchanged, so single-language notes keep working.
+    """
+    text = str(body or "").strip()
+    if not text:
+        return ""
+    sections = _split_h2_sections(text)
+    if len(sections) <= 1:
+        return text
+    native = SUPPORTED.get(lang, DEFAULT_LANG)
+    for name in (native, SUPPORTED[DEFAULT_LANG]):
+        for heading, content in sections:
+            if name.lower() in heading.lower():
+                return content
+    return text
+
+
 def update_ctx(update: UpdateInfo | None, lang: str) -> dict[str, Any]:
     """Return localized update banner data, or an empty context.
 
@@ -144,6 +189,11 @@ def update_ctx(update: UpdateInfo | None, lang: str) -> dict[str, Any]:
             "update_url": "",
             "update_notes_text": "",
         }
+    # Notes are shown in the user's language when the release body carries
+    # per-language sections; otherwise the pre-cleaned English notes are used.
+    notes_text = update.release_notes
+    if update.release_notes_raw:
+        notes_text = _clean_notes(pick_notes_lang(update.release_notes_raw, lang))
     return {
         "update_available": True,
         "update_message": make_t(lang)("update_available")
@@ -152,7 +202,7 @@ def update_ctx(update: UpdateInfo | None, lang: str) -> dict[str, Any]:
         "update_latest": update.latest_version,
         "update_current": update.current_version,
         "update_url": update.url,
-        "update_notes_text": update.release_notes,
+        "update_notes_text": notes_text,
     }
 
 

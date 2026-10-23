@@ -165,6 +165,8 @@ class TestCheckForUpdate:
         assert result is not None
         assert len(result.release_notes) <= version_check.MAX_NOTES_CHARS
         assert "\n" not in result.release_notes
+        # The untouched body is carried along for per-language section picking.
+        assert result.release_notes_raw == "line 1\n\nline 2" + "x" * 1000
 
     @pytest.mark.asyncio
     async def test_notes_have_no_markdown_syntax(self, monkeypatch) -> None:

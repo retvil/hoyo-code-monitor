@@ -17,6 +17,7 @@ from src.web_views import (
     is_source_stale,
     mask_secret,
     page_ctx,
+    pick_notes_lang,
     safe_detail,
     source_health,
     update_ctx,
@@ -269,6 +270,52 @@ class TestPageCtx:
         en = update_ctx(update, lang="en")["update_message"]
         de = update_ctx(update, lang="de")["update_message"]
         assert en != de
+
+    def test_update_notes_picked_in_user_language(self) -> None:
+        """Release notes follow the UI language when the body has sections."""
+        raw = (
+            "## What's new (English)\nEnglish notes here\n\n"
+            "## Что нового (Русский)\nРусские заметки здесь\n"  # noqa: RUF001
+        )
+        update = UpdateInfo(
+            "9.9.9", "1.2.2", "https://x", "english notes", release_notes_raw=raw
+        )
+        ru = update_ctx(update, lang="ru")["update_notes_text"]
+        en = update_ctx(update, lang="en")["update_notes_text"]
+        assert "Русские заметки здесь" in ru
+        assert "English notes here" not in ru
+        assert "English notes here" in en
+        assert "Русские заметки" not in en
+
+    def test_update_notes_fallback_to_english_section(self) -> None:
+        """Languages without their own section get the English one."""
+        raw = (
+            "## What's new (English)\nEnglish notes here\n\n"
+            "## Что нового (Русский)\nРусские заметки здесь\n"  # noqa: RUF001
+        )
+        update = UpdateInfo(
+            "9.9.9", "1.2.2", "https://x", "english notes", release_notes_raw=raw
+        )
+        de = update_ctx(update, lang="de")["update_notes_text"]
+        assert "English notes here" in de
+        assert "Русские заметки" not in de
+
+    def test_pick_notes_lang_single_section_body_unchanged(self) -> None:
+        """Single-language notes (no language sections) pass through whole."""
+        body = "## What's new\nOne language only."
+        assert pick_notes_lang(body, "ru") == body
+
+    def test_pick_notes_lang_no_match_returns_whole_body(self) -> None:
+        """Sections exist but none matches: show everything, not nothing."""
+        body = (
+            "## Что нового (Русский)\nРусские заметки.\n\n"  # noqa: RUF001
+            "## Was ist neu (Deutsch)\nDeutsche Notizen."
+        )
+        assert pick_notes_lang(body, "ja") == body
+
+    def test_pick_notes_lang_handles_empty(self) -> None:
+        assert pick_notes_lang("", "en") == ""
+        assert pick_notes_lang("   ", "en") == ""
 
     def test_update_banner_data_survives_page_context_merge(self, storage: Storage) -> None:
         """An update result is available to every Jinja-rendered page."""
