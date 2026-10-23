@@ -76,6 +76,9 @@ GAME_CHECKIN_CONF: dict[str, dict[str, str]] = {
 RETCODE_SUCCESS: int = 0
 RETCODE_ALREADY_CLAIMED: int = -5003
 RETCODE_COOKIE_EXPIRED: tuple[int, ...] = (10001, -100)
+# "Account has no character/role in this game" - verified live: ZZZ, HI3 and
+# ToT all answer -10002 on /sign for an account without a role in that game.
+RETCODE_NO_CHARACTER: int = -10002
 
 # --- Check-in statuses (persisted in checkin_log.status) ---
 STATUS_SUCCESS: str = "success"
@@ -501,6 +504,13 @@ class CheckinRunner:
         """Classify a non-zero API retcode into a CheckinResult."""
         if retcode in RETCODE_COOKIE_EXPIRED:
             return self._failed(game, claimed_date, self._cookie_expired_message())
+        if retcode == RETCODE_NO_CHARACTER:
+            # Not an error: the account simply has no role in this game.
+            # Skipped so it does not drag the pass-level success flag down;
+            # the slot is retried next day in case a character appears.
+            return CheckinResult(
+                game, claimed_date, STATUS_SKIPPED, message=message
+            )
         return self._failed(game, claimed_date, message)
 
     async def _signed_result(

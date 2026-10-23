@@ -267,14 +267,30 @@ class TestRunTearsOfThemis:
         )
 
     @pytest.mark.asyncio
-    async def test_run_tot_no_character_is_failure(self, cookies: dict) -> None:
-        """An account without a ToT role gets retcode -10002 -> failed."""
+    async def test_run_tot_no_character_is_skipped(self, cookies: dict) -> None:
+        """An account without a ToT role gets retcode -10002 -> skipped."""
         transport = FakeTransport(sign=[make_sign(-10002, "Character info not found")])
         runner = CheckinRunner(transport=transport, retry_base_delay=0.0)
         result = await runner.run("tot", cookies, "dev-1", "2026-09-24")
 
-        assert result.status == "failed"
+        assert result.status == "skipped"
         assert "Character info not found" in (result.message or "")
+
+    @pytest.mark.asyncio
+    async def test_no_character_retcode_skips_for_any_game(self, cookies: dict) -> None:
+        """-10002 means 'no role in this game' for every game, not just ToT.
+
+        Verified live: ZZZ, HI3 and ToT all answer -10002 on /sign for an
+        account without a character in that game.
+        """
+        transport = FakeTransport(
+            sign=[make_sign(-10002, "No in-game character detected, create one first")]
+        )
+        runner = CheckinRunner(transport=transport, retry_base_delay=0.0)
+        result = await runner.run("genshin", cookies, "dev-1", "2026-09-24")
+
+        assert result.status == "skipped"
+        assert "No in-game character" in (result.message or "")
 
 
 class TestRunAlreadyClaimed:

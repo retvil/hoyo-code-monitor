@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Changed
+- **"No character in this game" is now `skipped`, not `failed`**: an account
+  without a role in a game (ZZZ, HI3, ToT all answer retcode `-10002` on
+  `/sign` - verified live for all three) no longer drags the pass-level
+  "check-in successful" indicator down. The slot is logged as `skipped` with
+  the API's own explanation and is retried the next day, so a character
+  created later is picked up automatically. Cookie-expired and real API
+  errors keep classifying as `failed`
+
 ### Added
 - **Tears of Themis daily check-in**: ToT now joins the daily sign-in pass,
   covering all 5 supported games. The OS `act_id` (`e202202281857121`) was
