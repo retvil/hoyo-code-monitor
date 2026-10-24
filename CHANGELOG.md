@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [1.3.1] - 2026-10-24
 
 ### Changed
 - **Update banner notes follow the UI language**: release bodies can now
