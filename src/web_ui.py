@@ -32,16 +32,15 @@ from src.sources import SOURCE_PRESETS, SourceConfig, SourceFetcher, seed_defaul
 from src.storage import Storage
 from src.templates import templates
 from src.version_check import check_for_update
+from src.i18n import DEFAULT_LANG, SUPPORTED, get_lang, make_t
 from src.web_views import (
     account_checkin_switch_html,
     account_redeem_switch_html,
     checkin_logs_with_names,
     is_source_stale,
     page_ctx,
-    source_health,
-)
-from src.web_views import (
     safe_detail as _safe_detail,
+    source_health,
 )
 
 if TYPE_CHECKING:
@@ -50,6 +49,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Rate limit for test_source
+_TEST_RATE_LIMIT_TTL_SECONDS = 60.0
 _test_rate_limit: dict[str, float] = {}
 _RATE_LIMIT_SECONDS = 5.0
 
@@ -140,7 +140,7 @@ async def _prime_update_cache() -> None:
     try:
         await check_for_update()
     except Exception:  # pragma: no cover - check_for_update already swallows
-        logger.debug("Update check failed", exc_info=True)
+        logger.warning("Update check failed", exc_info=True)
 
 
 @asynccontextmanager
@@ -462,7 +462,17 @@ async def test_source(name: str, request: Request):
             status_code=429,
             detail=f"Rate limited, try in {_RATE_LIMIT_SECONDS - (now - last):.1f}s",
         )
+    # Prune stale entries (TTL cleanup to prevent memory leak on long runs)
+    _test_rate_limit = {
+        k: v for k, v in _test_rate_limit.items()
+        if now - v < _TEST_RATE_LIMIT_TTL_SECONDS
+    }
     _test_rate_limit[key] = now
+    # Prune stale entries (TTL cleanup to prevent memory leak on long runs)
+    _test_rate_limit = {
+        k: v for k, v in _test_rate_limit.items()
+        if now - v < _TEST_RATE_LIMIT_TTL_SECONDS
+    }
 
     storage = Storage()
     source_data = storage.get_source(name)
@@ -487,6 +497,7 @@ async def accounts_page(request: Request):
     for acc in accounts:
         cookies = storage.load_account_cookies(acc["name"]) or {}
         acc["has_cookies"] = bool(cookies.get("ltuid") and cookies.get("ltoken"))
+    sched_status = scheduler.status if scheduler else None
     return templates.TemplateResponse(
         request,
         "accounts.html",
@@ -495,6 +506,7 @@ async def accounts_page(request: Request):
             {
                 "request": request,
                 "accounts": accounts,
+                "scheduler": sched_status,
             },
         ),
     )
@@ -1279,6 +1291,9 @@ async def metrics():
 async def partial_scheduler_status(request: Request):
     """HTMX partial for scheduler status."""
     global scheduler
+    storage = Storage()
+    lang = get_lang(storage)
+    t_func = make_t(lang)
     if not scheduler:
         return templates.TemplateResponse(
             request,
@@ -1286,6 +1301,7 @@ async def partial_scheduler_status(request: Request):
             {
                 "request": request,
                 "scheduler": None,
+                "t": t_func,
             },
         )
     status = scheduler.status
@@ -1295,6 +1311,7 @@ async def partial_scheduler_status(request: Request):
         {
             "request": request,
             "scheduler": status,
+            "t": t_func,
         },
     )
 
@@ -1338,12 +1355,15 @@ async def partial_stats(request: Request):
     """HTMX partial for statistics."""
     storage = Storage()
     stats = storage.get_stats()
+    lang = get_lang(storage)
+    t_func = make_t(lang)
     return templates.TemplateResponse(
         request,
         "partials/stats.html",
         {
             "request": request,
             "stats": stats,
+            "t": t_func,
         },
     )
 
