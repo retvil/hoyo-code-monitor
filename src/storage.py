@@ -916,6 +916,10 @@ class Storage:
         if attempted_at is None:
             attempted_at = datetime.now()
 
+        # Truncate error_message to 300 chars with ellipsis if needed
+        if error_message and len(error_message) > 300:
+            error_message = error_message[:297] + "..."
+
         with self._connection() as conn:
             cursor = conn.execute(
                 """

@@ -1,5 +1,5 @@
 <div class="card" hx-get="/partials/stats" hx-trigger="every 10s" hx-swap="outerHTML">
-<div class="card-title" style="margin-bottom: 12px;">Statistics</div>
+<div class="card-title" style="margin-bottom: 12px;">{{ t("statistics") }}</div>
 <div class="kpi-grid">
     <div class="kpi"><div style="font-size: 1.8rem; font-weight: 700;">{{ stats.total_codes }}</div><div class="muted" style="font-size: 0.85rem;">Total codes</div></div>
     <div class="kpi good"><div style="font-size: 1.8rem; font-weight: 700;">{{ stats.successful }}</div><div class="muted" style="font-size: 0.85rem;">Redeemed</div></div>

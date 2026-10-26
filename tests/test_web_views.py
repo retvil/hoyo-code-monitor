@@ -275,7 +275,7 @@ class TestPageCtx:
         """Release notes follow the UI language when the body has sections."""
         raw = (
             "## What's new (English)\nEnglish notes here\n\n"
-            "## Что нового (Русский)\nРусские заметки здесь\n"  # noqa: RUF001
+            "## Что нового (Русский)\nРусские заметки здесь\n"  # noqa: RUF001  # noqa: RUF001
         )
         update = UpdateInfo(
             "9.9.9", "1.2.2", "https://x", "english notes", release_notes_raw=raw
@@ -291,7 +291,7 @@ class TestPageCtx:
         """Languages without their own section get the English one."""
         raw = (
             "## What's new (English)\nEnglish notes here\n\n"
-            "## Что нового (Русский)\nРусские заметки здесь\n"  # noqa: RUF001
+            "## Что нового (Русский)\nРусские заметки здесь\n"  # noqa: RUF001  # noqa: RUF001
         )
         update = UpdateInfo(
             "9.9.9", "1.2.2", "https://x", "english notes", release_notes_raw=raw
@@ -308,7 +308,7 @@ class TestPageCtx:
     def test_pick_notes_lang_no_match_returns_whole_body(self) -> None:
         """Sections exist but none matches: show everything, not nothing."""
         body = (
-            "## Что нового (Русский)\nРусские заметки.\n\n"  # noqa: RUF001
+            "## Что нового (Русский)\nРусские заметки.\n\n"  # noqa: RUF001  # noqa: RUF001
             "## Was ist neu (Deutsch)\nDeutsche Notizen."
         )
         assert pick_notes_lang(body, "ja") == body
