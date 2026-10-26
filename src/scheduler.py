@@ -581,6 +581,120 @@ class Scheduler:
             "errors": errors,
         }
 
+    async def _redeem_new_codes(
+        self,
+        new_codes: list[str],
+        redeem_accounts: list[dict[str, Any]],
+        gap: int = 8,
+    ) -> tuple[int, list[str]]:
+        """Redeem a list of new codes for the given accounts.
+
+        Args:
+            new_codes: List of new codes to redeem.
+            redeem_accounts: List of accounts eligible for redemption.
+            gap: Time gap between redemptions in seconds.
+
+        Returns:
+            Tuple of (codes_redeemed_count, errors_list).
+        """
+        codes_redeemed = 0
+        errors = []
+
+        for code in new_codes:
+            try:
+                # Log redemption per account
+                for idx, acc in enumerate(redeem_accounts):
+                    try:
+                        from src.constants import GAME_CONF
+
+                        acc_game = acc.get("game") or "genshin"
+                        gconf = GAME_CONF.get(acc_game, GAME_CONF["genshin"])
+                        cookies = (
+                            self.storage.load_account_cookies(acc["name"])
+                            or self.config.cookies
+                        )
+                        res = await self.redeemer.redeem_code(
+                            code=code,
+                            cookies=cookies,
+                            uid=acc["uid"],
+                            region=acc["region"],
+                            game_biz=acc.get("game_biz") or gconf["game_biz"],
+                            lang=acc.get("lang", "en-us"),
+                            s_lang_key=acc.get("s_lang_key", "en-us"),
+                            game=acc_game,
+                        )
+                        claimed = res.success or res.raw_response.get("retcode") in (
+                            -2017,
+                            -2018,
+                        )
+                        self.storage.update_code_redemption(
+                            code=code,
+                            redeemed=claimed,
+                            reward=res.reward if res.success else None,
+                            game=acc_game,
+                        )
+                        self.storage.add_redemption_log(
+                            code=code,
+                            account_id=acc["id"],
+                            status="success" if claimed else "failed",
+                            reward=res.reward if res.success else None,
+                            error_message=None if claimed else res.message,
+                        )
+                        if claimed:
+                            codes_redeemed += 1
+                            try:
+                                await notify_redeemed(
+                                    self.storage,
+                                    code,
+                                    acc["name"],
+                                    res.reward or "claimed",
+                                )
+                            except Exception:
+                                pass
+                            # Local toast: no config, no network; best-effort.
+                            try:
+                                await notify_redeemed_toast(code, acc["name"], res.reward or "claimed")
+                            except Exception:
+                                pass
+                    except Exception as e:
+                        logger.error(
+                            "Error redeeming code %s for %s: %s",
+                            code[:4] + "****",
+                            acc["name"],
+                            e,
+                        )
+                        errors.append(
+                            f"Redemption error for {code[:4]}**** ({acc['name']}): {e}"
+                        )
+                    await asyncio.sleep(gap)
+            except Exception as e:
+                logger.error("Error redeeming code %s: %s", code[:4] + "****", e)
+                errors.append(f"Redemption error for {code[:4]}****: {e}")
+
+        return codes_redeemed, errors
+
+    async def _redeem_codes_for_run_once(
+        self,
+        new_codes: list[str],
+        redeem_accounts: list[dict[str, Any]],
+        gap: int = 8,
+    ) -> tuple[int, list[str]]:
+        """Redeem codes for run-once CLI command.
+
+        This is a simplified version of _redeem_new_codes that can be called
+        from external code (like the CLI) without requiring the full scheduler
+        context.
+
+        Args:
+            new_codes: List of new codes to redeem.
+            redeem_accounts: List of accounts eligible for redemption.
+            gap: Time gap between redemptions in seconds.
+
+        Returns:
+            Tuple of (codes_redeemed_count, errors_list).
+        """
+        return await self._redeem_new_codes(new_codes, redeem_accounts, gap)
+
     def _run_loop(self) -> None:
         """Main scheduler loop running in background thread."""
         self._loop = asyncio.new_event_loop()

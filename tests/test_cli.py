@@ -180,11 +180,18 @@ class TestRunOnceCommand:
     @patch("src.cli.Storage")
     @patch("src.cli.SourceFetcher")
     @patch("src.cli.ConfigManager")
-    def test_run_once_success(self, mock_config_class: MagicMock, mock_fetcher_class: MagicMock, mock_storage_class: MagicMock, runner: CliRunner) -> None:
-        """Test run-once command success."""
+    @patch("src.cli.create_scheduler_from_storage")
+    def test_run_once_with_redemption(
+        mock_create_scheduler: MagicMock,
+        mock_config_class: MagicMock,
+        mock_fetcher_class: MagicMock,
+        mock_storage_class: MagicMock,
+        runner: CliRunner,
+    ) -> None:
+        """Test run-once command with redemption enabled."""
         mock_config = MagicMock()
         mock_config.get_all.return_value = {
-            "redemption_enabled": False,
+            "redemption_enabled": True,
             "db_path": "data/monitor.db",
         }
         mock_config_class.return_value = mock_config
@@ -198,13 +205,29 @@ class TestRunOnceCommand:
         mock_storage = MagicMock()
         mock_storage.get_code.return_value = None
         mock_storage.add_code.return_value = True
+        mock_storage.list_accounts.return_value = [
+            {"name": "test_account", "uid": "12345", "region": "os_usa", "id": 1}
+        ]
+        mock_storage.is_account_redeem_enabled.return_value = True
+        mock_storage.load_account_cookies.return_value = {"ltuid": "test", "ltoken": "test"}
         mock_storage_class.return_value = mock_storage
+
+        mock_scheduler = MagicMock()
+        mock_scheduler.config = MagicMock()
+        mock_scheduler.config.redemption_enabled = True
+        mock_scheduler.config.uid = "12345"
+        mock_scheduler.config.region = "os_usa"
+        mock_scheduler.config.cookies = {"ltuid": "test", "ltoken": "test"}
+        mock_scheduler._redeem_new_codes = AsyncMock(return_value=(1, []))
+        mock_create_scheduler.return_value = mock_scheduler
 
         result = runner.invoke(cli, ["run-once"])
 
         assert result.exit_code == 0
         assert "Running single check cycle" in result.output
         assert "Stored 1 new code(s)" in result.output
+        assert "Redeemed 1 code(s)" in result.output
+        mock_scheduler._redeem_new_codes.assert_called_once()
 
 
 class TestConfigCommand:

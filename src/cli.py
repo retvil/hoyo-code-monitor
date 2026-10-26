@@ -525,16 +525,6 @@ def stats():
             click.echo(f"  {source}: {count}")
 
 
-@cli.command()
-def run_once():
-    """Run a single check cycle immediately."""
-
-    config_manager = ConfigManager()
-    config = config_manager.get_all()
-    db_path = config.get("db_path", "data/monitor.db")
-
-    storage = Storage(db_path)
-
     async def run_cycle():
         async with SourceFetcher(storage) as fetcher:
             return await fetcher.fetch_all_enabled()
@@ -571,7 +561,154 @@ def run_once():
         redemption_enabled = config.get("redemption_enabled", False)
 
         if redemption_enabled and new_codes > 0:
-            click.echo("Redemption enabled but not implemented in run-once (use scheduler).")
+            # Import scheduler here to avoid circular imports
+            from src.scheduler import create_scheduler_from_storage
+            
+            # Create scheduler instance
+            scheduler = create_scheduler_from_storage(db_path)
+            
+            # Get accounts eligible for redemption
+            redeem_accounts = [
+                a for a in storage.list_accounts() 
+                if storage.is_account_redeem_enabled(a["name"])
+            ]
+            
+            if redeem_accounts:
+                # Check if redemption is configured
+                can_redeem = (
+                    getattr(scheduler.config, "redemption_enabled", False)
+                    and getattr(scheduler.config, "uid", None)
+                    and getattr(scheduler.config, "region", None)
+                    and scheduler.config.cookies.get("ltuid")
+                    and scheduler.config.cookies.get("ltoken")
+                )
+                
+                if can_redeem:
+                    # Use asyncio to run the async redemption method
+                    loop = asyncio.new_event_loop()
+                    try:
+                        codes_redeemed, errors = loop.run_until_complete(
+                            scheduler._redeem_new_codes(
+                                new_codes=new_codes,
+                                redeem_accounts=redeem_accounts,
+                                gap=8,
+                            )
+                        )
+                    finally:
+                        loop.close()
+                    
+                    # Update stats
+                    click.echo(f"Redeemed {codes_redeemed} code(s).")
+                    if errors:
+                        click.echo(f"Errors during redemption: {len(errors)}")
+                else:
+                    click.echo("Redemption enabled but missing configuration (uid, region, or cookies).")
+            else:
+                click.echo("Redemption enabled but no accounts have auto-redeem enabled.")
+        else:
+            click.echo("Redemption not enabled or no new codes.")
+
+        click.echo("Single check cycle completed.")
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@cli.command()
+def run_once():
+    """Run a single check cycle with redemption (one-shot mode)."""
+    _ensure_single_instance()
+    try:
+        storage = Storage()
+        config_manager = ConfigManager()
+        config = config_manager.get_all()
+        redemption_enabled = config.get("redemption_enabled", False)
+
+        click.echo("Running single check cycle...")
+
+        # Import scheduler to use its redemption helper
+        from src.scheduler import create_scheduler_from_storage
+        scheduler = create_scheduler_from_storage()
+
+        # Fetch codes from all enabled sources
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        try:
+            # Run fetch part of check cycle
+            from src.sources import SourceFetcher
+
+            async def _fetch_codes():
+                async with SourceFetcher(storage) as fetcher:
+                    return await fetcher.fetch_all_enabled()
+
+            results = loop.run_until_complete(_fetch_codes())
+
+            # Store new codes and count them
+            new_codes = 0
+            for source_name, codes in results.items():
+                for code in codes:
+                    code = code.strip()
+                    if not code:
+                        continue
+                    try:
+                        storage.add_code(code, source_name)
+                        new_codes += 1
+                    except Exception:
+                        pass  # Duplicate or other error
+
+            click.echo(f"Stored {new_codes} new code(s).")
+
+            # Get accounts eligible for redemption
+            redeem_accounts = [
+                a for a in storage.list_accounts()
+                if storage.is_account_redeem_enabled(a["name"])
+            ]
+
+            if redemption_enabled and new_codes > 0:
+                # Check if redemption is fully configured
+                can_redeem = (
+                    getattr(scheduler.config, "redemption_enabled", False)
+                    and getattr(scheduler.config, "uid", None)
+                    and getattr(scheduler.config, "region", None)
+                    and scheduler.config.cookies.get("ltuid")
+                    and scheduler.config.cookies.get("ltoken")
+                )
+
+                if can_redeem:
+                    # Read gap from config, default to 8
+                    gap = getattr(scheduler.config, "redemption_min_gap_seconds", 8)
+
+                    # Use asyncio to run the async redemption method
+                    redeem_loop = asyncio.new_event_loop()
+                    try:
+                        codes_redeemed, errors = redeem_loop.run_until_complete(
+                            scheduler._redeem_new_codes(
+                                new_codes=new_codes,
+                                redeem_accounts=redeem_accounts,
+                                gap=gap,
+                            )
+                        )
+                    finally:
+                        redeem_loop.close()
+
+                    # Update stats
+                    click.echo(f"Redeemed {codes_redeemed} code(s).")
+                    if errors:
+                        click.echo(f"Errors during redemption: {len(errors)}")
+                else:
+                    click.echo("Redemption enabled but missing configuration (uid, region, or cookies).")
+            elif redemption_enabled and new_codes == 0:
+                click.echo("Redemption enabled but no new codes found.")
+            elif redemption_enabled and redeem_accounts:
+                click.echo("Redemption enabled but redemption did not claim any codes.")
+            else:
+                click.echo("Redemption not enabled or no new codes.")
+           
+            click.echo(f"Found {new_codes} code(s), {codes_redeemed if redemption_enabled and codes_redeemed is not None else 0} redeemed.")
+        finally:
+            loop.close()
 
         click.echo("Single check cycle completed.")
     except Exception as e:
