@@ -9,6 +9,7 @@ import asyncio
 import json
 import logging
 import re
+import random
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol, Self
@@ -389,7 +390,7 @@ class SourceFetcher:
                         "HTTP error fetching %s after %d retries: %s", source.name, max_retries, e
                     )
                     raise
-                delay = base_delay * (2**attempt)
+                delay = base_delay * (2**attempt) * random.uniform(0.5, 1.0)
                 logger.warning(
                     "Fetch attempt %d/%d failed for %s: %s. Retrying in %.1fs",
                     attempt + 1,
@@ -405,7 +406,7 @@ class SourceFetcher:
                         "HTTP error fetching %s after %d retries: %s", source.name, max_retries, e
                     )
                     raise
-                delay = base_delay * (2**attempt)
+                delay = base_delay * (2**attempt) * random.uniform(0.5, 1.0)
                 logger.warning(
                     "Fetch attempt %d/%d failed for %s: %s. Retrying in %.1fs",
                     attempt + 1,
