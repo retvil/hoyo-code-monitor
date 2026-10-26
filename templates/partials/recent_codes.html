@@ -20,7 +20,7 @@
     <input type="hidden" name="game" value="{{ f_game }}">
 </form>
 <div style="margin-bottom: 12px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-    <button class="btn btn-primary" style="padding: 6px 14px; font-size: 0.82rem;" hx-post="/redeem/all" hx-target="#redeem-all-result" hx-swap="innerHTML" hx-indicator="#redeem-all-spin">{{ t('redeem_all') }} <span id="redeem-all-spin" class="spinner htmx-indicator" aria-hidden="true"></span></button>
+    <button class="btn btn-primary" style="padding: 6px 14px; font-size: 0.82rem;" hx-post="/redeem/all" hx-target="#redeem-all-result" hx-swap="innerHTML" hx-indicator="#redeem-all-spin" hx-confirm="{{ t('confirm_redeem_all') }}">{{ t('redeem_all') }} <span id="redeem-all-spin" class="spinner htmx-indicator" aria-hidden="true"></span></button>
     <button class="btn btn-danger" style="padding: 6px 14px; font-size: 0.82rem;" hx-post="/codes/cleanup" hx-target="#redeem-all-result" hx-swap="innerHTML" hx-confirm="Delete all expired/invalid codes?">{{ t('cleanup_dead') }}</button>
     <span id="redeem-all-result" style="font-size: 0.85rem;"></span>
 </div>
