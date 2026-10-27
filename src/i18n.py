@@ -176,6 +176,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "update_notes_none": "No release notes were published for this version.",
         "scheduler_running_login_disabled": "Scheduler is running — auto-login disabled",
         "theme_dark": "Dark theme",
+        "appearance_label": "Appearance",
         "theme_light": "Light theme",
     },
     "ru": {
@@ -313,6 +314,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "update_notes_none": "Для этой версии описание изменений не опубликовано.",
         "scheduler_running_login_disabled": "Планировщик работает — авто-вход отключен",
         "theme_dark": "Тёмная тема",
+        "appearance_label": "Оформление",
         "theme_light": "Светлая тема",
     },
     "de": {
@@ -434,6 +436,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "scheduler_running_login_disabled": "Planer läuft — Auto-Login deaktiviert",
         "checkin_auto_refresh": "Abgelaufene Cookies automatisch aktualisieren (headless)",
         "theme_dark": "Dunkles Design",
+        "appearance_label": "Design",
         "theme_light": "Helles Design",
     },
     "fr": {
@@ -554,6 +557,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "update_notes_none": "Aucune note de version n'a été publiée pour cette version.",
         "checkin_auto_refresh": "Actualiser automatiquement les cookies expirés (headless)",
         "theme_dark": "Thème sombre",
+        "appearance_label": "Apparence",
         "theme_light": "Thème clair",
     },
     "ja": {
@@ -674,6 +678,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "update_notes_none": "このバージョンのリリースノートはありません。",
         "checkin_auto_refresh": "期限切れクッキーの自動更新（headless）",
         "theme_dark": "ダークテーマ",
+        "appearance_label": "外観",
         "theme_light": "ライトテーマ",
     },
     "zh": {
@@ -794,6 +799,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "update_notes_none": "此版本未发布更新说明。",
         "checkin_auto_refresh": "自动刷新过期的 Cookie (headless)",
         "theme_dark": "深色主题",
+        "appearance_label": "外观",
         "theme_light": "浅色主题",
     },
 }

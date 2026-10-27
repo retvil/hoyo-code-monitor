@@ -138,27 +138,19 @@
             .nav { flex-direction: row; flex-wrap: wrap; }
             main { padding: 0 14px 40px; }
         }
-        .theme-toggle { position: fixed; top: 14px; right: 14px; z-index: 200;
-                        width: 36px; height: 36px; border-radius: 10px;
-                        border: 1px solid var(--border); background: var(--surface); color: var(--fg);
-                        font-size: 1.25rem; cursor: pointer; display: grid; place-items: center;
-                        box-shadow: 0 2px 10px rgba(0,0,0,0.18); }
-        .theme-toggle:hover { background: var(--bg); }
+        .theme-switch { display: flex; gap: 4px; margin-top: 14px; padding: 0 10px; }
+        .theme-switch .group-label { padding-left: 0; }
+        .theme-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+                     padding: 7px 8px; border-radius: 8px; border: 1px solid var(--border);
+                     background: var(--surface); color: var(--muted); font-size: 0.78rem; font-weight: 600;
+                     cursor: pointer; transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease; }
+        .theme-btn:hover { background: var(--bg); color: var(--fg); }
+        .theme-btn.active { background: var(--accent-soft); color: var(--accent);
+                            border-color: var(--accent); }
     </style>
     {% block extra_css %}{% endblock %}
 </head>
 <body{% if current_game and current_game in game_accents %} style="--accent: {{ game_accents[current_game].accent }}; --accent-soft: {{ game_accents[current_game].accent_soft }}; --game-accent: {{ game_accents[current_game].accent }};"{% endif %}>
-<button class="theme-toggle" id="theme-toggle" aria-label="{{ t('theme_dark') }}" title="{{ t('theme_dark') }}" onclick="toggleTheme()">🌙</button>
-<script>
-(function(){
-    var btn = document.getElementById('theme-toggle');
-    if (!btn) return;
-    var isDark = document.documentElement.dataset.theme === 'dark';
-    btn.textContent = isDark ? '☀️' : '🌙';
-    btn.setAttribute('aria-label', isDark ? '{{ t('theme_light') }}' : '{{ t('theme_dark') }}');
-    btn.setAttribute('title', btn.getAttribute('aria-label'));
-})();
-</script>
 <svg width="0" height="0" style="position: absolute;" aria-hidden="true">
     <symbol id="g-genshin" viewBox="0 0 24 24"><path d="M12 1l2.6 7.2 7.4 2.8-7.4 2.8L12 21l-2.6-7.2L2 11l7.4-2.8z" fill="currentColor"/><circle cx="12" cy="11" r="2.2" fill="var(--surface, #fff)"/></symbol>
     <symbol id="g-hsr" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.4"/><circle cx="12" cy="12" r="3" fill="currentColor"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
@@ -195,19 +187,24 @@ function copyText(txt, el) {
     });
 }
 function toggleTheme(){
+    setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+}
+function setTheme(theme){
     var el = document.documentElement;
-    var isDark = el.dataset.theme === 'dark';
-    var theme = isDark ? 'light' : 'dark';
     try { localStorage.setItem('hcm-theme', theme); } catch (e) {}
     if (theme === 'light') el.removeAttribute('data-theme');
     else el.setAttribute('data-theme', theme);
-    var btn = document.getElementById('theme-toggle');
-    if (btn) {
-        btn.textContent = theme === 'light' ? '🌙' : '☀️';
-        btn.setAttribute('aria-label', theme === 'light' ? '{{ t('theme_dark') }}' : '{{ t('theme_light') }}');
-        btn.setAttribute('title', btn.getAttribute('aria-label'));
+    var sw = document.getElementById('theme-switch');
+    if (sw) {
+        sw.querySelectorAll('.theme-btn').forEach(function(b){
+            b.classList.toggle('active', b.dataset.themeVal === theme);
+        });
     }
 }
+(function(){
+    var isDark = document.documentElement.dataset.theme === 'dark';
+    setTheme(isDark ? 'dark' : 'light');
+})();
 </script>
 <aside class="sidebar">
     <div class="brand">{% if current_game and current_game in game_accents %}<svg style="width: 26px; height: 26px; flex: none; color: {{ game_accents[current_game].accent }};"><use href="#g-{{ current_game }}"/></svg>{% else %}<span class="brand-mark" aria-hidden="true"></span>{% endif %}<span>{{ t('app_name') }}<small>v{{ app_version }} · by {{ app_author }}{% if current_game and current_game in game_accents %} · {{ game_accents[current_game].name }}{% endif %}</small></span></div>
@@ -227,6 +224,13 @@ function toggleTheme(){
             <option value="{{ code }}" {% if code == lang %}selected{% endif %}>{{ name }}</option>
             {% endfor %}
         </select>
+    </div>
+    <div class="theme-switch" id="theme-switch" role="group">
+        <div class="group-label muted" style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; padding: 0 0 4px;">{{ t('appearance_label') }}</div>
+        <div style="display: flex; gap: 4px;">
+            <button class="theme-btn" data-theme-val="light" onclick="setTheme('light')" aria-label="{{ t('theme_light') }}">☀️ {{ t('theme_light') }}</button>
+            <button class="theme-btn" data-theme-val="dark" onclick="setTheme('dark')" aria-label="{{ t('theme_dark') }}">🌙 {{ t('theme_dark') }}</button>
+        </div>
     </div>
     <div class="lang-switch">
         <div style="display: flex; gap: 4px;">
