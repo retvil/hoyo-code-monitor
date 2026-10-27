@@ -10,7 +10,7 @@
 - ✅ `templates/recent_codes.html:23` — кнопка «Redeem all» без `hx-confirm`. Добавлен (коммит f0c7af6).
 - ✅ `src/web_ui.py:53` — `_test_rate_limit` накапливал ключи без очистки. In-place TTL-prune (коммит d531b64; баг с global-rebind починен в ee0f2b6).
 - ✅ `src/web_ui.py:138-143` — `_prime_update_cache`: ошибки терялись молча. Теперь `logger.warning` (коммит d531b64).
-- 🟡 `templates/dashboard.html:33,53` — scheduler/stats partials режутся каждые 5/10s даже когда scheduler остановлен. Делать polling условным по статусу.
+- ✅ `templates/dashboard.html:33,53` — scheduler/stats partials: scheduler-карточка теперь авто-поллит только когда scheduler running (`hx-trigger` условный); stats остаётся every 10s (статистика актуальна всегда). (коммит cf80eb8)
 - ✅ `templates/accounts.html:26` — Auto-login кнопка не блокировалась при работающем scheduler. Disabled-state добавлен (коммит c35085a).
 - ✅ `templates/dashboard.html:8` — метка `stats.failed` отображалась как «pending». Теперь `t('stats_failed')` (коммит c35085a).
 - 💭 Новые языки (es/pt/it) в `src/i18n.py` — опционально.
@@ -41,14 +41,14 @@
 ## CI / Release
 
 - ✅ `.github/workflows/ci-cd.yml:76` — NSIS-инсталятор: smoke-test step добавлен (коммит 4f8502f).
-- 🟡 `ci-cd.yml:68` — `pip install pyinstaller nsis` на каждый билд; кэш.
-- 🟡 `ci-cd.yml:87-100` — assets грузятся только на `release` event; автоматический draft-release на main-тег не работает.
+- ✅ `ci-cd.yml:68` — `pip install pyinstaller nsis`: pyinstaller перенесён в `pyproject.toml [dev]` (кэшируется `actions/setup-python cache: pip`), `nsis` (pip) удалён — `makensis` предустановлен на windows-раннерах. (коммит cf80eb8)
+- ✅ `ci-cd.yml:87-100` — draft-release на тег `v*` добавлен (job `draft-release-on-tag`). Плюс починены пути: `dist/genshin-code-monitor` → `dist/hoyo-code-monitor` (spec COLLECT name) — старый путь в release-загрузке был сломан. (коммит cf80eb8)
 - ✅ `Dockerfile:25-30` — системный chromium + Playwright-хром. Убран системный chromium, `PLAYWRIGHT_BROWSERS_PATH` (он указывал на файл, а не директорию — сломан), добавлен `playwright install chromium` на build (коммит ef250bf). ⚠️ Билд Docker не верифицирован в этой среде.
 - ✅ `genshin-code-monitor.spec` — 70+ hiddenimports: приведено к минимальному набору (только то, что PyInstaller не вытягивает сам). Верифицировано чистым PyInstaller-билдом + `--help` smoke (коммит ef250bf).
 
 ## Hygiene
 
 - ✅ Корень репо: 10+ старых `*-setup.exe`. Удалены (коммит ef250bf; `.gitignore` уже покрывает `*.exe`/`dist`/`build`).
-- 💭 Нет `CODEOWNERS`, нет `CONTRIBUTING.md`.
-- 💭 README × 6 языков — риск рассинхронизации при изменениях в EN.
+- ✅ Нет `CODEOWNERS`, нет `CONTRIBUTING.md`. Оба созданы (коммит cf80eb8).
+- 💭 README × 6 языков — риск рассинхронизации при изменениях в EN (оставлено как есть: переводы сопровождаются вручную).
 
