@@ -182,11 +182,11 @@ class TestRunOnceCommand:
     @patch("src.cli.ConfigManager")
     @patch("src.cli.create_scheduler_from_storage")
     def test_run_once_with_redemption(
+        self,
         mock_create_scheduler: MagicMock,
         mock_config_class: MagicMock,
         mock_fetcher_class: MagicMock,
         mock_storage_class: MagicMock,
-        runner: CliRunner,
     ) -> None:
         """Test run-once command with redemption enabled."""
         mock_config = MagicMock()
@@ -204,7 +204,7 @@ class TestRunOnceCommand:
 
         mock_storage = MagicMock()
         mock_storage.get_code.return_value = None
-        mock_storage.add_code.return_value = True
+        mock_storage.add_code.return_value = 1
         mock_storage.list_accounts.return_value = [
             {"name": "test_account", "uid": "12345", "region": "os_usa", "id": 1}
         ]
@@ -221,7 +221,7 @@ class TestRunOnceCommand:
         mock_scheduler._redeem_new_codes = AsyncMock(return_value=(1, []))
         mock_create_scheduler.return_value = mock_scheduler
 
-        result = runner.invoke(cli, ["run-once"])
+        result = CliRunner().invoke(cli, ["run-once"])
 
         assert result.exit_code == 0
         assert "Running single check cycle" in result.output

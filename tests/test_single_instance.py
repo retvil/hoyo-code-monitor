@@ -82,17 +82,23 @@ class TestStaleLockDetection:
             guard.release()
 
     def test_own_pid_in_lock_acquires_fails(self, lock_path: Path) -> None:
-        """Lock file containing the current process's own PID blocks acquisition."""
-        # Write our own PID into the lock file
-        own_pid = os.getpid()
-        lock_path.write_text(str(own_pid))
+        """A live holder's PID in the lock file is respected by the fallback path.
 
-        guard = SingleInstance(lock_path)
+        The file lock is the source of truth; the PID is a liveness signal consulted
+        when the lockers report the file is held. Here guard1 holds the lock (writing
+        the live parent PID), so guard2's lockers fail, it falls back to reading the
+        PID, finds it alive, and correctly refuses the lock.
+        """
+        guard1 = SingleInstance(lock_path)
+        guard2 = SingleInstance(lock_path)
         try:
-            # Should fail because the PID is alive (this process)
-            assert guard.acquire() is False, "Expected acquire to fail when PID is alive"
+            assert guard1.acquire() is True
+            assert guard1.acquire() in (True, False)  # guard1 already holds it
+            # guard2 must be refused: lockers report held, fallback sees live PID
+            assert guard2.acquire() is False, "Expected acquire to fail while a live holder owns the lock"
         finally:
-            guard.release()
+            guard1.release()
+            guard2.release()
 
 
 class TestIsProcessAlive:

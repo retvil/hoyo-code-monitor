@@ -462,17 +462,10 @@ async def test_source(name: str, request: Request):
             status_code=429,
             detail=f"Rate limited, try in {_RATE_LIMIT_SECONDS - (now - last):.1f}s",
         )
-    # Prune stale entries (TTL cleanup to prevent memory leak on long runs)
-    _test_rate_limit = {
-        k: v for k, v in _test_rate_limit.items()
-        if now - v < _TEST_RATE_LIMIT_TTL_SECONDS
-    }
+    # Prune stale entries in place (TTL cleanup to prevent memory leak on long runs)
+    for k in [key for key in _test_rate_limit if now - _test_rate_limit[key] >= _TEST_RATE_LIMIT_TTL_SECONDS]:
+        del _test_rate_limit[k]
     _test_rate_limit[key] = now
-    # Prune stale entries (TTL cleanup to prevent memory leak on long runs)
-    _test_rate_limit = {
-        k: v for k, v in _test_rate_limit.items()
-        if now - v < _TEST_RATE_LIMIT_TTL_SECONDS
-    }
 
     storage = Storage()
     source_data = storage.get_source(name)
