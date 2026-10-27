@@ -13,9 +13,10 @@ HoYoverse-Spiele veröffentlichen regelmäßig zeitlich begrenzte Promocodes —
 ### So funktioniert es
 
 1. Der Planer fragt aktivierte Quellen ab, extrahiert Codes (`[A-Z0-9]{8,14}`), speichert neue.
-2. Für jedes Konto mit aktivierter Auto-Einlösung: `GET webExchangeCdkey` mit Konto-Cookies, 8s Pause zwischen Einlösungen.
+2. Für jedes Konto mit aktivierter Auto-Einlösung: `GET webExchangeCdkey` mit Konto-Cookies, konfigurierbare Pause zwischen Einlösungen (Standard 8 s).
 3. Ergebnis wird protokolliert: `success` → Done + Belohnung; `-2017/-2018` → bereits eingelöst (zählt als Done); `-2001` abgelaufen, `-2003` ungültig/nur China.
 4. Tägliche HoYoLAB-Check-ins laufen nach eigenem Zeitplan (Standard 04:00 + Streuung): `info → sign → home` pro Konto × Spiel, gleiche Cookies, Ergebnis auf der Check-ins-Seite.
+5. Falls eine Check-in-Fehlermeldung auf abgelaufene Cookies hinweist, kann der Planer sie **automatisch im Headless-Modus** aus dem gespeicherten Browserprofil aktualisieren (optionale Option, Cooldown pro Konto) – kein manuelles erneutes Anmelden, solange die gespeicherte Sitzung gültig ist.
 
 ## Funktionen
 
@@ -24,7 +25,8 @@ HoYoverse-Spiele veröffentlichen regelmäßig zeitlich begrenzte Promocodes —
 - **Tägliche Check-ins** — automatische Anmeldung bei HoYoLAB für Genshin, Star Rail, ZZZ + HI3 (opt-in, pro Konto, eigener Zeitplan, idempotent)
 - **Multi-Source** — Wiki, Wiki-API, Community-JSON-APIs, Guide-Seiten (25 Presets)
 - **Multi-Account** — jedes Konto hat eigene verschlüsselte Cookies und eigenen Schalter
-- **Statistik** — gesamt / eingelöst / ausstehend, pro Quelle, Einlöseprotokoll
+- **Automatische Cookie-Aktualisierung** — wenn eine Check-in an abgelaufenen Cookies scheitert, werden sie im Headless-Modus aus dem gespeicherten Browserprofil neu erfasst (optional, Cooldown pro Konto), sodass der Betrieb ohne manuelles erneutes Anmelden läuft
+- **Statistik** — gesamt / eingelöst / fehlgeschlagen, pro Quelle, Einlöseprotokoll
 - **Web UI** — lokales Dashboard unter `http://127.0.0.1:8000` in 6 Sprachen
 - **System Tray** — Symbol mit Ein/Aus, Scanintervall-Menü, Einstellungen per Klick
 - **Verschlüsselte Cookies** — Fernet (AES-128), Schlüssel in env / OS-Keyring / lokaler Datei
@@ -63,7 +65,7 @@ HoYoverse-Spiele veröffentlichen regelmäßig zeitlich begrenzte Promocodes —
 
 Installer aus [Releases](https://github.com/retvil/hoyo-code-monitor/releases) herunterladen:
 
-- **Windows** — `hoyo-code-monitor-1.2.4-setup.exe` (Installation pro Benutzer, keine Adminrechte nötig)
+- **Windows** — `hoyo-code-monitor-1.3.2-setup.exe` (Installation pro Benutzer, keine Adminrechte nötig)
 
 Stille Installation: `setup.exe /S`. Komponenten: Desktop-Verknüpfung, Windows-Autostart (beide standardmäßig an).
 

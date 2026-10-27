@@ -13,9 +13,10 @@ Les jeux HoYoverse publient régulièrement des codes promo à durée limitée �
 ### Comment ça marche
 
 1. Le planificateur interroge les sources activées, extrait les codes (`[A-Z0-9]{8,14}`), stocke les nouveaux.
-2. Pour chaque compte avec échange auto : `GET webExchangeCdkey` avec les cookies du compte, pause de 8s entre les échanges.
+2. Pour chaque compte avec échange auto : `GET webExchangeCdkey` avec les cookies du compte, pause configurable entre les échanges (8 s par défaut).
 3. Résultat enregistré : `success` → Done + récompense ; `-2017/-2018` → déjà échangé (compte comme Done) ; `-2001` expiré, `-2003` invalide/Chine uniquement.
 4. Les check-ins quotidiens HoYoLAB suivent leur propre planning (04h00 + marge par défaut) : `info → sign → home` par compte × jeu, mêmes cookies, résultats sur la page Check-ins.
+5. Si un check-in échoue à cause de cookies expirés, le planificateur peut les **actualiser automatiquement en mode headless** à partir du profil navigateur sauvegardé (option, délai par compte) — sans connexion manuelle tant que la session sauvegardée est valide.
 
 ## Fonctionnalités
 
@@ -24,7 +25,8 @@ Les jeux HoYoverse publient régulièrement des codes promo à durée limitée �
 - **Check-ins quotidiens** — connexion auto sur HoYoLAB pour Genshin, Star Rail, ZZZ + HI3 (opt-in, par compte, planning dédié, idempotent)
 - **Multi-sources** — Wiki, Wiki API, API JSON communautaires, sites de guides (25 préréglages)
 - **Multi-comptes** — chaque compte a ses cookies chiffrés et son interrupteur
-- **Statistiques** — total / échangés / en attente, par source, journal d'échange
+- **Actualisation auto des cookies** — si un check-in échoue à cause de cookies expirés, ils sont recapturés en mode headless depuis le profil navigateur sauvegardé (option, délai par compte) — la surveillance ne s'interrompt pas sans reconnexion manuelle
+- **Statistiques** — total / échangés / échoués, par source, journal d'échange
 - **Web UI** — tableau de bord local sur `http://127.0.0.1:8000` en 6 langues
 - **Barre système** — icône avec activer/désactiver, menu d'intervalle, réglages en un clic
 - **Cookies chiffrés** — Fernet (AES-128), clé dans env / trousseau OS / fichier local
@@ -63,7 +65,7 @@ Les jeux HoYoverse publient régulièrement des codes promo à durée limitée �
 
 Téléchargez l'installeur depuis [Releases](https://github.com/retvil/hoyo-code-monitor/releases) :
 
-- **Windows** — `hoyo-code-monitor-1.2.4-setup.exe` (installation par utilisateur, sans droits admin)
+- **Windows** — `hoyo-code-monitor-1.3.2-setup.exe` (installation par utilisateur, sans droits admin)
 
 Installation silencieuse : `setup.exe /S`. Composants : raccourci bureau, démarrage Windows (tous deux activés par défaut).
 
