@@ -1,0 +1,36 @@
+# CODEOWNERS — HoYo Code Monitor
+# Line format: pattern → owner. Last matching line wins.
+# GitHub handles this only in the repo root `CODEOWNERS` (or .github/CODEOWNERS).
+
+# Core application
+src/                                  @retvil
+
+# Web UI + templates
+templates/                            @retvil
+src/web_ui.py                         @retvil
+src/web_views.py                      @retvil
+
+# Scheduler / redemption / check-in
+src/scheduler.py                      @retvil
+src/redeemer.py                       @retvil
+src/checkin.py                        @retvil
+
+# Data & persistence
+src/storage.py                        @retvil
+src/config.py                         @retvil
+
+# Build, packaging, release
+genshin-code-monitor.spec             @retvil
+installer.nsi                         @retvil
+pyproject.toml                        @retvil
+requirements.txt                      @retvil
+Dockerfile                            @retvil
+
+# CI/CD + docs + tests
+.github/                              @retvil
+docs/                                 @retvil
+tests/                                @retvil
+README*.md                            @retvil
+
+# Catch-all
+*                                     @retvil

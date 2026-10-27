@@ -30,7 +30,7 @@
     {% endfor %}
 </div>
 
-<div class="card" hx-get="/partials/scheduler-status" hx-trigger="every 5s" hx-swap="outerHTML">
+<div class="card" hx-get="/partials/scheduler-status" hx-trigger="{% if scheduler and scheduler.running %}every 5s{% else %}load{% endif %}" hx-swap="outerHTML">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
         <div class="card-title">{{ t('scheduler') }}</div>
         {% if scheduler and scheduler.running %}

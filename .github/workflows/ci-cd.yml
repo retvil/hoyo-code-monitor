@@ -3,6 +3,7 @@ name: CI/CD
 on:
   push:
     branches: [main, develop]
+    tags: ["v*"]
   pull_request:
     branches: [main, develop]
   release:
@@ -65,7 +66,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install -e .[dev]
-          pip install pyinstaller nsis
 
       - name: Build executable
         run: |
@@ -79,30 +79,55 @@ jobs:
         run: |
           & "dist\hoyo-code-monitor\hoyo-code-monitor.exe" --help
           if ($LASTEXITCODE -ne 0) { exit 1 }
-          if (-not (Test-Path "hoyo-code-monitor-1.3.1-setup.exe")) { exit 1 }
-          if ((Get-Item "hoyo-code-monitor-1.3.1-setup.exe").Length -le 5MB) { exit 1 }
+          $ver = (Select-String -Path pyproject.toml -Pattern '^version\s*=\s*"(.+)"').Matches[0].Groups[1].Value
+          $setup = "hoyo-code-monitor-$ver-setup.exe"
+          if (-not (Test-Path $setup)) { exit 1 }
+          if ((Get-Item $setup).Length -le 5MB) { exit 1 }
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: genshin-code-monitor-windows
+          name: hoyo-code-monitor-windows
           path: |
-            dist/genshin-code-monitor/*.exe
+            dist/hoyo-code-monitor/*.exe
             *.exe
           retention-days: 30
 
       - name: Create release assets
         if: github.event_name == 'release'
         run: |
-          echo "RELEASE_ASSETS=dist/genshin-code-monitor/genshin-code-monitor.exe;genshin-code-monitor-${{ github.event.release.tag_name }}-setup.exe" >> $GITHUB_ENV
+          echo "RELEASE_ASSETS=dist/hoyo-code-monitor/hoyo-code-monitor.exe;hoyo-code-monitor-${{ github.event.release.tag_name }}-setup.exe" >> $GITHUB_ENV
 
       - name: Upload release assets
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            dist/genshin-code-monitor/genshin-code-monitor.exe
-            genshin-code-monitor-${{ github.event.release.tag_name }}-setup.exe
+            dist/hoyo-code-monitor/hoyo-code-monitor.exe
+            hoyo-code-monitor-${{ github.event.release.tag_name }}-setup.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  draft-release-on-tag:
+    needs: [lint-and-test, build-windows]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: hoyo-code-monitor-windows
+          path: release
+
+      - name: Create draft release
+        uses: softprops/action-gh-release@v1
+        with:
+          draft: true
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            release/dist/hoyo-code-monitor/*.exe
+            release/*.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
