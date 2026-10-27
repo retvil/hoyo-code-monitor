@@ -43,19 +43,19 @@ def _ensure_single_instance() -> None:
 
 
 @click.group()
-def cli():
+def cli() -> None:
     """Command group for hoyo-code-monitor."""
     setup_logging()
 
 
 @cli.group()
-def config():
+def config() -> None:
     """Configuration management."""
     pass
 
 
 @config.command()
-def show():
+def show() -> None:
     """Show current configuration."""
     config_manager = ConfigManager()
     config = config_manager.get_all()
@@ -75,7 +75,7 @@ def show():
 @config.command()
 @click.argument("key")
 @click.argument("value")
-def set(key, value):
+def set(key, value) -> None:
     """Set a configuration key to a value."""
     config_manager = ConfigManager()
     try:
@@ -87,13 +87,13 @@ def set(key, value):
 
 
 @cli.group()
-def accounts():
+def accounts() -> None:
     """Manage Hoyolab accounts."""
     pass
 
 
 @accounts.command()
-def list():
+def list() -> None:
     """List all stored accounts."""
     storage = Storage()
     accounts = storage.list_accounts()
@@ -123,7 +123,7 @@ def list():
 @click.option("--lang", default="en-us", help="Language code.")
 @click.option("--s-lang-key", default="en-us", help="Secondary language key.")
 @click.option("--game", default="genshin", help="Game id: genshin, hsr, zzz, hi3, tot.")
-def add(name, uid, region, game_biz, lang, s_lang_key, game):
+def add(name, uid, region, game_biz, lang, s_lang_key, game) -> None:
     """Add a new account <name> <uid> <region>."""
     storage = Storage()
     existing = storage.get_account(name)
@@ -151,7 +151,7 @@ def add(name, uid, region, game_biz, lang, s_lang_key, game):
 
 @accounts.command()
 @click.argument("name")
-def remove(name):
+def remove(name) -> None:
     """Remove an account <name>."""
     storage = Storage()
     try:
@@ -171,7 +171,7 @@ def remove(name):
 @click.option("--game-biz", help="New game business identifier.")
 @click.option("--lang", help="New language code.")
 @click.option("--s-lang-key", help="New secondary language key.")
-def update(name, uid, region, game_biz, lang, s_lang_key):
+def update(name, uid, region, game_biz, lang, s_lang_key) -> None:
     """Update an account <name>."""
     storage = Storage()
     existing = storage.get_account(name)
@@ -199,7 +199,7 @@ def update(name, uid, region, game_biz, lang, s_lang_key):
 @accounts.command()
 @click.argument("name")
 @click.option("--cookies", help="JSON string of cookies (ltuid, ltoken, cookie_token_v2).")
-def set_cookies(name, cookies):
+def set_cookies(name, cookies) -> None:
     """Set cookies for an account <name>."""
     storage = Storage()
     existing = storage.get_account(name)
@@ -226,7 +226,7 @@ def set_cookies(name, cookies):
 @accounts.command()
 @click.argument("name")
 @click.option("--timeout", type=int, default=300, help="Seconds to wait for login.")
-def login(name, timeout):
+def login(name, timeout) -> None:
     """Auto-capture cookies: opens browser, you log in to HoYoLAB, cookies are saved encrypted."""
     storage = Storage()
     existing = storage.get_account(name)
@@ -254,7 +254,7 @@ def login(name, timeout):
 
 @accounts.command()
 @click.argument("name")
-def show_cookies(name):
+def show_cookies(name) -> None:
     """Show cookies for an account <name> (masked)."""
     storage = Storage()
     existing = storage.get_account(name)
@@ -282,13 +282,13 @@ def show_cookies(name):
 
 
 @cli.group()
-def sources():
+def sources() -> None:
     """Manage data sources."""
     pass
 
 
 @sources.command(name="list")
-def list_sources():
+def list_sources() -> None:
     """List all stored sources."""
     storage = Storage()
     sources = storage.list_sources()
@@ -317,7 +317,7 @@ def list_sources():
 @click.argument("url")
 @click.option("--selector-type", "-t", default="css", help="Type of selector (css, json, xpath).")
 @click.option("--selector", "-s", help="Selector value.")
-def add_source(name, url, selector_type, selector):
+def add_source(name, url, selector_type, selector) -> None:
     """Add a new source <name> <url>."""
     storage = Storage()
     existing = storage.get_source(name)
@@ -342,7 +342,7 @@ def add_source(name, url, selector_type, selector):
 
 @sources.command(name="remove")
 @click.argument("name")
-def remove_source(name):
+def remove_source(name) -> None:
     """Remove a source <name>."""
     storage = Storage()
     try:
@@ -357,7 +357,7 @@ def remove_source(name):
 
 @sources.command()
 @click.argument("name")
-def enable(name):
+def enable(name) -> None:
     """Enable a source <name>."""
     storage = Storage()
     try:
@@ -372,7 +372,7 @@ def enable(name):
 
 @sources.command()
 @click.argument("name")
-def disable(name):
+def disable(name) -> None:
     """Disable a source <name>."""
     storage = Storage()
     try:
@@ -386,7 +386,7 @@ def disable(name):
 
 
 @cli.command()
-def start():
+def start() -> None:
     """Start monitoring."""
     _ensure_single_instance()
     try:
@@ -401,7 +401,7 @@ def start():
 
 
 @cli.command()
-def stop():
+def stop() -> None:
     """Stop monitoring."""
     try:
         scheduler = create_scheduler_from_storage()
@@ -415,7 +415,7 @@ def stop():
 
 
 @cli.command()
-def health():
+def health() -> None:
     """Check system health."""
     storage = Storage()
     try:
@@ -442,7 +442,7 @@ def health():
 
 
 @cli.group()
-def notify():
+def notify() -> None:
     """Telegram notification settings."""
     pass
 
@@ -450,7 +450,7 @@ def notify():
 @notify.command("config")
 @click.option("--bot-token", default=None, help="Telegram bot token from @BotFather.")
 @click.option("--chat-id", default=None, help="Telegram chat id (from @userinfobot).")
-def notify_config(bot_token, chat_id):
+def notify_config(bot_token, chat_id) -> None:
     """Show or set Telegram notification settings."""
     storage = Storage()
     if bot_token is not None:
@@ -466,7 +466,7 @@ def notify_config(bot_token, chat_id):
 
 
 @notify.command("test")
-def notify_test():
+def notify_test() -> None:
     """Send a test message to Telegram."""
     storage = Storage()
     token = storage.get_config("telegram_bot_token", "") or ""
@@ -481,7 +481,7 @@ def notify_test():
 
 
 @notify.command("test-toast")
-def notify_test_toast():
+def notify_test_toast() -> None:
     """Show a test Windows toast (no configuration needed)."""
     from src.system_notify import is_configured, show_toast
 
@@ -495,7 +495,7 @@ def notify_test_toast():
 
 
 @cli.command()
-def status():
+def status() -> None:
 
     """Show current status."""
     try:
@@ -511,7 +511,7 @@ def status():
 
 
 @cli.command()
-def stats():
+def stats() -> None:
     """Show redemption statistics."""
     storage = Storage()
     stats = storage.get_stats()
@@ -526,7 +526,7 @@ def stats():
 
 
 @cli.command()
-def run_once():
+def run_once() -> None:
     """Run a single check cycle with redemption (one-shot mode)."""
     _ensure_single_instance()
     try:
@@ -544,6 +544,9 @@ def run_once():
         asyncio.set_event_loop(loop)
 
         try:
+            # NOTE: the `accounts list` command below shadows the builtin `list`,
+            # so a runtime-subscriptable annotation (e.g. list[str]) is not safe
+            # here; _fetch_codes keeps no return annotation on purpose.
             async def _fetch_codes():
                 async with SourceFetcher(storage) as fetcher:
                     return await fetcher.fetch_all_enabled()
@@ -625,13 +628,13 @@ def run_once():
 
 
 @cli.group()
-def autostart():
+def autostart() -> None:
     """Manage Windows autostart on login."""
     pass
 
 
 @autostart.command("enable")
-def autostart_enable_cli():
+def autostart_enable_cli() -> None:
     """Enable autostart on Windows login."""
     try:
         autostart_enable()
@@ -642,7 +645,7 @@ def autostart_enable_cli():
 
 
 @autostart.command("disable")
-def autostart_disable_cli():
+def autostart_disable_cli() -> None:
     """Disable autostart on Windows login."""
     try:
         autostart_disable()
@@ -653,7 +656,7 @@ def autostart_disable_cli():
 
 
 @autostart.command("status")
-def autostart_status_cli():
+def autostart_status_cli() -> None:
     """Show autostart status."""
     try:
         enabled = autostart_is_enabled()
@@ -664,7 +667,7 @@ def autostart_status_cli():
 
 
 @cli.command()
-def tray():
+def tray() -> None:
     """Run in system tray with live menu and embedded settings server."""
     _ensure_single_instance()
     scheduler = create_scheduler_from_storage()

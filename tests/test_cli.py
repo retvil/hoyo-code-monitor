@@ -229,6 +229,86 @@ class TestRunOnceCommand:
         assert "Redeemed 1 code(s)" in result.output
         mock_scheduler._redeem_new_codes.assert_called_once()
 
+    @patch("src.cli.Storage")
+    @patch("src.cli.SourceFetcher")
+    @patch("src.cli.ConfigManager")
+    @patch("src.cli.create_scheduler_from_storage")
+    def test_run_once_redemption_missing_config(
+        self,
+        mock_create_scheduler: MagicMock,
+        mock_config_class: MagicMock,
+        mock_fetcher_class: MagicMock,
+        mock_storage_class: MagicMock,
+    ) -> None:
+        """When scheduler config lacks uid/region/cookies, redemption is skipped."""
+        mock_config = MagicMock()
+        mock_config.get_all.return_value = {"redemption_enabled": True}
+        mock_config_class.return_value = mock_config
+
+        mock_fetcher = AsyncMock()
+        mock_fetcher.fetch_all_enabled = AsyncMock(return_value={"wiki": ["TEST123"]})
+        mock_fetcher.__aenter__ = AsyncMock(return_value=mock_fetcher)
+        mock_fetcher.__aexit__ = AsyncMock(return_value=None)
+        mock_fetcher_class.return_value = mock_fetcher
+
+        mock_storage = MagicMock()
+        mock_storage.get_code.return_value = None
+        mock_storage.add_code.return_value = 1
+        mock_storage.list_accounts.return_value = [{"name": "a", "uid": "1", "region": "os_usa", "id": 1}]
+        mock_storage.is_account_redeem_enabled.return_value = True
+        mock_storage_class.return_value = mock_storage
+
+        # Scheduler config is missing uid/region -> can_redeem is False
+        mock_scheduler = MagicMock()
+        mock_scheduler.config.redemption_enabled = True
+        mock_scheduler.config.uid = None
+        mock_scheduler.config.region = "os_usa"
+        mock_scheduler.config.cookies = {}
+        mock_create_scheduler.return_value = mock_scheduler
+
+        result = CliRunner().invoke(cli, ["run-once"])
+
+        assert result.exit_code == 0
+        assert "missing configuration" in result.output
+        mock_scheduler._redeem_new_codes.assert_not_called()
+
+    @patch("src.cli.Storage")
+    @patch("src.cli.SourceFetcher")
+    @patch("src.cli.ConfigManager")
+    @patch("src.cli.create_scheduler_from_storage")
+    def test_run_once_no_new_codes(
+        self,
+        mock_create_scheduler: MagicMock,
+        mock_config_class: MagicMock,
+        mock_fetcher_class: MagicMock,
+        mock_storage_class: MagicMock,
+    ) -> None:
+        """Redemption is enabled but no codes were found -> redemption is skipped."""
+        mock_config = MagicMock()
+        mock_config.get_all.return_value = {"redemption_enabled": True}
+        mock_config_class.return_value = mock_config
+
+        mock_fetcher = AsyncMock()
+        mock_fetcher.fetch_all_enabled = AsyncMock(return_value={})
+        mock_fetcher.__aenter__ = AsyncMock(return_value=mock_fetcher)
+        mock_fetcher.__aexit__ = AsyncMock(return_value=None)
+        mock_fetcher_class.return_value = mock_fetcher
+
+        mock_storage = MagicMock()
+        mock_storage.get_code.return_value = None
+        mock_storage.list_accounts.return_value = []
+        mock_storage.is_account_redeem_enabled.return_value = True
+        mock_storage_class.return_value = mock_storage
+
+        mock_scheduler = MagicMock()
+        mock_create_scheduler.return_value = mock_scheduler
+
+        result = CliRunner().invoke(cli, ["run-once"])
+
+        assert result.exit_code == 0
+        assert "no new codes" in result.output
+        mock_scheduler._redeem_new_codes.assert_not_called()
+
 
 class TestConfigCommand:
     """Tests for the 'config' command group."""
