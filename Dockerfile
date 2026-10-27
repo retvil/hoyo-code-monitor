@@ -21,11 +21,11 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install runtime dependencies
+# Install system runtime libs. The app uses Playwright's OWN chromium
+# (downloaded into the user's ms-playwright cache), not the distro's
+# `chromium`/`chromium-driver`, so those are intentionally NOT installed.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
-    chromium \
-    chromium-driver \
     fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
 
@@ -37,18 +37,27 @@ RUN useradd -m -u 1000 appuser && \
     mkdir -p /app/data /app/logs /app/config && \
     chown -R appuser:appuser /app
 
-# Copy application code
+# Copy application code (before USER so chown works, then ownership is set)
 COPY --chown=appuser:appuser src/ ./src/
 COPY --chown=appuser:appuser config.toml ./
 COPY --chown=appuser:appuser pyproject.toml ./
 
+# Install the system shared libraries Playwright's chromium needs at launch
+# (libnss3, libatk, libgbm, ...). This must run as root; the slim base image
+# does not ship these by default.
+RUN python -m playwright install-deps chromium
+
 # Switch to non-root user
 USER appuser
+
+# Pre-install Playwright's chromium so runtime logins don't need a network
+# download. Runs as appuser so the browser lands in /home/appuser/.cache/
+# ms-playwright, exactly where src.cookies_login.browsers_dir() looks.
+RUN python -m playwright install chromium
 
 # Environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PLAYWRIGHT_BROWSERS_PATH=/usr/bin/chromium \
     CONFIG_PATH=/app/config/config.toml \
     DB_PATH=/app/data/monitor.db \
     LOG_FILE=/app/logs/app.log
