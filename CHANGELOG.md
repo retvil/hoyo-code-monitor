@@ -1,22 +1,84 @@
 # Changelog
 
-## [1.3.2] - 2026-10-26
+## [1.3.2] - 2026-10-27
 
 ### Added
 - **Automatic cookie refresh for expired accounts**: when a daily check-in slot
   fails because the account's HoYoLAB cookies expired (retcode `10001`/`-100`),
   the scheduler now optionally re-captures the cookies from the saved browser
-  profile — headless, no user interaction needed. If the saved session is still
+  profile - headless, no user interaction needed. If the saved session is still
   valid the fresh cookies are stored and the next check-in pass picks them up
   automatically. Controlled by two new check-in settings: an "auto-refresh
   expired cookies (headless)" toggle and a per-account cooldown (default 60 min)
   so it never hammers the browser. When the saved profile session is gone, the
   log tells you to run the visible Auto-login once.
+- **Redemption in `run-once`**: the one-shot CLI now performs the redemption
+  cycle for newly found codes when redemption is enabled, reusing the same
+  `_redeem_new_codes` helper as the scheduler (previously it printed a
+  "not implemented, use scheduler" stub and skipped redemption).
+- **Configurable cookie skip-filters**: new HoYoLAB tracking cookies can be
+  filtered via `config.toml` (`[cookies] skip_cookie_prefixes` /
+  `skip_cookies`) without a code update; the built-in defaults are unchanged
+  when the section is absent.
+- **Release notes follow the UI language**: GitHub release bodies can carry
+  per-language sections under `##` headings (e.g. `## Что нового (Русский)`);
+  the update banner picks the section matching the selected language,
+  falling back to English, then to the whole body. Single-language notes keep
+  working unchanged.
 
 ### Changed
-- `capture_cookies()` now accepts `headless` and `prefer_saved_session`
+- **Accurate dashboard stat**: the hero counter previously labeled the
+  failed-code total as "pending"; it now reads "failed" (i18n `stats_failed`).
+- **Auto-login disabled while the scheduler runs**: the accounts page now
+  disables the Auto-login (cookie capture) button while the background scheduler
+  is active, to avoid conflicting browser sessions.
+- **`capture_cookies()` now accepts `headless` and `prefer_saved_session`**
   parameters so the automatic refresh path can run without popping a visible
   browser window.
+- **Dashboard scheduler card polls only while running**: the auto-refresh
+  trigger is conditional on the scheduler state, so a stopped scheduler no
+  longer re-fetches the status partial every 5 s.
+
+### Fixed
+- **Stale single-instance lock**: if the previous instance crashed, its lock
+  file now gets detected (dead PID) and cleaned up automatically instead of
+  blocking every future start.
+- **Retry thundering-herd**: source fetch retries now apply random jitter to
+  the exponential backoff instead of retrying in lockstep.
+- **Cookie-capture polling no longer starves the event loop**: the login wait
+  loop yields to the event loop between polls.
+- **Rate-limit cache leak**: the web UI's per-request rate-limit tracker is
+  pruned in place on a TTL instead of accumulating entries for the life of
+  the process.
+- **Silent update-check failures**: the background "check for update" task
+  now logs a warning instead of dropping the error.
+- **Reverted accidental regression in `stats` / `run-once` CLI structure**
+  (the two commands had an orphaned code block merged between them).
+- **Redeem-all button now has a confirmation dialog** (i18n `confirm_redeem_all`).
+- **Dead-code cleanup is a single batched transaction** instead of N separate
+  delete transactions.
+
+### Performance
+- `cleanup_dead_codes` now issues one batched `DELETE ... IN (...)` instead of
+  one `delete_code` call per doomed code.
+
+### CI / build
+- Added an NSIS installer smoke-test step to the Windows build.
+- Draft release is now auto-created on any `v*` tag push.
+- Fixed the release-artifact paths (they referenced the old
+  `genshin-code-monitor` directory name; the spec's COLLECT output is
+  `hoyo-code-monitor`).
+- `pyinstaller` moved into the cached `[dev]` extras; the unused `nsis` pip
+  install was dropped.
+- Docker image now uses Playwright's own chromium (the broken
+  `PLAYWRIGHT_BROWSERS_PATH=/usr/bin/chromium` env var was removed) and
+  pre-installs the browser at build time.
+- The PyInstaller `.spec` hiddenimports were trimmed to only the modules the
+  bytecode analysis cannot infer.
+
+### Docs
+- Added `CODEOWNERS`, `CONTRIBUTING.md`, and `ROADMAP.md`.
+- Removed the 10+ stale `*-setup.exe` build artifacts from the repo root.
 
 ## [1.3.1] - 2026-10-24
 

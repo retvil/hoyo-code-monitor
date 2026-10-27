@@ -13,9 +13,10 @@ HoYoverse games regularly release time-limited promo codes — and they expire f
 ### How it works
 
 1. The scheduler polls enabled sources, extracts codes (`[A-Z0-9]{8,14}`), stores new ones.
-2. For each account with auto-redeem ON: `GET webExchangeCdkey` with the account's cookies, 8s gap between redemptions.
+2. For each account with auto-redeem ON: `GET webExchangeCdkey` with the account's cookies, a configurable gap between redemptions (default 8 s).
 3. Result recorded: `success` → Done + reward; `-2017/-2018` → already claimed (counts as Done); `-2001` expired, `-2003` invalid/CN-only.
 4. Daily HoYoLAB check-ins run on their own schedule (default 04:00 + jitter): `info → sign → home` per account × game, same cookies, results on the Check-ins page.
+5. If a check-in fails because the account cookies expired, the scheduler can **auto-refresh them headless** from the saved browser profile (opt-in toggle, per-account cooldown) — no manual re-login needed while the saved session is still valid.
 
 ## Features
 
@@ -24,7 +25,8 @@ HoYoverse games regularly release time-limited promo codes — and they expire f
 - **Daily check-ins** — auto sign-in on HoYoLAB for all 5 games: Genshin, Star Rail, ZZZ, HI3, Tears of Themis (opt-in, per account, own schedule, idempotent)
 - **Multi-source** — Wiki, Wiki API, community JSON APIs, guide sites (25 presets, see table)
 - **Multi-account** — each account has its own encrypted cookies and redeem toggle
-- **Statistics** — total / redeemed / pending, per-source breakdown, redemption log
+- **Auto cookie refresh** — when a check-in fails on expired cookies, re-capture them headless from the saved browser profile (opt-in, per-account cooldown) so monitoring keeps working without a manual re-login
+- **Statistics** — total / redeemed / failed, per-source breakdown, redemption log
 - **Web UI** — local dashboard at `http://127.0.0.1:8000` in 6 languages
 - **System tray** — icon with enable/disable, scan-interval submenu, one-click settings
 - **Encrypted cookies** — Fernet (AES-128), key in env / OS keyring / local file
@@ -63,7 +65,7 @@ HoYoverse games regularly release time-limited promo codes — and they expire f
 
 Download the installer from [Releases](https://github.com/retvil/hoyo-code-monitor/releases):
 
-- **Windows** — `hoyo-code-monitor-1.3.0-setup.exe` (per-user install, no admin rights needed)
+- **Windows** — `hoyo-code-monitor-1.3.2-setup.exe` (per-user install, no admin rights needed)
 
 Silent install: `setup.exe /S`. Components: desktop shortcut, Windows autostart (both on by default).
 
