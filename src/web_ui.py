@@ -27,20 +27,22 @@ from src.constants import (
 )
 from src.http_session import close_all as close_http_sessions
 from src.http_session import get_session
+from src.i18n import get_lang, make_t
 from src.scheduler import create_scheduler_from_storage
 from src.sources import SOURCE_PRESETS, SourceConfig, SourceFetcher, seed_default_sources
 from src.storage import Storage
 from src.templates import templates
 from src.version_check import check_for_update
-from src.i18n import DEFAULT_LANG, SUPPORTED, get_lang, make_t
 from src.web_views import (
     account_checkin_switch_html,
     account_redeem_switch_html,
     checkin_logs_with_names,
     is_source_stale,
     page_ctx,
-    safe_detail as _safe_detail,
     source_health,
+)
+from src.web_views import (
+    safe_detail as _safe_detail,
 )
 
 if TYPE_CHECKING:
@@ -967,6 +969,7 @@ async def checkins_page(request: Request) -> HTMLResponse:
         "enabled": storage.get_config("checkin_enabled", "true") == "true",
         "time": storage.get_config("checkin_time", "04:00") or "04:00",
         "jitter": storage.get_config("checkin_jitter_minutes", "15") or "15",
+        "auto_refresh": storage.get_config("cookie_auto_refresh", "false") == "true",
     }
     checkin_status = {
         "last_checkin_run": sched.last_checkin_run if sched else None,
@@ -1006,6 +1009,7 @@ async def update_checkin_settings(
     checkin_enabled: bool = Form(False),
     checkin_time: str = Form("04:00"),
     checkin_jitter_minutes: int = Form(15),
+    cookie_auto_refresh: bool = Form(False),
 ) -> dict[str, Any]:
     """Update daily check-in schedule settings (form-data)."""
     storage = Storage()
@@ -1016,6 +1020,7 @@ async def update_checkin_settings(
     storage.set_config("checkin_enabled", "true" if checkin_enabled else "false")
     storage.set_config("checkin_time", checkin_time.strip())
     storage.set_config("checkin_jitter_minutes", str(checkin_jitter_minutes))
+    storage.set_config("cookie_auto_refresh", "true" if cookie_auto_refresh else "false")
     return {"success": True, "message": "Check-in settings saved"}
 
 

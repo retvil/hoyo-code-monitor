@@ -10,6 +10,7 @@ import logging
 import random
 import sqlite3
 import threading
+import time
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import TYPE_CHECKING, Any
@@ -20,6 +21,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 from src.checkin import (
+    COOKIE_EXPIRED_MARKER,
     GAME_CHECKIN_CONF,
     STATUS_ALREADY_CLAIMED,
     STATUS_FAILED,
@@ -37,6 +39,7 @@ from src.constants import (
     MAX_CHECKIN_JITTER_MINUTES,
     MAX_CHECKIN_MINUTE,
 )
+from src.cookies_login import capture_cookies as _capture_cookies
 from src.exceptions import CheckinError, ConfigError
 from src.http_session import close_current
 from src.redeemer import Redeemer
@@ -236,6 +239,8 @@ class Scheduler:
                 summary["games_claimed"] += 1
                 return
             self._tally_result(acc["name"], game, result, summary)
+            if result.status == STATUS_FAILED and COOKIE_EXPIRED_MARKER in (result.message or ""):
+                await self._auto_refresh_cookies(acc)
         except (TimeoutError, aiohttp.ClientError, CheckinError) as e:
             logger.exception("Check-in slot failed for %s/%s", acc["name"], game)
             summary["failed"] += 1
@@ -261,6 +266,62 @@ class Scheduler:
             summary["errors"].append(f"{account_name}/{game}: {result.message}")
         else:
             summary["skipped"] += 1
+
+    def _cookie_auto_refresh_enabled(self) -> bool:
+        """Whether cookie auto-refresh is on (config, default off)."""
+        val = self.storage.get_config("cookie_auto_refresh", "false")
+        return val is not None and val.lower() == "true"
+
+    def _cookie_refresh_due(self, account_name: str) -> bool:
+        """Per-account cooldown: True if enough time has passed since last refresh."""
+        raw = self.storage.get_config(f"last_cookie_refresh_{account_name}", "0")
+        try:
+            last = int(raw)
+        except (TypeError, ValueError):
+            last = 0
+        if last == 0:
+            return True
+        cooldown_min = int(self.storage.get_config("cookie_refresh_cooldown_minutes", "60") or 60)
+        return (time.time() - last) >= cooldown_min * 60
+
+    async def _auto_refresh_cookies(self, acc: dict[str, Any]) -> None:
+        """Re-capture the account's cookies from the saved browser profile.
+
+        Triggered when a check-in slot failed with the cookie-expired marker.
+        Best-effort: a refresh failure never fails the pass, and no retry is
+        scheduled here — the next daily run simply tries the cookies again.
+        """
+        if not self._cookie_auto_refresh_enabled():
+            return
+        account_name = acc["name"]
+        if not self._cookie_refresh_due(account_name):
+            logger.info(
+                "Cookie auto-refresh for %s skipped (cooldown)", account_name
+            )
+            return
+        logger.info("Auto-refreshing cookies for %s (headless)", account_name)
+        try:
+            fresh = await _capture_cookies(
+                timeout_seconds=30, headless=True, prefer_saved_session=True
+            )
+        except Exception as e:
+            logger.warning("Auto cookie refresh failed for %s: %s", account_name, e)
+            return
+        if not fresh.get("ltoken"):
+            logger.info(
+                "Auto cookie refresh for %s: no live session in profile; "
+                "run Auto-login to restore",
+                account_name,
+            )
+            return
+        self.storage.store_account_cookies(account_name, fresh)
+        self.storage.set_config(
+            f"last_cookie_refresh_{account_name}", str(int(time.time()))
+        )
+        logger.info(
+            "Auto cookie refresh succeeded for %s; next check-in run uses the fresh cookies",
+            account_name,
+        )
 
     async def run_daily_checkins(self, claimed_date: str | None = None) -> dict[str, Any]:
         """Run one daily check-in pass over enabled accounts x games.

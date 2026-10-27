@@ -92,7 +92,7 @@ def ensure_chromium() -> None:
         raise RuntimeError(f"Chromium download failed to start: {e}") from e  # noqa: TRY003 -- startup detail needed
     if proc.returncode != 0 or not chromium_executable():
         tail = (proc.stderr or proc.stdout or "")[-500:]
-        raise RuntimeError(f"Chromium download failed: {tail}") from None  # noqa: TRY003, EM101 -- download detail needed
+        raise RuntimeError(f"Chromium download failed: {tail}") from None  # noqa: TRY003 -- download detail needed
     logger.info("Chromium downloaded")
 
 
@@ -141,11 +141,19 @@ def _normalize(cookies: list[dict]) -> dict[str, str]:
     return out
 
 
-async def capture_cookies(timeout_seconds: int = 300) -> dict[str, str]:
+async def capture_cookies(
+    timeout_seconds: int = 300,
+    headless: bool = False,
+    prefer_saved_session: bool = False,
+) -> dict[str, str]:
     """Open login page and wait until auth cookies appear.
 
     Args:
         timeout_seconds: Max time to wait for user login.
+        headless: Run the browser without a visible window.
+        prefer_saved_session: When headless is set, skip opening the login
+            page if the persistent profile already holds valid auth cookies.
+            This is the fast path for automatic cookie refresh.
 
     Returns:
         Dict with at least ltuid + ltoken.
@@ -166,7 +174,7 @@ async def capture_cookies(timeout_seconds: int = 300) -> dict[str, str]:
         # Persistent profile: login survives restarts, user logs in once
         context = await p.chromium.launch_persistent_context(
             profile_dir(),
-            headless=False,
+            headless=headless,
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             locale="en-US",
         )
@@ -174,8 +182,14 @@ async def capture_cookies(timeout_seconds: int = 300) -> dict[str, str]:
             # Already logged in from previous run?
             found = _normalize(await context.cookies())
             if found.get("ltuid") and found.get("ltoken"):
-                logger.info("Already logged in via saved profile")
+                logger.info("Already logged in via saved profile (headless=%s)", headless)
                 return found
+            if headless and prefer_saved_session:
+                # Refresh-only path: if the saved profile has no valid
+                # session there is nothing we can do headless — the user
+                # must log in through the visible Auto-login flow.
+                logger.info("Saved profile session missing/expired; headless refresh not possible")
+                return {}
             page = await context.new_page()
             await page.goto(LOGIN_URL, wait_until="domcontentloaded")
             logger.info("Browser opened, waiting for HoYoLAB login (timeout %ds)", timeout_seconds)

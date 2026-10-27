@@ -1,5 +1,6 @@
 """Unit tests for daily check-ins in the Scheduler."""
 
+import time
 from datetime import date, datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -170,6 +171,75 @@ async def test_run_daily_checkins_sign_failure_logged(
 
     assert result["failed"] == EXPECTED_GAMES_CLAIMED
     assert storage.get_checkin_logs(status="failed")
+
+
+@pytest.mark.asyncio
+async def test_cookie_expired_triggers_auto_refresh(
+    storage: Storage, account_id: int
+) -> None:
+    """Expired-cookie failures re-capture and re-store account cookies when auto-refresh is on."""
+    assert account_id > 0
+    storage.set_config("cookie_auto_refresh", "true")
+    storage.set_config("cookie_refresh_cooldown_minutes", "0")
+    transport = FakeTransport(sign=[make_sign(10001, "Not logged in")] * len(GAME_CHECKIN_CONF))
+    scheduler = make_scheduler(storage, transport)
+    fresh = {"ltuid": "123456", "ltoken": "fresh"}
+
+    async def fake_capture(**_kwargs):
+        return fresh
+
+    with patch("src.scheduler._capture_cookies", side_effect=fake_capture) as capture:
+        result = await scheduler.run_daily_checkins("2026-09-25")
+
+    # Each expired slot attempted a refresh.
+    assert result["failed"] == EXPECTED_GAMES_CLAIMED
+    assert capture.call_count == EXPECTED_GAMES_CLAIMED
+    # Fresh cookies are re-stored on the account.
+    assert storage.load_account_cookies("traveler") == fresh
+    assert storage.get_config("last_cookie_refresh_traveler") is not None
+
+
+@pytest.mark.asyncio
+async def test_cookie_refresh_disabled_does_nothing(
+    storage: Storage, account_id: int
+) -> None:
+    """With auto-refresh off, expired failures are logged without any capture."""
+    assert account_id > 0
+    storage.set_config("cookie_auto_refresh", "false")
+    transport = FakeTransport(sign=[make_sign(10001, "Not logged in")] * len(GAME_CHECKIN_CONF))
+    scheduler = make_scheduler(storage, transport)
+
+    async def fail_capture(**_kwargs):
+        raise AssertionError
+
+    with patch("src.scheduler._capture_cookies", side_effect=fail_capture):
+        result = await scheduler.run_daily_checkins("2026-09-25")
+
+    assert result["failed"] == EXPECTED_GAMES_CLAIMED
+
+
+@pytest.mark.asyncio
+async def test_cookie_refresh_respects_cooldown(
+    storage: Storage, account_id: int
+) -> None:
+    """A recent refresh timestamp blocks a second capture within the cooldown window."""
+    assert account_id > 0
+    storage.set_config("cookie_auto_refresh", "true")
+    storage.set_config("cookie_refresh_cooldown_minutes", "60")
+
+    storage.set_config("last_cookie_refresh_traveler", str(int(time.time())))
+    transport = FakeTransport(sign=[make_sign(10001, "Not logged in")] * len(GAME_CHECKIN_CONF))
+    scheduler = make_scheduler(storage, transport)
+    capture_calls: list = []
+
+    async def record_capture(**_kwargs):
+        capture_calls.append(1)
+        return {"ltuid": "x", "ltoken": "y"}
+
+    with patch("src.scheduler._capture_cookies", side_effect=record_capture):
+        await scheduler.run_daily_checkins("2026-09-26")
+
+    assert capture_calls == []
 
 
 class TestNextCheckinDatetime:

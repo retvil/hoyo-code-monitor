@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.3.2] - 2026-10-26
+
+### Added
+- **Automatic cookie refresh for expired accounts**: when a daily check-in slot
+  fails because the account's HoYoLAB cookies expired (retcode `10001`/`-100`),
+  the scheduler now optionally re-captures the cookies from the saved browser
+  profile — headless, no user interaction needed. If the saved session is still
+  valid the fresh cookies are stored and the next check-in pass picks them up
+  automatically. Controlled by two new check-in settings: an "auto-refresh
+  expired cookies (headless)" toggle and a per-account cooldown (default 60 min)
+  so it never hammers the browser. When the saved profile session is gone, the
+  log tells you to run the visible Auto-login once.
+
+### Changed
+- `capture_cookies()` now accepts `headless` and `prefer_saved_session`
+  parameters so the automatic refresh path can run without popping a visible
+  browser window.
+
 ## [1.3.1] - 2026-10-24
 
 ### Changed

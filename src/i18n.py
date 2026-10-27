@@ -156,6 +156,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "checkin_last": "Last check-in",
         "auto_checkin": "Auto check-in",
         "checkin_cookie_hint": "Cookie expired — refresh cookies",
+        "checkin_auto_refresh": "Auto-refresh expired cookies (headless)",
         "checkin_manual_hint": "Needs one manual sign-in",
         "on": "ON",
         "off": "OFF",
@@ -290,6 +291,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "checkin_last": "Последняя отметка",
         "auto_checkin": "Авто-отметка",
         "checkin_cookie_hint": "Куки протухли — обновите куки",
+        "checkin_auto_refresh": "Автоматически обновлять протухшие куки (headless)",
         "checkin_manual_hint": "Нужна одна ручная отметка",
         "on": "ВКЛ",
         "off": "ВЫКЛ",
@@ -426,6 +428,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "update_later": "Später",
         "update_notes_none": "Für diese Version wurden keine Versionshinweise veröffentlicht.",
         "scheduler_running_login_disabled": "Planer läuft — Auto-Login deaktiviert",
+        "checkin_auto_refresh": "Abgelaufene Cookies automatisch aktualisieren (headless)",
     },
     "fr": {
         "app_name": "HoYo Code Monitor",
@@ -543,6 +546,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "update_download": "Télécharger",
         "update_later": "Plus tard",
         "update_notes_none": "Aucune note de version n'a été publiée pour cette version.",
+        "checkin_auto_refresh": "Actualiser automatiquement les cookies expirés (headless)",
     },
     "ja": {
         "app_name": "HoYo Code Monitor",
@@ -660,6 +664,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "update_download": "ダウンロード",
         "update_later": "後で",
         "update_notes_none": "このバージョンのリリースノートはありません。",
+        "checkin_auto_refresh": "期限切れクッキーの自動更新（headless）",
     },
     "zh": {
         "app_name": "HoYo Code Monitor",
@@ -777,6 +782,7 @@ STRINGS: dict[str, dict[str, str]] = {
         "update_download": "下载",
         "update_later": "稍后",
         "update_notes_none": "此版本未发布更新说明。",
+        "checkin_auto_refresh": "自动刷新过期的 Cookie (headless)",
     },
 }
 

@@ -86,6 +86,12 @@ STATUS_ALREADY_CLAIMED: str = "already_claimed"
 STATUS_FAILED: str = "failed"
 STATUS_SKIPPED: str = "skipped"
 
+# Stable marker embedded in a failed CheckinResult.message when the slot
+# failed because the account cookies are expired. Callers (the scheduler)
+# match this exact string rather than parsing the i18n display text, so
+# auto-refresh can key off it. ASCII + language-neutral by design.
+COOKIE_EXPIRED_MARKER: str = "cookie_expired"
+
 # DS salt for overseas HoYoLAB (public constant, cf. genshin.py utility/ds.py, MIT).
 OS_DS_SALT: str = "6s25p5ox5y14umn1a8aafuwvlvogknd"
 
@@ -489,8 +495,10 @@ class CheckinRunner:
 
     @staticmethod
     def _cookie_expired_message() -> str:
-        """User-facing hint for expired/invalid cookies."""
-        return "Check-in unavailable: cookie expired, refresh account cookies"
+        """User-facing hint for expired/invalid cookies (with stable marker)."""
+        # The leading COOKIE_EXPIRED_MARKER is machine-matched by the scheduler
+        # to trigger an auto cookie-refresh; the rest is the human hint.
+        return f"{COOKIE_EXPIRED_MARKER}: check-in unavailable, refresh account cookies"
 
     def _failed(
         self, game: str, claimed_date: str, message: str

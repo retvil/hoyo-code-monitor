@@ -18,6 +18,10 @@
             <input type="checkbox" name="checkin_enabled" value="true" {% if checkin_settings.enabled %}checked{% endif %} style="width: 18px; height: 18px;">
             {{ t('checkin_enabled') }}
         </label>
+        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+            <input type="checkbox" name="cookie_auto_refresh" value="true" {% if checkin_settings.auto_refresh %}checked{% endif %} style="width: 18px; height: 18px;">
+            {{ t('checkin_auto_refresh') }}
+        </label>
         <div><label>{{ t('checkin_time') }}</label><input type="text" name="checkin_time" value="{{ checkin_settings.time }}" placeholder="04:00" style="width: 90px;"></div>
         <div><label>{{ t('checkin_jitter') }}</label><input type="number" name="checkin_jitter_minutes" value="{{ checkin_settings.jitter }}" min="0" max="120" style="width: 80px;"></div>
         <button type="submit" class="btn">{{ t('save') }}</button>
