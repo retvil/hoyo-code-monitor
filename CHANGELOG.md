@@ -1,8 +1,12 @@
 # Changelog
 
-## [1.3.2] - 2026-10-27
+## [1.4.0] - 2026-10-27
 
 ### Added
+- **Dark theme**: a Light/Dark toggle in the sidebar (below the language
+  switcher) as a visible two-button widget. The choice persists per browser
+  (localStorage); an early paint-time script applies it before first render so
+  there is no flash of the wrong theme.
 - **Automatic cookie refresh for expired accounts**: when a daily check-in slot
   fails because the account's HoYoLAB cookies expired (retcode `10001`/`-100`),
   the scheduler now optionally re-captures the cookies from the saved browser

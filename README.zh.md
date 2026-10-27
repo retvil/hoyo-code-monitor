@@ -26,6 +26,7 @@ HoYoverse 游戏会定期发布限时兑换码 —— 而且很快过期。**HoY
 - **多来源** — Wiki、Wiki API、社区 JSON API、攻略站 (25 个预设)
 - **多账号** — 每个账号独立加密 Cookie 和兑换开关
 - **Cookie 自动刷新** — 签到因 Cookie 过期失败时，从已保存的浏览器配置文件无头重新捕获（可选项，按账号冷却）——无需手动重新登录即可保持监控
+深色主题
 - **统计** — 总数 / 已兑换 / 失败、按来源统计、兑换日志
 - **Web 界面** — 本地仪表盘 `http://127.0.0.1:8000`，支持 6 种语言
 - **系统托盘** — 启用/禁用图标、扫描间隔菜单、一键打开设置
@@ -65,7 +66,7 @@ HoYoverse 游戏会定期发布限时兑换码 —— 而且很快过期。**HoY
 
 从 [Releases](https://github.com/retvil/hoyo-code-monitor/releases) 下载安装程序：
 
-- **Windows** — `hoyo-code-monitor-1.3.2-setup.exe` (按用户安装，无需管理员权限)
+- **Windows** — `hoyo-code-monitor-1.4.0-setup.exe` (按用户安装，无需管理员权限)
 
 静默安装：`setup.exe /S`。组件：桌面快捷方式、Windows 开机自启 (默认全部开启)。
 

@@ -26,6 +26,7 @@ HoYoverse games regularly release time-limited promo codes — and they expire f
 - **Multi-source** — Wiki, Wiki API, community JSON APIs, guide sites (25 presets, see table)
 - **Multi-account** — each account has its own encrypted cookies and redeem toggle
 - **Auto cookie refresh** — when a check-in fails on expired cookies, re-capture them headless from the saved browser profile (opt-in, per-account cooldown) so monitoring keeps working without a manual re-login
+- **Dark theme** — a Light/Dark toggle in the sidebar; the choice persists per browser
 - **Statistics** — total / redeemed / failed, per-source breakdown, redemption log
 - **Web UI** — local dashboard at `http://127.0.0.1:8000` in 6 languages
 - **System tray** — icon with enable/disable, scan-interval submenu, one-click settings
@@ -65,7 +66,7 @@ HoYoverse games regularly release time-limited promo codes — and they expire f
 
 Download the installer from [Releases](https://github.com/retvil/hoyo-code-monitor/releases):
 
-- **Windows** — `hoyo-code-monitor-1.3.2-setup.exe` (per-user install, no admin rights needed)
+- **Windows** — `hoyo-code-monitor-1.4.0-setup.exe` (per-user install, no admin rights needed)
 
 Silent install: `setup.exe /S`. Components: desktop shortcut, Windows autostart (both on by default).
 

@@ -30,6 +30,7 @@ HoYoverse-Spiele veröffentlichen regelmäßig zeitlich begrenzte Promocodes —
 - **Web UI** — lokales Dashboard unter `http://127.0.0.1:8000` in 6 Sprachen
 - **System Tray** — Symbol mit Ein/Aus, Scanintervall-Menü, Einstellungen per Klick
 - **Verschlüsselte Cookies** — Fernet (AES-128), Schlüssel in env / OS-Keyring / lokaler Datei
+- **Dunkelmodus** — Light/Dark-Schalter in der Sidebar; die Auswahl wird im Browser gespeichert
 - **Autostart** — Windows-Login-Autostart (standardmäßig an)
 
 ## Screenshots
@@ -65,7 +66,7 @@ HoYoverse-Spiele veröffentlichen regelmäßig zeitlich begrenzte Promocodes —
 
 Installer aus [Releases](https://github.com/retvil/hoyo-code-monitor/releases) herunterladen:
 
-- **Windows** — `hoyo-code-monitor-1.3.2-setup.exe` (Installation pro Benutzer, keine Adminrechte nötig)
+- **Windows** — `hoyo-code-monitor-1.4.0-setup.exe` (Installation pro Benutzer, keine Adminrechte nötig)
 
 Stille Installation: `setup.exe /S`. Komponenten: Desktop-Verknüpfung, Windows-Autostart (beide standardmäßig an).
 

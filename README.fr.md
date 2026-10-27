@@ -17,6 +17,7 @@ Les jeux HoYoverse publient régulièrement des codes promo à durée limitée �
 3. Résultat enregistré : `success` → Done + récompense ; `-2017/-2018` → déjà échangé (compte comme Done) ; `-2001` expiré, `-2003` invalide/Chine uniquement.
 4. Les check-ins quotidiens HoYoLAB suivent leur propre planning (04h00 + marge par défaut) : `info → sign → home` par compte × jeu, mêmes cookies, résultats sur la page Check-ins.
 5. Si un check-in échoue à cause de cookies expirés, le planificateur peut les **actualiser automatiquement en mode headless** à partir du profil navigateur sauvegardé (option, délai par compte) — sans connexion manuelle tant que la session sauvegardée est valide.
+Thème sombre
 
 ## Fonctionnalités
 
@@ -65,7 +66,7 @@ Les jeux HoYoverse publient régulièrement des codes promo à durée limitée �
 
 Téléchargez l'installeur depuis [Releases](https://github.com/retvil/hoyo-code-monitor/releases) :
 
-- **Windows** — `hoyo-code-monitor-1.3.2-setup.exe` (installation par utilisateur, sans droits admin)
+- **Windows** — `hoyo-code-monitor-1.4.0-setup.exe` (installation par utilisateur, sans droits admin)
 
 Installation silencieuse : `setup.exe /S`. Composants : raccourci bureau, démarrage Windows (tous deux activés par défaut).
 
