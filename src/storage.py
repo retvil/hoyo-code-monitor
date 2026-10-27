@@ -481,18 +481,28 @@ class Storage:
             conn.commit()
             return True
 
+    def delete_codes_by_id(self, ids: list[int]) -> int:
+        """Delete codes and their source associations in one transaction.
+
+        Returns the number of code rows actually deleted. Logs are kept.
+        """
+        if not ids:
+            return 0
+        ph = ",".join("?" for _ in ids)
+        with self._connection() as conn:
+            conn.execute(f"DELETE FROM code_sources WHERE code_id IN ({ph})", ids)
+            cur = conn.execute(f"DELETE FROM codes WHERE id IN ({ph})", ids)
+            conn.commit()
+            return cur.rowcount or 0
+
     def cleanup_dead_codes(self) -> int:
         """Delete unredeemed codes proven dead by API (expired/invalid)."""
-        doomed = [
-            c["code"]
+        doomed_ids = [
+            c["id"]
             for c in self.list_codes(limit=5000)
             if not c.get("redeemed") and c.get("display_status") in ("expired", "invalid")
         ]
-        count = 0
-        for code in doomed:
-            if self.delete_code(code):
-                count += 1
-        return count
+        return self.delete_codes_by_id(doomed_ids)
 
     def codes_per_day(self, days: int = 14) -> list[dict[str, Any]]:
         """Codes found per day for the last N days (for sparkline)."""
