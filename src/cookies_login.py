@@ -96,19 +96,42 @@ def ensure_chromium() -> None:
     logger.info("Chromium downloaded")
 
 
+def _cookie_skip_filters() -> tuple[tuple[str, ...], frozenset[str]]:
+    """Read cookie skip-filters from config, falling back to the defaults.
+
+    HoYoLAB adds tracking cookies over time; the skip lists live in
+    config.toml ([cookies] skip_cookie_prefixes / skip_cookies) so new
+    noise can be filtered without a code update.
+    """
+    try:
+        from src.config import ConfigManager
+
+        raw = ConfigManager().get_all()
+    except Exception:
+        return SKIP_PREFIXES, SKIP_EXACT
+    cookie_conf = raw.get("cookies") or {}
+    prefixes = cookie_conf.get("skip_cookie_prefixes")
+    exact = cookie_conf.get("skip_cookies")
+    return (
+        tuple(prefixes) if prefixes else SKIP_PREFIXES,
+        frozenset(exact) if exact else SKIP_EXACT,
+    )
+
+
 def _normalize(cookies: list[dict]) -> dict[str, str]:
     """Pick auth cookies from Playwright cookie list.
 
     Keeps the full auth set plus normalized ltuid/ltoken aliases
     so the redeemer works regardless of _v2 suffix.
     """
+    skip_prefixes, skip_exact = _cookie_skip_filters()
     out: dict[str, str] = {}
     for c in cookies:
         name = c.get("name", "")
         value = c.get("value", "")
         if not name or not value:
             continue
-        if name in SKIP_EXACT or name.startswith(SKIP_PREFIXES):
+        if name in skip_exact or name.startswith(skip_prefixes):
             continue
         out[name] = value
     if "ltuid" not in out and "ltuid_v2" in out:
