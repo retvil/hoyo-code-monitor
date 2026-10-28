@@ -144,6 +144,7 @@
                      padding: 7px 8px; border-radius: 8px; border: 1px solid var(--border);
                      background: var(--surface); color: var(--muted); font-size: 0.78rem; font-weight: 600;
                      cursor: pointer; transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease; }
+        .theme-btn .t-ic { width: 14px; height: 14px; flex: none; color: currentColor; }
         .theme-btn:hover { background: var(--bg); color: var(--fg); }
         .theme-btn.active { background: var(--accent-soft); color: var(--accent);
                             border-color: var(--accent); }
@@ -152,6 +153,9 @@
 </head>
 <body{% if current_game and current_game in game_accents %} style="--accent: {{ game_accents[current_game].accent }}; --accent-soft: {{ game_accents[current_game].accent_soft }}; --game-accent: {{ game_accents[current_game].accent }};"{% endif %}>
 <svg width="0" height="0" style="position: absolute;" aria-hidden="true">
+    <symbol id="theme-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="theme-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+</svg>
     <symbol id="g-genshin" viewBox="0 0 24 24"><path d="M12 1l2.6 7.2 7.4 2.8-7.4 2.8L12 21l-2.6-7.2L2 11l7.4-2.8z" fill="currentColor"/><circle cx="12" cy="11" r="2.2" fill="var(--surface, #fff)"/></symbol>
     <symbol id="g-hsr" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.4"/><circle cx="12" cy="12" r="3" fill="currentColor"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
     <symbol id="g-zzz" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M8 6V3.5M16 6V3.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><circle cx="12" cy="12" r="2" fill="currentColor"/></symbol>
@@ -228,8 +232,8 @@ function setTheme(theme){
     <div class="theme-switch" id="theme-switch" role="group">
         <div class="group-label muted" style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; padding: 0 0 4px;">{{ t('appearance_label') }}</div>
         <div style="display: flex; gap: 4px;">
-            <button class="theme-btn" data-theme-val="light" onclick="setTheme('light')" aria-label="{{ t('theme_light') }}">☀️ {{ t('theme_light') }}</button>
-            <button class="theme-btn" data-theme-val="dark" onclick="setTheme('dark')" aria-label="{{ t('theme_dark') }}">🌙 {{ t('theme_dark') }}</button>
+            <button class="theme-btn" data-theme-val="light" onclick="setTheme('light')" aria-label="{{ t('theme_light') }}"><svg class="t-ic"><use href="#theme-sun"/></svg> {{ t('theme_light') }}</button>
+            <button class="theme-btn" data-theme-val="dark" onclick="setTheme('dark')" aria-label="{{ t('theme_dark') }}"><svg class="t-ic"><use href="#theme-moon"/></svg> {{ t('theme_dark') }}</button>
         </div>
     </div>
     <div class="lang-switch">
