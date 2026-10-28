@@ -17,8 +17,7 @@ from src.autostart import disable as autostart_disable
 from src.autostart import enable as autostart_enable
 from src.autostart import is_enabled as autostart_is_enabled
 from src.config import ConfigManager
-from src.constants import MASK_VISIBLE_CHARS, MAX_MASKED_UID
-from src.constants import WEB_HOST, WEB_PORT
+from src.constants import MASK_VISIBLE_CHARS, MAX_MASKED_UID, WEB_HOST, WEB_PORT
 from src.cookies_login import capture_cookies_sync
 from src.logging_setup import setup_logging
 from src.notify import send_telegram
@@ -37,7 +36,9 @@ _instance_guard: list[SingleInstance | None] = [None]
 def _ensure_single_instance() -> None:
     """Exit if another instance is already running."""
     _instance_guard[0] = SingleInstance()
-    if not _instance_guard[0].acquire():
+    guard = _instance_guard[0]
+    assert guard is not None
+    if not guard.acquire():
         click.echo("Another instance is already running. Exiting.", err=True)
         sys.exit(1)
 
@@ -75,7 +76,7 @@ def show() -> None:
 @config.command()
 @click.argument("key")
 @click.argument("value")
-def set(key, value) -> None:
+def set(key: str, value: str) -> None:
     """Set a configuration key to a value."""
     config_manager = ConfigManager()
     try:
@@ -93,7 +94,7 @@ def accounts() -> None:
 
 
 @accounts.command()
-def list() -> None:
+def list_accounts() -> None:
     """List all stored accounts."""
     storage = Storage()
     accounts = storage.list_accounts()
@@ -123,7 +124,7 @@ def list() -> None:
 @click.option("--lang", default="en-us", help="Language code.")
 @click.option("--s-lang-key", default="en-us", help="Secondary language key.")
 @click.option("--game", default="genshin", help="Game id: genshin, hsr, zzz, hi3, tot.")
-def add(name, uid, region, game_biz, lang, s_lang_key, game) -> None:
+def add(name: str, uid: str, region: str, game_biz: str, lang: str, s_lang_key: str, game: str) -> None:
     """Add a new account <name> <uid> <region>."""
     storage = Storage()
     existing = storage.get_account(name)
@@ -151,7 +152,7 @@ def add(name, uid, region, game_biz, lang, s_lang_key, game) -> None:
 
 @accounts.command()
 @click.argument("name")
-def remove(name) -> None:
+def remove(name: str) -> None:
     """Remove an account <name>."""
     storage = Storage()
     try:
@@ -171,7 +172,7 @@ def remove(name) -> None:
 @click.option("--game-biz", help="New game business identifier.")
 @click.option("--lang", help="New language code.")
 @click.option("--s-lang-key", help="New secondary language key.")
-def update(name, uid, region, game_biz, lang, s_lang_key) -> None:
+def update(name: str, uid: str | None = None, region: str | None = None, game_biz: str | None = None, lang: str | None = None, s_lang_key: str | None = None) -> None:
     """Update an account <name>."""
     storage = Storage()
     existing = storage.get_account(name)
@@ -199,7 +200,7 @@ def update(name, uid, region, game_biz, lang, s_lang_key) -> None:
 @accounts.command()
 @click.argument("name")
 @click.option("--cookies", help="JSON string of cookies (ltuid, ltoken, cookie_token_v2).")
-def set_cookies(name, cookies) -> None:
+def set_cookies(name: str, cookies: str) -> None:
     """Set cookies for an account <name>."""
     storage = Storage()
     existing = storage.get_account(name)
@@ -226,7 +227,7 @@ def set_cookies(name, cookies) -> None:
 @accounts.command()
 @click.argument("name")
 @click.option("--timeout", type=int, default=300, help="Seconds to wait for login.")
-def login(name, timeout) -> None:
+def login(name: str, timeout: int) -> None:
     """Auto-capture cookies: opens browser, you log in to HoYoLAB, cookies are saved encrypted."""
     storage = Storage()
     existing = storage.get_account(name)
@@ -254,7 +255,7 @@ def login(name, timeout) -> None:
 
 @accounts.command()
 @click.argument("name")
-def show_cookies(name) -> None:
+def show_cookies(name: str) -> None:
     """Show cookies for an account <name> (masked)."""
     storage = Storage()
     existing = storage.get_account(name)
@@ -317,7 +318,7 @@ def list_sources() -> None:
 @click.argument("url")
 @click.option("--selector-type", "-t", default="css", help="Type of selector (css, json, xpath).")
 @click.option("--selector", "-s", help="Selector value.")
-def add_source(name, url, selector_type, selector) -> None:
+def add_source(name: str, url: str, selector_type: str, selector: str) -> None:
     """Add a new source <name> <url>."""
     storage = Storage()
     existing = storage.get_source(name)
@@ -342,11 +343,11 @@ def add_source(name, url, selector_type, selector) -> None:
 
 @sources.command(name="remove")
 @click.argument("name")
-def remove_source(name) -> None:
+def remove_source(name: str) -> None:
     """Remove a source <name>."""
     storage = Storage()
     try:
-        storage.remove_source(name)
+        storage.delete_source(name)
     except Exception as e:
         click.echo(f"Error removing source: {e}", err=True)
         sys.exit(1)
@@ -357,11 +358,11 @@ def remove_source(name) -> None:
 
 @sources.command()
 @click.argument("name")
-def enable(name) -> None:
+def enable(name: str) -> None:
     """Enable a source <name>."""
     storage = Storage()
     try:
-        storage.enable_source(name)
+        storage.update_source(name, enabled=True)
     except Exception as e:
         click.echo(f"Error enabling source: {e}", err=True)
         sys.exit(1)
@@ -372,11 +373,11 @@ def enable(name) -> None:
 
 @sources.command()
 @click.argument("name")
-def disable(name) -> None:
+def disable(name: str) -> None:
     """Disable a source <name>."""
     storage = Storage()
     try:
-        storage.disable_source(name)
+        storage.update_source(name, enabled=False)
     except Exception as e:
         click.echo(f"Error disabling source: {e}", err=True)
         sys.exit(1)
@@ -450,7 +451,7 @@ def notify() -> None:
 @notify.command("config")
 @click.option("--bot-token", default=None, help="Telegram bot token from @BotFather.")
 @click.option("--chat-id", default=None, help="Telegram chat id (from @userinfobot).")
-def notify_config(bot_token, chat_id) -> None:
+def notify_config(bot_token: str | None, chat_id: str | None) -> None:
     """Show or set Telegram notification settings."""
     storage = Storage()
     if bot_token is not None:
@@ -501,7 +502,7 @@ def status() -> None:
     try:
         scheduler = create_scheduler_from_storage()
         if scheduler.is_running():
-            next_run = scheduler.next_run_time()
+            next_run = scheduler.status.next_run
             click.echo(f"Scheduler is running. Next run: {next_run}")
         else:
             click.echo("Scheduler is stopped.")
@@ -547,7 +548,7 @@ def run_once() -> None:
             # NOTE: the `accounts list` command below shadows the builtin `list`,
             # so a runtime-subscriptable annotation (e.g. list[str]) is not safe
             # here; _fetch_codes keeps no return annotation on purpose.
-            async def _fetch_codes():
+            async def _fetch_codes() -> dict[str, list[str]]:
                 async with SourceFetcher(storage) as fetcher:
                     return await fetcher.fetch_all_enabled()
 

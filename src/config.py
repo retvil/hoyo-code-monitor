@@ -32,11 +32,11 @@ except ImportError:
     _toml_legacy = None  # type: ignore[assignment]
 
 
-def _default(fn_name: str):
+def _default(fn_name: str) -> str:
     """Lazy default from src.paths (keeps import graph acyclic)."""
     from importlib import import_module
 
-    return getattr(import_module("src.paths"), fn_name)()
+    return str(getattr(import_module("src.paths"), fn_name)())
 
 
 @dataclass
@@ -57,9 +57,18 @@ class Settings:
     log_file: str = field(default_factory=lambda: _default("default_log_path"))
     max_log_size: int = 10485760
     backup_count: int = 5
+    # Per-account auth cookies. Populated at runtime by
+    # load_config_from_storage (legacy SimpleNamespace path) and read by the
+    # scheduler/redeemer. Excluded from TOML persistence below so secrets
+    # never land in config.toml.
+    cookies: dict[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        # ``cookies`` holds per-account secrets, so it must never be persisted
+        # to config.toml. Drop it on serialization.
+        data = asdict(self)
+        data.pop("cookies", None)
+        return data
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Settings:

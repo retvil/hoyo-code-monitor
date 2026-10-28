@@ -32,7 +32,7 @@ def _is_process_alive(pid: int) -> bool:
     """
     if _HAS_PSUTIL:
         try:
-            return psutil.Process(pid).is_running()
+            return bool(psutil.Process(pid).is_running())
         except Exception:
             return False
     # ctypes fallback – Windows API only

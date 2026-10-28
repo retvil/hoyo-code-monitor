@@ -6,6 +6,8 @@ Language is stored in storage config under key "language".
 
 from __future__ import annotations
 
+from typing import Any, Callable
+
 SUPPORTED: dict[str, str] = {
     "en": "English",
     "ru": "Русский",
@@ -805,7 +807,7 @@ STRINGS: dict[str, dict[str, str]] = {
 }
 
 
-def get_lang(storage=None) -> str:
+def get_lang(storage: Any = None) -> str:
     """Get current UI language code (stored value, else OS language)."""
     lang = None
     if storage is not None:
@@ -818,7 +820,7 @@ def get_lang(storage=None) -> str:
     return lang if lang in SUPPORTED else DEFAULT_LANG
 
 
-def set_lang(storage, lang: str) -> None:
+def set_lang(storage: Any, lang: str) -> None:
     """Set UI language code."""
     if lang not in SUPPORTED:
         raise ValueError(f"Unknown language: {lang}")  # noqa: TRY003 -- must name the bad value
@@ -830,7 +832,7 @@ def t(lang: str, key: str) -> str:
     return STRINGS.get(lang, {}).get(key) or STRINGS["en"].get(key, key)
 
 
-def make_t(lang: str):
+def make_t(lang: str) -> Callable[[str], str]:
     """Return translator function for templates."""
     lang = lang if lang in SUPPORTED else DEFAULT_LANG
 

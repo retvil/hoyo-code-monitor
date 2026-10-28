@@ -5,6 +5,7 @@ Provides async redemption of Genshin Impact promotional codes via Hoyolab API.
 
 import logging
 from dataclasses import dataclass
+from types import TracebackType
 from typing import Any, Self
 
 import aiohttp
@@ -107,7 +108,7 @@ class Redeemer:
         """Async context manager entry."""
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+    async def __aexit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None) -> None:
         """Async context manager exit - closes session."""
         await self.close()
 

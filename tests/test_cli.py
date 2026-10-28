@@ -128,7 +128,7 @@ class TestStatusCommand:
         """Test status command when scheduler is running."""
         mock_scheduler = MagicMock()
         mock_scheduler.is_running.return_value = True
-        mock_scheduler.next_run_time.return_value = "2024-01-01 12:00:00"
+        mock_scheduler.status.next_run = "2024-01-01 12:00:00"
         mock_create_scheduler.return_value = mock_scheduler
 
         result = runner.invoke(cli, ["status"])
@@ -436,7 +436,7 @@ class TestSourcesCommand:
 
         assert result.exit_code == 0
         assert "Removed source 'test'" in result.output
-        mock_storage.remove_source.assert_called_once_with("test")
+        mock_storage.delete_source.assert_called_once_with("test")
 
     @patch("src.cli.Storage")
     def test_sources_enable(self, mock_storage_class: MagicMock, runner: CliRunner) -> None:
@@ -449,7 +449,7 @@ class TestSourcesCommand:
 
         assert result.exit_code == 0
         assert "Enabled source 'test'" in result.output
-        mock_storage.enable_source.assert_called_once_with("test")
+        mock_storage.update_source.assert_called_once_with("test", enabled=True)
 
     @patch("src.cli.Storage")
     def test_sources_disable(self, mock_storage_class: MagicMock, runner: CliRunner) -> None:
@@ -462,7 +462,7 @@ class TestSourcesCommand:
 
         assert result.exit_code == 0
         assert "Disabled source 'test'" in result.output
-        mock_storage.disable_source.assert_called_once_with("test")
+        mock_storage.update_source.assert_called_once_with("test", enabled=False)
 
 
 class TestHelpCommand:

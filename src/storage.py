@@ -180,7 +180,7 @@ class Storage:
             ).fetchone()
 
             if existing:
-                code_id = existing[0]
+                code_id = int(existing[0])
                 # Check if this source is already associated
                 existing_source = conn.execute(
                     "SELECT 1 FROM code_sources WHERE code_id = ? AND source = ?",
@@ -205,7 +205,7 @@ class Storage:
                 """,
                 (code, attempted_at.isoformat(), _ts(published_at), _ts(expires_at), game),
             )
-            code_id = cursor.lastrowid
+            code_id = cursor.lastrowid or 0
 
             # Insert into code_sources junction table
             conn.execute(
@@ -595,7 +595,7 @@ class Storage:
                 ),
             )
             conn.commit()
-            return cursor.lastrowid
+            return int(cursor.lastrowid or 0)
 
     def get_source(self, name: str) -> dict[str, Any] | None:
         """Retrieve a source by name.
@@ -792,7 +792,7 @@ class Storage:
                 (name, uid, region, game_biz, lang, s_lang_key, game),
             )
             conn.commit()
-            return cursor.lastrowid
+            return int(cursor.lastrowid or 0)
 
     def get_account(self, name: str) -> dict[str, Any] | None:
         """Retrieve an account by name."""
@@ -885,7 +885,7 @@ class Storage:
                 ),
             )
             conn.commit()
-            return cursor.lastrowid
+            return int(cursor.lastrowid or 0)
 
     def get_active_session(self, account_id: int) -> dict[str, Any] | None:
         """Get the active session for an account."""
@@ -947,7 +947,7 @@ class Storage:
                 ),
             )
             conn.commit()
-            return cursor.lastrowid
+            return int(cursor.lastrowid or 0)
 
     def get_redemption_logs(
         self,
@@ -1052,7 +1052,7 @@ class Storage:
         """
         try:
             data = self._fernet.decrypt(encrypted.encode())
-            return json.loads(data.decode())
+            return json.loads(data.decode()) or {}
         except Exception:
             logger.warning("Failed to decrypt cookies; returning empty dict")
             return {}
@@ -1088,7 +1088,8 @@ class Storage:
         except Exception:
             pass
         try:
-            return json.loads(value)
+            parsed = json.loads(value)
+            return parsed if isinstance(parsed, dict) else {}
         except Exception:
             logger.warning("Failed to decode account cookies; returning empty")
             return {}
@@ -1109,7 +1110,7 @@ class Storage:
         """Check per-account auto-redeem flag (falls back to global flag)."""
         val = self.get_config(f"account_redeem_{account_name}")
         if val is None:
-            return self.get_config("redemption_enabled", "false").lower() == "true"
+            return (self.get_config("redemption_enabled", "false") or "").lower() == "true"
         return val.lower() == "true"
 
     def set_account_redeem(self, account_name: str, enabled: bool) -> None:
@@ -1151,7 +1152,7 @@ class Storage:
                 ),
             )
             conn.commit()
-            return cursor.lastrowid
+            return int(cursor.lastrowid or 0)
 
     def get_checkin_logs(
         self,

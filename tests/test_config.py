@@ -56,7 +56,6 @@ class TestSettingsDefaults:
         s = Settings()
         assert not hasattr(s, "uid")
         assert not hasattr(s, "region")
-        assert not hasattr(s, "cookies")
         assert not hasattr(s, "game_biz")
 
     def test_to_dict_round_trip(self) -> None:

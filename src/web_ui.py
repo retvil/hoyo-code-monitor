@@ -46,7 +46,7 @@ from src.web_views import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Coroutine
+    from collections.abc import AsyncIterator, Callable, Coroutine
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +146,7 @@ async def _prime_update_cache() -> None:
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     global scheduler
     # Startup
 
@@ -188,7 +188,7 @@ app = FastAPI(
 
 
 @app.middleware("http")
-async def request_id_middleware(request: Request, call_next):
+async def request_id_middleware(request: Request, call_next: Callable[[Request], Coroutine[Any, Any, Response]]) -> Response:
     """Attach a unique request ID for traceability."""
     request_id = secrets.token_urlsafe(16)
     request.state.request_id = request_id
@@ -198,7 +198,7 @@ async def request_id_middleware(request: Request, call_next):
 
 
 @app.middleware("http")
-async def csrf_middleware(request: Request, call_next):
+async def csrf_middleware(request: Request, call_next: Callable[[Request], Coroutine[Any, Any, Response]]) -> Response:
     """Enforce CSRF protection on state-changing requests.
 
     HTTPException raised inside user middleware escapes Starlette's inner
@@ -263,7 +263,7 @@ async def csrf_token(request: Request) -> JSONResponse:
 
 
 @app.post("/language")
-async def set_language(language: str = Form(...)):
+async def set_language(language: str = Form(...)) -> dict[str, Any]:
     """Set UI language (en, ru, de, fr, ja, zh)."""
     from src.i18n import set_lang
 
@@ -277,7 +277,7 @@ async def set_language(language: str = Form(...)):
 
 # Routes
 @app.get("/", response_class=HTMLResponse)
-async def dashboard(request: Request, game: str = ""):
+async def dashboard(request: Request, game: str = "") -> HTMLResponse:
     """Main dashboard (variant C: game summary cards + filter)."""
     from src.constants import GAME_CONF, GAMES
 
@@ -349,7 +349,7 @@ async def dashboard(request: Request, game: str = ""):
 
 
 @app.get("/sources", response_class=HTMLResponse)
-async def sources_page(request: Request):
+async def sources_page(request: Request) -> HTMLResponse:
     """Sources management page."""
     storage = Storage()
     sources = storage.list_sources()
@@ -382,7 +382,8 @@ async def create_source(
     browser_wait_seconds: int = Form(5),
     max_retries: int = Form(3),
     retry_base_delay: float = Form(1.0),
-):
+    game: str = Form("genshin"),
+) -> dict[str, Any]:
     """Create a new source (accepts form-data from HTMX modal)."""
     storage = Storage()
     try:
@@ -413,7 +414,7 @@ async def create_source(
 
 
 @app.post("/sources/{name}/enable")
-async def enable_source(name: str):
+async def enable_source(name: str) -> dict[str, Any]:
     """Enable a source."""
     storage = Storage()
     try:
@@ -426,7 +427,7 @@ async def enable_source(name: str):
 
 
 @app.post("/sources/{name}/disable")
-async def disable_source(name: str):
+async def disable_source(name: str) -> dict[str, Any]:
     """Disable a source."""
     storage = Storage()
     try:
@@ -439,7 +440,7 @@ async def disable_source(name: str):
 
 
 @app.delete("/sources/{name}")
-async def delete_source(name: str):
+async def delete_source(name: str) -> dict[str, Any]:
     """Delete a source."""
     storage = Storage()
     try:
@@ -452,7 +453,7 @@ async def delete_source(name: str):
 
 
 @app.post("/sources/{name}/test")
-async def test_source(name: str, request: Request):
+async def test_source(name: str, request: Request) -> dict[str, Any]:
     """Test fetch from a source."""
     # Simple per-IP rate limit (local only)
     ip = request.client.host if request.client else "unknown"
@@ -485,7 +486,7 @@ async def test_source(name: str, request: Request):
 
 
 @app.get("/accounts", response_class=HTMLResponse)
-async def accounts_page(request: Request):
+async def accounts_page(request: Request) -> HTMLResponse:
     """Accounts management page."""
     storage = Storage()
     accounts = storage.list_accounts()
@@ -516,7 +517,7 @@ async def create_account(
     lang: str = Form("en-us"),
     s_lang_key: str = Form("en-us"),
     game: str = Form("genshin"),
-):
+) -> dict[str, Any]:
     """Create a new account (accepts form-data from HTMX modal)."""
     from src.constants import GAMES
 
@@ -539,7 +540,7 @@ async def create_account(
 
 
 @app.post("/accounts/{name}/cookies")
-async def set_account_cookies(name: str, cookies: str = Form(...)):
+async def set_account_cookies(name: str, cookies: str = Form(...)) -> dict[str, Any]:
     """Set cookies for an account (cookies as JSON string)."""
     storage = Storage()
     existing = storage.get_account(name)
@@ -555,7 +556,7 @@ async def set_account_cookies(name: str, cookies: str = Form(...)):
 
 
 @app.post("/accounts/{name}/login")
-async def login_account(name: str, timeout: int = 300):
+async def login_account(name: str, timeout: int = 300) -> dict[str, Any]:
     """Auto-capture cookies via browser login (opens browser on this PC)."""
     from src.cookies_login import capture_cookies
 
@@ -579,7 +580,7 @@ async def login_account(name: str, timeout: int = 300):
 
 
 @app.get("/accounts/{name}/cookies")
-async def get_account_cookies(name: str):
+async def get_account_cookies(name: str) -> HTMLResponse:
     """Get cookies for an account (masked)."""
     storage = Storage()
     existing = storage.get_account(name)
@@ -607,7 +608,7 @@ async def get_account_cookies(name: str):
 
 
 @app.delete("/accounts/{name}")
-async def delete_account(name: str):
+async def delete_account(name: str) -> dict[str, Any]:
     """Delete an account."""
     storage = Storage()
     try:
@@ -618,7 +619,7 @@ async def delete_account(name: str):
 
 
 @app.get("/config", response_class=HTMLResponse)
-async def config_page(request: Request):
+async def config_page(request: Request) -> HTMLResponse:
     """Configuration page."""
     storage = Storage()
     config_manager = ConfigManager()
@@ -646,7 +647,7 @@ async def update_config(
     db_path: str = Form("data/monitor.db"),
     log_level: str = Form("INFO"),
     log_file: str = Form("logs/app.log"),
-):
+) -> dict[str, Any]:
     """Update configuration from settings form (form-data)."""
     config_manager = ConfigManager()
     try:
@@ -668,7 +669,7 @@ async def update_config(
 
 
 @app.get("/author", response_class=HTMLResponse)
-async def author_page(request: Request):
+async def author_page(request: Request) -> HTMLResponse:
     """Author page with contacts and support options."""
     from src import author as author_module
 
@@ -710,7 +711,7 @@ async def author_page(request: Request):
 
 
 @app.get("/author/qr")
-async def author_qr(kind: str = "bitcoin"):
+async def author_qr(kind: str = "bitcoin") -> Response:
     """QR code PNG for a crypto address (generated locally, no external calls)."""
     from src import author as author_module
 
@@ -739,7 +740,7 @@ async def author_qr(kind: str = "bitcoin"):
 
 
 @app.post("/scheduler/start")
-async def start_scheduler():
+async def start_scheduler() -> dict[str, Any]:
     """Start the scheduler."""
     global scheduler
     if not scheduler:
@@ -755,7 +756,7 @@ async def start_scheduler():
 
 
 @app.post("/scheduler/stop")
-async def stop_scheduler():
+async def stop_scheduler() -> dict[str, Any]:
     """Stop the scheduler."""
     global scheduler
     if not scheduler:
@@ -769,7 +770,7 @@ async def stop_scheduler():
 
 
 @app.post("/scheduler/run-once")
-async def run_once():
+async def run_once() -> dict[str, Any]:
     """Run a single check cycle."""
     global scheduler
     if not scheduler:
@@ -782,7 +783,7 @@ async def run_once():
 
 
 @app.get("/api/status")
-async def api_status():
+async def api_status() -> dict[str, Any]:
     """Get scheduler status as JSON."""
     global scheduler
     if not scheduler:
@@ -800,14 +801,14 @@ async def api_status():
 
 
 @app.get("/api/stats")
-async def api_stats():
+async def api_stats() -> dict[str, Any]:
     """Get statistics as JSON."""
     storage = Storage()
     return storage.get_stats()
 
 
 @app.get("/api/sources/status")
-async def api_sources_status():
+async def api_sources_status() -> list[dict[str, Any]]:
     """Get status of all sources."""
     storage = Storage()
     sources = storage.list_sources()
@@ -832,7 +833,7 @@ async def api_sources_status():
 
 
 @app.get("/health")
-async def health_check():
+async def health_check() -> dict[str, Any]:
     """Health check endpoint."""
     storage = Storage()
     payload: dict[str, Any] = {
@@ -898,7 +899,7 @@ def _safe_scheduler_status() -> dict[str, Any]:
 
 
 @app.get("/partials/health", response_class=HTMLResponse)
-async def partial_health():
+async def partial_health() -> str:
     """HTMX partial: pretty health badge (machine JSON stays at /health)."""
     storage = Storage()
     try:
@@ -920,7 +921,7 @@ async def partial_health():
 
 
 @app.get("/accounts/{name}/redeem-state", response_class=HTMLResponse)
-async def account_redeem_state(name: str):
+async def account_redeem_state(name: str) -> str:
     """Current per-account auto-redeem switch HTML (for initial load)."""
     storage = Storage()
     if not storage.get_account(name):
@@ -929,7 +930,7 @@ async def account_redeem_state(name: str):
 
 
 @app.post("/accounts/{name}/redeem/toggle", response_class=HTMLResponse)
-async def toggle_account_redeem(name: str):
+async def toggle_account_redeem(name: str) -> str:
     """Toggle per-account auto-redeem on/off, returns switch HTML."""
     storage = Storage()
     if not storage.get_account(name):
@@ -1084,7 +1085,7 @@ async def partial_checkin_progress(request: Request) -> HTMLResponse:
 
 
 @app.post("/codes/{code}/redeem")
-async def redeem_single_code(code: str):
+async def redeem_single_code(code: str) -> dict[str, Any]:
     """Redeem one code for all accounts with auto-redeem ON."""
     import asyncio
 
@@ -1136,7 +1137,7 @@ async def redeem_single_code(code: str):
 
 
 @app.delete("/codes/{code}")
-async def delete_single_code(code: str):
+async def delete_single_code(code: str) -> dict[str, Any]:
     """Delete a code (logs are kept for history)."""
     storage = Storage()
     if not storage.delete_code(code.strip()):
@@ -1145,7 +1146,7 @@ async def delete_single_code(code: str):
 
 
 @app.post("/codes/cleanup")
-async def cleanup_dead():
+async def cleanup_dead() -> dict[str, Any]:
     """Delete unredeemed codes proven dead by API (expired/invalid)."""
     storage = Storage()
     count = storage.cleanup_dead_codes()
@@ -1153,7 +1154,7 @@ async def cleanup_dead():
 
 
 @app.post("/redeem/all")
-async def redeem_all_codes():
+async def redeem_all_codes() -> dict[str, Any]:
     """Redeem all unredeemed, non-expired codes for accounts with auto-redeem ON."""
     import asyncio
 
@@ -1217,7 +1218,7 @@ async def redeem_all_codes():
 
 
 @app.get("/export")
-async def export_data():
+async def export_data() -> dict[str, Any]:
     """Export codes + redemption state as JSON (backup / transfer)."""
     storage = Storage()
     codes = storage.list_codes(limit=10000)
@@ -1240,7 +1241,7 @@ async def export_data():
 
 
 @app.post("/import")
-async def import_data(payload: str = Form(...)):
+async def import_data(payload: str = Form(...)) -> dict[str, Any]:
     """Import codes JSON (merges, never overwrites redemption state)."""
     storage = Storage()
     try:
@@ -1273,7 +1274,7 @@ async def import_data(payload: str = Form(...)):
 
 
 @app.get("/metrics")
-async def metrics():
+async def metrics() -> Response:
     """Prometheus metrics endpoint."""
     from src.logging_setup import get_prometheus_metrics
 
@@ -1286,7 +1287,7 @@ async def metrics():
 
 
 @app.get("/partials/scheduler-status")
-async def partial_scheduler_status(request: Request):
+async def partial_scheduler_status(request: Request) -> HTMLResponse:
     """HTMX partial for scheduler status."""
     global scheduler
     storage = Storage()
@@ -1315,7 +1316,7 @@ async def partial_scheduler_status(request: Request):
 
 
 @app.get("/partials/sparkline", response_class=HTMLResponse)
-async def partial_sparkline(request: Request):
+async def partial_sparkline(request: Request) -> HTMLResponse:
     """HTMX partial: SVG sparkline of codes found per day (last 14 days)."""
     storage = Storage()
     data = storage.codes_per_day(14)
@@ -1349,7 +1350,7 @@ async def partial_sparkline(request: Request):
 
 
 @app.get("/partials/stats")
-async def partial_stats(request: Request):
+async def partial_stats(request: Request) -> HTMLResponse:
     """HTMX partial for statistics."""
     storage = Storage()
     stats = storage.get_stats()
@@ -1377,7 +1378,7 @@ async def partial_recent_codes(
     status: str = "all",
     q: str = "",
     game: str = "",
-):
+) -> HTMLResponse:
     """HTMX partial for codes table with filters + pagination."""
     from src.constants import GAMES
 
@@ -1417,7 +1418,7 @@ async def partial_recent_codes(
 
 
 @app.get("/partials/recent-logs")
-async def partial_recent_logs(request: Request):
+async def partial_recent_logs(request: Request) -> HTMLResponse:
     """HTMX partial for recent redemption logs."""
     storage = Storage()
     logs = storage.get_redemption_logs(limit=20)

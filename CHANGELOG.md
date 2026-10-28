@@ -1,5 +1,34 @@
 # Changelog
 
+## [1.4.1] - 2026-10-28
+
+### Changed
+- **UPX-compressed executable**: the 1.4.1 build ships with real UPX
+  compression applied to all bundled C extension modules (.pyd/.dll) —
+  132 files confirmed with UPX signature. Previous installers (1.4.0 and
+  earlier) were built without the UPX binary present in PATH, so PyInstaller
+  silently skipped the compression step and the exe carried full-size native
+  modules. The dist payload dropped from ~132 MB (1.3.2) to ~111 MB.
+
+### Fixed
+- **CLI source management used nonexistent storage methods**: `sources remove`
+  called `Storage.remove_source` (→ `delete_source`), and `sources enable` /
+  `sources disable` called `Storage.enable_source` / `disable_source`
+  (→ `update_source(name, enabled=…)`). All three commands now target methods
+  that actually exist.
+- **`scheduler status` read a nonexistent attribute**: it called
+  `scheduler.next_run_time()`; now uses `scheduler.status.next_run`.
+- **Scheduler redemption path referenced undefined names**: the per-account
+  redemption loop called `notify_redeemed` / `notify_redeemed_toast` that were
+  only imported locally inside the check-cycle path. They are now module-level
+  imports so the run-once redemption path also works.
+- **Typing pass**: `mypy src` now reports 0 errors across all 27 source
+  modules (previously ~118). The `Settings` dataclass carries a `cookies` field
+  (excluded from TOML persistence so secrets never reach `config.toml`), the
+  `Scheduler` constructor accepts the legacy `SimpleNamespace` config shape, and
+  CLI/web-app endpoints are fully annotated.
+
+
 ## [1.4.0] - 2026-10-27
 
 ### Added

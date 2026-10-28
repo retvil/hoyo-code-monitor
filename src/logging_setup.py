@@ -35,10 +35,10 @@ SENSITIVE_PATTERNS = [
 ]
 
 # Prometheus metrics (created lazily)
-_metrics = {}
+_metrics: dict = {}
 
 
-def get_metrics():
+def get_metrics() -> Any:
     """Get or create Prometheus metrics."""
     global _metrics
     if not PROMETHEUS_AVAILABLE:
@@ -203,11 +203,11 @@ def _create_console_handler(level: int = logging.INFO) -> logging.Handler:
         handler = logging.StreamHandler()
         handler.setLevel(level)
 
-        formatter = logging.Formatter(
+        standard_formatter: logging.Formatter = logging.Formatter(
             fmt="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",
         )
-        handler.setFormatter(formatter)
+        handler.setFormatter(standard_formatter)
 
     # Add sensitive data filter
     handler.addFilter(SensitiveDataFilter())

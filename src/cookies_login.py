@@ -15,6 +15,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,9 @@ LOGIN_URL = "https://www.hoyolab.com/"
 # Skip junk/consent cookies, keep everything else (auth needs full set:
 # ltuid_v2, ltoken_v2, cookie_token_v2, account_id_v2, account_mid_v2, ...)
 SKIP_PREFIXES = ("_ga", "_gid", "_gat", "_hj", "intercom-", "cf_", "__cf")
-SKIP_EXACT = {"mi18nLang", "DEVICEFP", "_MHYUUID", "Hm_lvt_", "Hm_lpvt_"}
+SKIP_EXACT: frozenset[str] = frozenset(
+    {"mi18nLang", "DEVICEFP", "_MHYUUID", "Hm_lvt_", "Hm_lpvt_"}
+)
 POLL_SECONDS = 2.0
 
 
@@ -112,13 +115,16 @@ def _cookie_skip_filters() -> tuple[tuple[str, ...], frozenset[str]]:
     cookie_conf = raw.get("cookies") or {}
     prefixes = cookie_conf.get("skip_cookie_prefixes")
     exact = cookie_conf.get("skip_cookies")
+    exact_frozen: frozenset[str] = (
+        frozenset(exact) if exact else frozenset(SKIP_EXACT)
+    )
     return (
         tuple(prefixes) if prefixes else SKIP_PREFIXES,
-        frozenset(exact) if exact else SKIP_EXACT,
+        exact_frozen,
     )
 
 
-def _normalize(cookies: list[dict]) -> dict[str, str]:
+def _normalize(cookies: Any) -> dict[str, str]:
     """Pick auth cookies from Playwright cookie list.
 
     Keeps the full auth set plus normalized ltuid/ltoken aliases

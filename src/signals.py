@@ -9,7 +9,6 @@ import logging
 import signal
 import sys
 from collections.abc import Callable
-from functools import partial
 from typing import Any
 
 logger = logging.getLogger(__name__)

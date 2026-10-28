@@ -8,10 +8,11 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import re
 import random
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
+from types import TracebackType
 from typing import Any, Protocol, Self
 from urllib.parse import urlparse
 
@@ -299,7 +300,8 @@ class SourceFetcher:
         self._session = session
         self._own_session = session is None
         self.user_agent = user_agent
-        self._browser = None
+        self._browser: Any = None
+        self._playwright: Any = None
         # Serializes lazy browser creation. ``_get_browser`` awaits inside its
         # init branch, so without this lock parallel browser fetches would each
         # start their own Playwright instance and Chromium process.
@@ -319,7 +321,12 @@ class SourceFetcher:
             self._own_session = False
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         # A borrowed session is left open for the rest of the process; it is
         # torn down at shutdown by http_session.close_all().
         if self._own_session and self._session:
@@ -327,12 +334,12 @@ class SourceFetcher:
         self._session = None
         if self._browser:
             await self._browser.close()
-            self._browser = None
+        self._browser = None
         if getattr(self, "_playwright", None):
             await self._playwright.stop()
-            self._playwright = None
+        self._playwright = None
 
-    async def _get_browser(self):
+    async def _get_browser(self) -> Any:
         """Lazy-initialize Playwright browser (single-flight)."""
         if self._browser is not None:
             return self._browser
@@ -419,6 +426,10 @@ class SourceFetcher:
             except Exception as e:
                 logger.error("Error extracting from %s: %s", source.name, e)
                 raise
+
+        # All retry paths either return codes or raise; reach here only
+        # when max_retries is 0 (caller configured zero retries).
+        return []
 
     async def _fetch_with_browser(self, source: SourceConfig) -> list[str]:
         """Fetch using Playwright for JS-rendered content."""
@@ -1155,7 +1166,7 @@ if __name__ == "__main__":
     import asyncio
     import tempfile
 
-    async def test():
+    async def test() -> None:
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
             db_path = f.name
 

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -132,13 +132,13 @@ class SystemTray:
             sub_items = []
             for label, seconds in self.INTERVALS:
 
-                def _make_action(s: int):
+                def _make_action(s: int) -> Any:
                     def _action(icon: pystray.Icon, item: pystray.MenuItem) -> None:
                         self._on_set_interval(icon, item, s)
 
                     return _action
 
-                def _make_checked(s: int):
+                def _make_checked(s: int) -> Any:
                     def _checked(item: pystray.MenuItem) -> bool:
                         return current == s
 

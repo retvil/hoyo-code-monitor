@@ -13,6 +13,7 @@ import threading
 import time
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
 import aiohttp
@@ -29,7 +30,7 @@ from src.checkin import (
     CheckinResult,
     CheckinRunner,
 )
-from src.config import Config, load_config_from_storage
+from src.config import Settings, load_config_from_storage
 from src.constants import (
     CHECKIN_FALLBACK_HOUR,
     CHECKIN_FALLBACK_MINUTE,
@@ -42,9 +43,11 @@ from src.constants import (
 from src.cookies_login import capture_cookies as _capture_cookies
 from src.exceptions import CheckinError, ConfigError
 from src.http_session import close_current
+from src.notify import notify_new_codes, notify_redeemed
 from src.redeemer import Redeemer
 from src.sources import SourceFetcher, seed_default_sources
 from src.storage import Storage
+from src.system_notify import notify_new_codes_toast, notify_redeemed_toast
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +101,7 @@ class Scheduler:
     def __init__(
         self,
         storage: Storage,
-        config: Config | None = None,
+        config: Settings | SimpleNamespace | None = None,
         redeemer: Redeemer | None = None,
         checkin_runner: CheckinRunner | None = None,
     ) -> None:
@@ -147,7 +150,7 @@ class Scheduler:
                 next_checkin_run=self._status.next_checkin_run,
             )
 
-    def _update_status(self, **kwargs) -> None:
+    def _update_status(self, **kwargs: Any) -> None:
         """Update scheduler status (thread-safe)."""
         with self._status_lock:
             for key, value in kwargs.items():
@@ -274,7 +277,7 @@ class Scheduler:
 
     def _cookie_refresh_due(self, account_name: str) -> bool:
         """Per-account cooldown: True if enough time has passed since last refresh."""
-        raw = self.storage.get_config(f"last_cookie_refresh_{account_name}", "0")
+        raw = self.storage.get_config(f"last_cookie_refresh_{account_name}", "0") or "0"
         try:
             last = int(raw)
         except (TypeError, ValueError):
@@ -521,9 +524,6 @@ class Scheduler:
                 "codes_redeemed": 0,
                 "errors": [f"Fetch error: {e}"],
             }
-
-        from src.notify import notify_new_codes, notify_redeemed
-        from src.system_notify import notify_new_codes_toast, notify_redeemed_toast
 
         new_codes: list[str] = []
 

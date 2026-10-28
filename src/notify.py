@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from typing import Any
 
 from src.http_session import get_session
 
@@ -64,7 +65,7 @@ async def send_telegram(bot_token: str, chat_id: str, text: str) -> bool:
     return False
 
 
-def notify_configured(storage) -> tuple[str, str] | None:
+def notify_configured(storage: Any) -> tuple[str, str] | None:
     """Return (token, chat_id) if notifications configured, else None."""
     token = storage.get_config("telegram_bot_token", "") or ""
     chat_id = storage.get_config("telegram_chat_id", "") or ""
@@ -73,7 +74,7 @@ def notify_configured(storage) -> tuple[str, str] | None:
     return None
 
 
-async def notify_new_codes(storage, codes: list[str]) -> None:
+async def notify_new_codes(storage: Any, codes: list[str]) -> None:
     """Notify about newly found codes (call sparingly, batched per cycle)."""
     cfg = notify_configured(storage)
     if not cfg or not codes:
@@ -83,7 +84,7 @@ async def notify_new_codes(storage, codes: list[str]) -> None:
     await send_telegram(cfg[0], cfg[1], f"🎁 New Genshin codes ({len(codes)}): {shown}{extra}")
 
 
-async def notify_redeemed(storage, code: str, account: str, reward: str) -> None:
+async def notify_redeemed(storage: Any, code: str, account: str, reward: str) -> None:
     """Notify about successful redemption."""
     cfg = notify_configured(storage)
     if not cfg:

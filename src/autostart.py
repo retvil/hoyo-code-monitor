@@ -10,6 +10,7 @@ import logging
 import sys
 import winreg
 from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,7 @@ def _tray_command() -> str:
     return f'"{python}" "{cli_py}" tray'
 
 
-def _open_key(write: bool = False):
+def _open_key(write: bool = False) -> Any:
     access = winreg.KEY_SET_VALUE if write else winreg.KEY_READ
     return winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY, 0, access)
 
