@@ -138,12 +138,13 @@
             .nav { flex-direction: row; flex-wrap: wrap; }
             main { padding: 0 14px 40px; }
         }
-        .theme-switch { display: flex; gap: 4px; margin-top: 14px; padding: 0 10px; }
+        .theme-switch { margin-top: 14px; padding: 0 10px; display: flex; flex-direction: column; gap: 6px; }
         .theme-switch .group-label { padding-left: 0; }
-        .theme-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
-                     padding: 7px 8px; border-radius: 8px; border: 1px solid var(--border);
+        .theme-btn { display: flex; align-items: center; gap: 6px;
+                     padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border);
                      background: var(--surface); color: var(--muted); font-size: 0.78rem; font-weight: 600;
-                     cursor: pointer; transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease; }
+                     cursor: pointer; transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+                     min-width: 0; text-overflow: ellipsis; }
         .theme-btn .t-ic { width: 14px; height: 14px; flex: none; color: currentColor; }
         .theme-btn:hover { background: var(--bg); color: var(--fg); }
         .theme-btn.active { background: var(--accent-soft); color: var(--accent);
@@ -230,10 +231,8 @@ function setTheme(theme){
     </div>
     <div class="theme-switch" id="theme-switch" role="group">
         <div class="group-label muted" style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; padding: 0 0 4px;">{{ t('appearance_label') }}</div>
-        <div style="display: flex; gap: 4px;">
-            <button class="theme-btn" data-theme-val="light" onclick="setTheme('light')" aria-label="{{ t('theme_light') }}"><svg class="t-ic"><use href="#theme-sun"/></svg> {{ t('theme_light') }}</button>
-            <button class="theme-btn" data-theme-val="dark" onclick="setTheme('dark')" aria-label="{{ t('theme_dark') }}"><svg class="t-ic"><use href="#theme-moon"/></svg> {{ t('theme_dark') }}</button>
-        </div>
+        <button class="theme-btn" data-theme-val="light" onclick="setTheme('light')" aria-label="{{ t('theme_light') }}"><svg class="t-ic"><use href="#theme-sun"/></svg> {{ t('theme_light') }}</button>
+        <button class="theme-btn" data-theme-val="dark" onclick="setTheme('dark')" aria-label="{{ t('theme_dark') }}"><svg class="t-ic"><use href="#theme-moon"/></svg> {{ t('theme_dark') }}</button>
     </div>
     <div class="lang-switch">
         <div style="display: flex; gap: 4px;">
