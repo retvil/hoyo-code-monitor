@@ -44,8 +44,7 @@
         .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1rem; padding: 8px 10px 4px; }
         .brand small { display: block; font-weight: 400; color: var(--muted); font-size: 0.75rem; }
         .nav { display: flex; flex-direction: column; gap: 2px; margin-top: 12px; }
-        .nav .group-label { font-size: 11px; color: var(--muted); padding: 12px 10px 4px;
-                            text-transform: uppercase; letter-spacing: 0.06em; }
+        .nav .group-label { font-size: 11px; color: var(--muted); padding: 12px 10px 4px; }
         .nav a { padding: 8px 10px; border-radius: 8px; color: var(--fg); text-decoration: none; }
         .nav a:hover { background: var(--bg); }
         .nav a.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
@@ -68,8 +67,6 @@
                      background: var(--good); margin-right: 6px; vertical-align: 1px; }
         main { animation: page-in 0.25s ease-out; }
         @media (prefers-reduced-motion: no-preference) {
-            .pulse-dot { animation: pulse 2s ease-in-out infinite; }
-            @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
             @keyframes page-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
         }
         .card-title { font-size: 0.95rem; font-weight: 600; }
@@ -211,12 +208,12 @@ function setTheme(theme){
 })();
 </script>
 <aside class="sidebar">
-    <div class="brand">{% if current_game and current_game in game_accents %}<svg style="width: 26px; height: 26px; flex: none; color: {{ game_accents[current_game].accent }};"><use href="#g-{{ current_game }}"/></svg>{% else %}<span class="brand-mark" aria-hidden="true"></span>{% endif %}<span>{{ t('app_name') }}<small>v{{ app_version }} · by {{ app_author }}{% if current_game and current_game in game_accents %} · {{ game_accents[current_game].name }}{% endif %}</small></span></div>
+    <div class="brand">{% if current_game and current_game in game_accents %}<svg style="width: 26px; height: 26px; flex: none; color: {{ game_accents[current_game].accent }};"><use href="#g-{{ current_game }}"/></svg>{% else %}<span class="brand-mark" aria-hidden="true"></span>{% endif %}        <span>{{ t('app_name') }}<small>v{{ app_version }} — by {{ app_author }}{% if current_game and current_game in game_accents %} — {{ game_accents[current_game].name }}{% endif %}</small></span></div>
     <nav class="nav">
         <div class="group-label">{{ t('nav_monitor') }}</div>
         <a href="/" class="{% if request.path == '/' %}active{% endif %}">{{ t('nav_dashboard') }}</a>
         <a href="/sources" class="{% if request.path == '/sources' %}active{% endif %}">{{ t('nav_sources') }}</a>
-<a href="/checkins" class="{% if request.path == '/checkins' %}active{% endif %}">{{ t('nav_checkins') }}</a>
+        <a href="/checkins" class="{% if request.path == '/checkins' %}active{% endif %}">{{ t('nav_checkins') }}</a>
         <div class="group-label">{{ t('nav_setup') }}</div>
         <a href="/accounts" class="{% if request.path == '/accounts' %}active{% endif %}">{{ t('nav_accounts') }}</a>
         <a href="/config" class="{% if request.path == '/config' %}active{% endif %}">{{ t('nav_config') }}</a>
@@ -230,7 +227,7 @@ function setTheme(theme){
         </select>
     </div>
     <div class="theme-switch" id="theme-switch" role="group">
-        <div class="group-label muted" style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; padding: 0 0 4px;">{{ t('appearance_label') }}</div>
+        <div class="group-label muted" style="font-size: 0.7rem; padding: 0 0 4px;">{{ t('appearance_label') }}</div>
         <button class="theme-btn" data-theme-val="light" onclick="setTheme('light')" aria-label="{{ t('theme_light') }}"><svg class="t-ic"><use href="#theme-sun"/></svg> {{ t('theme_light') }}</button>
         <button class="theme-btn" data-theme-val="dark" onclick="setTheme('dark')" aria-label="{{ t('theme_dark') }}"><svg class="t-ic"><use href="#theme-moon"/></svg> {{ t('theme_dark') }}</button>
     </div>
@@ -257,7 +254,7 @@ function setTheme(theme){
         </div>
     </div>
     <div style="margin-top: 16px; padding: 12px 10px 4px; border-top: 1px solid var(--border); font-size: 0.8rem;">
-        <div class="muted" style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px;"><a href="/author" style="color: inherit; text-decoration: none;">{{ t('about_author') }}</a></div>
+        <div class="muted" style="font-size: 0.7rem; padding: 0 0 4px;"><a href="/author" style="color: inherit; text-decoration: none;">{{ t('about_author') }}</a></div>
         <div style="font-weight: 600;"><a href="/author" style="color: inherit;">{{ author_name or app_author }}</a></div>
     </div>
 </aside>

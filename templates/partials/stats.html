@@ -1,13 +1,13 @@
 <div class="card" hx-get="/partials/stats" hx-trigger="every 10s" hx-swap="outerHTML">
 <div class="card-title" style="margin-bottom: 12px;">{{ t("statistics") }}</div>
 <div class="kpi-grid">
-    <div class="kpi"><div style="font-size: 1.8rem; font-weight: 700;">{{ stats.total_codes }}</div><div class="muted" style="font-size: 0.85rem;">Total codes</div></div>
-    <div class="kpi good"><div style="font-size: 1.8rem; font-weight: 700;">{{ stats.successful }}</div><div class="muted" style="font-size: 0.85rem;">Redeemed</div></div>
-    <div class="kpi bad"><div style="font-size: 1.8rem; font-weight: 700;">{{ stats.failed }}</div><div class="muted" style="font-size: 0.85rem;">Pending</div></div>
+    <div class="kpi"><div style="font-size: 1.8rem; font-weight: 700;">{{ stats.total_codes }}</div><div class="muted" style="font-size: 0.85rem;">{{ t('total_codes') }}</div></div>
+    <div class="kpi good"><div style="font-size: 1.8rem; font-weight: 700;">{{ stats.successful }}</div><div class="muted" style="font-size: 0.85rem;">{{ t('redeemed') }}</div></div>
+    <div class="kpi bad"><div style="font-size: 1.8rem; font-weight: 700;">{{ stats.failed }}</div><div class="muted" style="font-size: 0.85rem;">{{ t('failed') }}</div></div>
 </div>
 {% if stats.by_source %}
 <details style="margin-top: 16px;">
-    <summary style="cursor: pointer; font-weight: 600; font-size: 0.9rem;">By source ({{ stats.by_source | length }})</summary>
+    <summary style="cursor: pointer; font-weight: 600; font-size: 0.9rem;">{{ t('by_source') }} ({{ stats.by_source | length }})</summary>
     <div class="table-scroll" style="margin-top: 8px;">
     <table>
         <thead><tr><th>Source</th><th style="text-align: right;">Codes</th></tr></thead>

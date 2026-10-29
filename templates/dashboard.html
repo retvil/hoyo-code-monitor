@@ -5,7 +5,7 @@
 <div class="hero">
     <svg class="mascot" aria-hidden="true"><use href="#mascot"/></svg>
     <h2>{% if current_game and current_game in game_accents %}{{ game_accents[current_game].name }}{% else %}{{ t('app_name') }}{% endif %}</h2>
-    <p>{{ stats.total_codes }} codes · {{ stats.successful }} redeemed · {{ stats.failed }} {{ t('stats_failed') }}</p>
+        <p>{{ stats.total_codes }} {{ t('total_codes').lower() }} — {{ stats.successful }} {{ t('redeemed').lower() }} — {{ stats.failed }} {{ t('stats_failed').lower() }}</p>
 </div>
 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px;">
     <a href="/" style="text-decoration: none; color: inherit;">
