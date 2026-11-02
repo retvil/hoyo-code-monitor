@@ -5,7 +5,7 @@
 !include "LogicLib.nsh"
 
 ; Application info
-!if /%defined VERSION == 0
+!ifndef VERSION
   !define VERSION "1.5.0"
 !endif
 !define APP_NAME "HoYo Code Monitor"
