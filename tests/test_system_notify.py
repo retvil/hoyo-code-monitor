@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import asyncio
 
+import pytest
+
 from src import system_notify
 from src.system_notify import (
     MAX_CODES_PER_TOAST,
@@ -31,6 +33,7 @@ def test_empty_payload_returns_false_without_calling_winotify(monkeypatch) -> No
 
 
 def test_success_path_builds_notification(monkeypatch) -> None:
+    pytest.importorskip("winotify")
     shown: list[dict[str, object]] = []
 
     class _FakeNotification:

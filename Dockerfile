@@ -9,12 +9,16 @@ WORKDIR /app
 # Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
-    libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
+# Install the project itself (so the `hoyo-code-monitor` / `-web` /
+# `-scheduler` console scripts from pyproject.toml [project.scripts]
+# land on PATH) plus any extra runtime deps not covered by pyproject
+# (requirements.txt is a legacy mirror kept for CI's `pip install -r`
+# step; installing it here too is harmless and idempotent).
 COPY pyproject.toml requirements.txt ./
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt \
+    && pip install --no-cache-dir --prefix=/install .
 
 # Runtime stage
 FROM python:3.11-slim
@@ -25,7 +29,6 @@ WORKDIR /app
 # (downloaded into the user's ms-playwright cache), not the distro's
 # `chromium`/`chromium-driver`, so those are intentionally NOT installed.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq5 \
     fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
 
@@ -65,9 +68,13 @@ ENV PYTHONUNBUFFERED=1 \
 # Expose port for health check (if web UI added later)
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import sqlite3; conn = sqlite3.connect('/app/data/monitor.db'); conn.execute('SELECT 1'); conn.close()" || exit 1
+# Health check — probe the live web server's /health endpoint (the
+# real, non-vacuous "is the app actually running" signal) instead of
+# touching the DB file, which on first boot gets created empty by the
+# connection itself and would pass vacuously even before the app
+# initializes any schema.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).status==200 else 1)" || exit 1
 
 # Default command
 CMD ["hoyo-code-monitor", "start"]

@@ -213,18 +213,13 @@ def source_health(storage: Storage) -> dict[str, Any]:
         health: list[dict[str, Any]] = []
         for source in sources:
             checked_at = source.get("last_checked")
-            stale = is_source_stale(checked_at)
             health.append(
                 {
                     "name": source.get("name", "unknown"),
                     "last_checked": checked_at,
                     "last_success": source.get("last_success"),
                     "error_count": source.get("error_count", 0),
-                    "state": (
-                        "active"
-                        if source.get("last_success") and not stale
-                        else "warning" if stale else "idle"
-                    ),
+                    "state": source_status(source),
                 }
             )
         return {
@@ -233,6 +228,20 @@ def source_health(storage: Storage) -> dict[str, Any]:
         }
     except Exception as exc:  # pragma: no cover - defensive
         return {"count": 0, "sources": [], "error": str(exc)}
+
+
+def source_status(source_row: dict[str, Any]) -> str:
+    """Return a single status word for a source row (used by /api/sources/status and source_health).
+
+    Vocabulary: active | idle | warning | error.
+    """
+    if source_row.get("enabled") and source_row.get("last_success"):
+        return "active"
+    if source_row.get("error_count", 0) > 3:
+        return "error"
+    if is_source_stale(source_row.get("last_checked")):
+        return "warning"
+    return "idle"
 
 
 def account_redeem_switch_html(name: str, enabled: bool) -> str:

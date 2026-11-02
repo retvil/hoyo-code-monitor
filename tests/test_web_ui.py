@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 from src.storage import Storage
 
 
-@pytest.fixture()
+@pytest.fixture
 def temp_db() -> str:
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
         db_path = f.name
@@ -25,11 +25,10 @@ def temp_db() -> str:
             pass
 
 
-@pytest.fixture()
+@pytest.fixture
 def client(temp_db: str, monkeypatch) -> TestClient:
+    from src import web_ui
     from src.scheduler import SchedulerStatus
-
-    import src.web_ui as web_ui
 
     async def _mock_seed(*_args, **_kwargs):
         return None
@@ -152,7 +151,7 @@ class TestImportExportApi:
 
         target_db = tempfile.NamedTemporaryFile(suffix=".db", delete=False).name
         try:
-            import src.web_ui as web_ui
+            from src import web_ui
 
             original_storage = web_ui.Storage
             web_ui.Storage = lambda *a, **k: Storage(target_db)
@@ -225,7 +224,7 @@ class TestMiscApi:
             conn.commit()
         r = client.get("/api/sources/status")
         assert r.status_code == 200
-        assert r.json()[0]["status"] == "unknown"
+        assert r.json()[0]["status"] == "idle"
 
     def test_redeem_single_mocked(self, client: TestClient, temp_db: str) -> None:
         from src.redeemer import RedemptionResult

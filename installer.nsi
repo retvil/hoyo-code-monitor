@@ -5,8 +5,11 @@
 !include "LogicLib.nsh"
 
 ; Application info
+!if /%defined VERSION == 0
+  !define VERSION "1.4.1"
+!endif
 !define APP_NAME "HoYo Code Monitor"
-!define APP_VERSION "1.4.1"
+!define APP_VERSION "${VERSION}"
 !define APP_PUBLISHER "HoYo Code Monitor Contributors"
 !define APP_URL "https://github.com/retvil/hoyo-code-monitor"
 !define APP_EXE "hoyo-code-monitor.exe"

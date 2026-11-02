@@ -1,7 +1,9 @@
 """Unit tests for the Storage class."""
 
 import gc
+import json
 import os
+import sqlite3
 import tempfile
 import time
 
@@ -76,6 +78,39 @@ class TestCodesCRUD:
         assert code["reward"] is None
         assert code["redeemed_at"] is None
 
+    def test_add_code_default_timestamp_is_utc(self, storage: Storage) -> None:
+        """Default attempted_at is stored as a tz-aware UTC ISO string.
+
+        codes_per_day() buckets on substr(attempted_at,1,10) against SQLite's
+        UTC date('now') — storing tz-aware UTC keeps the write side aligned with
+        the read side instead of drifting up to 24h.
+        """
+        storage.add_code("UTCCODE", "wiki")
+        with storage._connection() as conn:
+            row = conn.execute(
+                "SELECT attempted_at FROM codes WHERE code = ?", ("UTCCODE",)
+            ).fetchone()
+        assert row is not None
+        # Naive local isoformat ends in a plain HH:MM:SS[.ffffff]; a tz-aware
+        # UTC one always carries an offset suffix ("+00:00" / "Z").
+        assert row["attempted_at"].endswith("+00:00") or row[
+            "attempted_at"
+        ].endswith("Z")
+
+    def test_add_redemption_log_default_timestamp_is_utc(self, storage: Storage) -> None:
+        """Same UTC-aware default for the redemption_log write path."""
+        account = storage.add_account("acc", "123456", "os_euro")
+        storage.add_redemption_log("UTCCODE2", account, "success")
+        with storage._connection() as conn:
+            row = conn.execute(
+                "SELECT attempted_at FROM redemption_log WHERE code = ?",
+                ("UTCCODE2",),
+            ).fetchone()
+        assert row is not None
+        assert row["attempted_at"].endswith("+00:00") or row[
+            "attempted_at"
+        ].endswith("Z")
+
     def test_add_code_duplicate_same_source_raises(self, storage: Storage) -> None:
         """Test that adding duplicate code from same source raises IntegrityError."""
         storage.add_code("GENSHIN123", "wiki")
@@ -92,6 +127,49 @@ class TestCodesCRUD:
         code = storage.get_code("GENSHIN123")
         assert code is not None
         assert set(code["sources"]) == {"wiki", "reddit"}
+
+    def test_add_code_race_losing_source_still_links(self, storage: Storage) -> None:
+        """Simulate the read-then-insert race: pre-insert the codes row, then add_code
+        from a fresh source should land on the IntegrityError branch and still record
+        the code_sources link without raising."""
+        # Manually seed the codes row so add_code's "no existing row" check will
+        # pass, then the INSERT will hit the UNIQUE(code, game) index and enter
+        # the except-branch that links the source to the winner's row.
+        with storage._connection() as conn:
+            cur = conn.execute(
+                "INSERT INTO codes (code, attempted_at, game) VALUES (?, ?, ?)",
+                ("RACECODE", "2026-01-01T00:00:00", "genshin"),
+            )
+            winner_id = cur.lastrowid
+            conn.execute(
+                "INSERT INTO code_sources (code_id, source) VALUES (?, ?)",
+                (winner_id, "winner_source"),
+            )
+
+        # The second call uses a different source. Because the codes row already
+        # exists, this goes through the except-branch and should NOT raise.
+        code_id = storage.add_code("RACECODE", "loser_source", game="genshin")
+        assert code_id == winner_id
+
+        # Both source names must be linked to the same code row.
+        code = storage.get_code("RACECODE", game="genshin")
+        assert code is not None
+        assert set(code["sources"]) == {"winner_source", "loser_source"}
+
+    def test_add_code_same_source_race_raises(self, storage: Storage) -> None:
+        """Same source racing against itself still raises IntegrityError."""
+        with storage._connection() as conn:
+            conn.execute(
+                "INSERT INTO codes (code, attempted_at, game) VALUES (?, ?, ?)",
+                ("RACECODE2", "2026-01-01T00:00:00", "genshin"),
+            )
+            cid = conn.execute("SELECT id FROM codes WHERE code='RACECODE2'").fetchone()[0]
+            conn.execute(
+                "INSERT INTO code_sources (code_id, source) VALUES (?, ?)",
+                (cid, "solo"),
+            )
+        with pytest.raises(sqlite3.IntegrityError):
+            storage.add_code("RACECODE2", "solo", game="genshin")
 
     def test_get_code_not_found_returns_none(self, storage: Storage) -> None:
         """Test that getting non-existent code returns None."""
@@ -322,6 +400,42 @@ class TestConfigCRUD:
         }
 
 
+class TestAccountGames:
+    """Tests for the per-account 'enabled games' filter (migration v15)."""
+
+    def test_update_account_games_roundtrip(self, storage: Storage) -> None:
+        """Setting the games list persists as JSON and reads back the same list."""
+        storage.add_account("acc", "123456", "os_euro")
+        assert storage.update_account_games("acc", ["genshin", "hsr"]) is True
+        assert storage.get_account_games("acc") == ["genshin", "hsr"]
+
+    def test_update_account_games_none_resets_to_all(self, storage: Storage) -> None:
+        """Passing None clears the filter; the sentinel reads back as None."""
+        storage.add_account("acc", "123456", "os_euro")
+        storage.update_account_games("acc", ["hsr"])
+        assert storage.update_account_games("acc", None) is True
+        assert storage.get_account_games("acc") is None
+        # Existing rows default to None (all games) without any explicit set.
+        storage.add_account("acc2", "789012", "os_usa")
+        assert storage.get_account_games("acc2") is None
+
+    def test_update_account_games_list_accounts_exposes_column(
+        self, storage: Storage
+    ) -> None:
+        """list_accounts rows carry the games column (SELECT * shape)."""
+        storage.add_account("acc", "123456", "os_euro")
+        rows = storage.list_accounts()
+        assert rows and "games" in rows[0]
+        assert rows[0]["games"] is None
+        storage.update_account_games("acc", ["genshin"])
+        rows = storage.list_accounts()
+        assert rows[0]["games"] == json.dumps(["genshin"])  # raw stored JSON
+
+    def test_update_account_games_unknown_account(self, storage: Storage) -> None:
+        """Updating a missing account is a no-op."""
+        assert storage.update_account_games("ghost", ["hsr"]) is False
+
+
 class TestCookieEncryptionPlaceholders:
     """Tests for cookie encryption placeholder methods."""
 
@@ -360,18 +474,21 @@ class TestContextManager:
         # Connection should be closed, no exception means success
 
     def test_connection_rollback_on_exception(self, storage: Storage) -> None:
-        """Test that connection handles exceptions properly."""
-        try:
-            with storage._connection() as conn:
-                conn.execute("INSERT INTO codes (code) VALUES (?)", ("TEST",))
-                raise ValueError("Test exception")
-        except ValueError:
-            pass
+        """Statements inside the context manager are rolled back on exception.
 
-        # Verify the insert was not committed (no transaction started explicitly)
-        storage.get_code("TEST")
-        # Note: SQLite autocommits by default in this context manager
-        # This test verifies the connection closes properly even on exception
+        The context manager runs a single ``BEGIN``/``COMMIT`` transaction across
+        the whole block (isolation_level=None), so any write made before an
+        exception inside the block must not survive the block.
+        """
+        with pytest.raises(ValueError, match="Test exception"):
+            with storage._connection() as conn:
+                conn.execute(
+                    "INSERT INTO codes (code, attempted_at, game) VALUES (?, ?, ?)",
+                    ("ROLBACK", "2026-01-01T00:00:00", "genshin"),
+                )
+                raise ValueError("Test exception")
+
+        assert storage.get_code("ROLBACK", game="genshin") is None
 
 
 if __name__ == "__main__":

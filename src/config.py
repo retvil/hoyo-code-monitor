@@ -57,6 +57,7 @@ class Settings:
     log_file: str = field(default_factory=lambda: _default("default_log_path"))
     max_log_size: int = 10485760
     backup_count: int = 5
+    update_check_enabled: bool = True
     # Per-account auth cookies. Populated at runtime by
     # load_config_from_storage (legacy SimpleNamespace path) and read by the
     # scheduler/redeemer. Excluded from TOML persistence below so secrets
@@ -226,6 +227,9 @@ class ConfigManager:
         elif key == "log_file":
             if not isinstance(value, str) or not value.strip():
                 raise ConfigError(f"log_file must be a non-empty string, got: {value}")  # noqa: TRY003 -- validation message needs interpolation
+        elif key == "update_check_enabled":
+            if not isinstance(value, bool):
+                raise ConfigError(f"update_check_enabled must be a boolean, got: {value}")  # noqa: TRY003 -- validation message needs interpolation
         elif key == "max_log_size":
             if not isinstance(value, int) or value <= 0:
                 raise ConfigError(f"max_log_size must be a positive integer, got: {value}")  # noqa: TRY003 -- validation message needs interpolation

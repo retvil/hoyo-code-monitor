@@ -1,5 +1,6 @@
 """Unit tests for the Redeemer class."""
 
+import asyncio
 from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -510,6 +511,60 @@ class TestRedeemerLogging:
         log_messages = [record.message for record in caplog.records]
         assert any("GENS****" in msg for msg in log_messages)
         assert not any("GENSHIN123" in msg for msg in log_messages)
+
+
+class TestRedeemerConcurrentGames:
+    """Regression: concurrent redemptions of different games on a shared
+    Redeemer must each hit their own GAME_CONF host, not each other's."""
+
+    @pytest.mark.asyncio
+    async def test_concurrent_games_hit_their_own_host(
+        self,
+        redeemer: Redeemer,
+        valid_cookies: dict,
+    ) -> None:
+        from src.constants import GAME_CONF
+
+        called_urls: list[str] = []
+
+        def fake_get_cm(url, *args, **kwargs):
+            called_urls.append(url)
+            return mock_async_context_manager(
+                AsyncMock(
+                    json=AsyncMock(
+                        return_value={"retcode": 0, "message": "OK", "data": {"award": "x"}}
+                    ),
+                    raise_for_status=MagicMock(),
+                )
+            )
+
+        await redeemer._get_session()
+        real_session = redeemer._session
+        real_get = real_session.get
+        real_session.get = MagicMock(side_effect=fake_get_cm)
+
+        async def run(game: str, code: str) -> None:
+            await redeemer.redeem_code(
+                code=code,
+                cookies=valid_cookies,
+                uid="123456789",
+                region="os_usa",
+                game=game,
+            )
+
+        try:
+            await asyncio.gather(
+                run("genshin", "GENSHIN123"),
+                run("hsr", "STARRAIL456"),
+            )
+        finally:
+            real_session.get = real_get
+
+        assert len(called_urls) == 2
+        genshin_host = GAME_CONF["genshin"]["api_host"]
+        hsr_host = GAME_CONF["hsr"]["api_host"]
+        assert any(f"https://{genshin_host}/" in u for u in called_urls)
+        assert any(f"https://{hsr_host}/" in u for u in called_urls)
 
 
 if __name__ == "__main__":

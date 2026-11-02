@@ -17,7 +17,13 @@
       "source": "wshobson/agents",
       "sourceType": "github",
       "skillPath": "plugins/python-development/skills/python-testing-patterns/SKILL.md",
-      "computedHash": "66b0f13c33ca5689ce6d59dfc6c441bacf3d017299d8ee3c30a028299e5d28e9"
+      "computedHash": "2c2731244febe78fe7c6c6fe89f1119a9bcd5d0ec9cadf6c37dbf96712ee0dc3"
+    },
+    "temporal-python-testing": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "skillPath": "plugins/backend-development/skills/temporal-python-testing/SKILL.md",
+      "computedHash": "9694252835336a62d1fb290f93398f1baf5951acc3355c33edae8ab9c82eea08"
     },
     "webapp-testing": {
       "source": "anthropics/skills",

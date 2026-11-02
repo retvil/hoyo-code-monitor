@@ -11,7 +11,7 @@ import os
 import sqlite3
 import uuid
 from collections.abc import Iterator
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -160,13 +160,16 @@ class Storage:
             attempted_at: Timestamp when code was attempted. Defaults to now.
 
         Returns:
-            The ID of the inserted or existing code row.
+            The ID of the inserted or existing code row. The ID is the same for
+            the winner and a racing loser; a loser just links its source.
 
         Raises:
             sqlite3.IntegrityError: If code already exists from the same source.
         """
         if attempted_at is None:
-            attempted_at = datetime.now()
+            # Store tz-aware UTC so codes_per_day's date('now') UTC cutoff and
+            # the local-clock writes don't drift against each other.
+            attempted_at = datetime.now(UTC)
 
         def _ts(v: datetime | str | None) -> str | None:
             if v is None:
@@ -192,19 +195,36 @@ class Storage:
                     )
                 # Add new source association
                 conn.execute(
-                    "INSERT INTO code_sources (code_id, source) VALUES (?, ?)",
+                    "INSERT OR IGNORE INTO code_sources (code_id, source) VALUES (?, ?)",
                     (code_id, source),
                 )
                 return code_id
 
-            # Insert new code
-            cursor = conn.execute(
-                """
-                INSERT INTO codes (code, attempted_at, published_at, expires_at, game)
-                VALUES (?, ?, ?, ?, ?)
-                """,
-                (code, attempted_at.isoformat(), _ts(published_at), _ts(expires_at), game),
-            )
+            # Insert new code; a concurrent source may have created the same
+            # (code, game) row between the check above and this insert (WAL
+            # read-then-write race), so fall back to linking our source on the
+            # row that now exists.
+            try:
+                cursor = conn.execute(
+                    """
+                    INSERT INTO codes (code, attempted_at, published_at, expires_at, game)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (code, attempted_at.isoformat(), _ts(published_at), _ts(expires_at), game),
+                )
+            except sqlite3.IntegrityError:
+                existing = conn.execute(
+                    "SELECT id FROM codes WHERE code = ? AND game = ?", (code, game)
+                ).fetchone()
+                if existing is None:
+                    raise
+                code_id = int(existing[0])
+                conn.execute(
+                    "INSERT OR IGNORE INTO code_sources (code_id, source) VALUES (?, ?)",
+                    (code_id, source),
+                )
+                return code_id
+
             code_id = cursor.lastrowid or 0
 
             # Insert into code_sources junction table
@@ -212,7 +232,6 @@ class Storage:
                 "INSERT INTO code_sources (code_id, source) VALUES (?, ?)",
                 (code_id, source),
             )
-            conn.commit()
             return code_id
 
     def set_code_dates(
@@ -233,12 +252,17 @@ class Storage:
                 "UPDATE codes SET published_at = ?, expires_at = ? WHERE code = ?",
                 (_ts(published_at), _ts(expires_at), code),
             )
-            conn.commit()
             return cursor.rowcount > 0
 
     @staticmethod
     def display_status(code_row: dict[str, Any]) -> str:
-        """Human status for UI: done / expired / invalid / failed / pending."""
+        """Human status for UI: done / expired / invalid / failed / pending.
+
+        NOTE: `expires_at` is stored on the codes table but NOT consulted here —
+        expiry is detected solely from the redeemer's `retcode` in `last_error`.
+        A future source-date-parsing feature should fill published_at/expires_at
+        and extend this method to use them.
+        """
         if code_row.get("redeemed"):
             return "done"
         err = str(code_row.get("last_error") or "")
@@ -335,7 +359,6 @@ class Storage:
                     """,
                     (int(redeemed), reward, redeemed_at.isoformat() if redeemed_at else None, code),
                 )
-            conn.commit()
             return cursor.rowcount > 0
 
     def list_codes(
@@ -478,7 +501,6 @@ class Storage:
                 return False
             conn.execute("DELETE FROM code_sources WHERE code_id = ?", (row[0],))
             conn.execute("DELETE FROM codes WHERE id = ?", (row[0],))
-            conn.commit()
             return True
 
     def delete_codes_by_id(self, ids: list[int]) -> int:
@@ -492,7 +514,6 @@ class Storage:
         with self._connection() as conn:
             conn.execute(f"DELETE FROM code_sources WHERE code_id IN ({ph})", ids)
             cur = conn.execute(f"DELETE FROM codes WHERE id IN ({ph})", ids)
-            conn.commit()
             return cur.rowcount or 0
 
     def cleanup_dead_codes(self) -> int:
@@ -594,7 +615,6 @@ class Storage:
                     game,
                 ),
             )
-            conn.commit()
             return int(cursor.lastrowid or 0)
 
     def get_source(self, name: str) -> dict[str, Any] | None:
@@ -729,7 +749,6 @@ class Storage:
                 f"UPDATE sources SET {', '.join(fields)} WHERE name = ?",
                 params,
             )
-            conn.commit()
             return cursor.rowcount > 0
 
     def increment_source_error(self, name: str) -> None:
@@ -739,7 +758,6 @@ class Storage:
                 "UPDATE sources SET error_count = error_count + 1 WHERE name = ?",
                 (name,),
             )
-            conn.commit()
 
     def delete_source(self, name: str) -> bool:
         """Delete a source by name.
@@ -752,7 +770,6 @@ class Storage:
         """
         with self._connection() as conn:
             cursor = conn.execute("DELETE FROM sources WHERE name = ?", (name,))
-            conn.commit()
             return cursor.rowcount > 0
 
     # --- Accounts CRUD ---
@@ -791,7 +808,6 @@ class Storage:
                 """,
                 (name, uid, region, game_biz, lang, s_lang_key, game),
             )
-            conn.commit()
             return int(cursor.lastrowid or 0)
 
     def get_account(self, name: str) -> dict[str, Any] | None:
@@ -851,64 +867,51 @@ class Storage:
                 f"UPDATE accounts SET {', '.join(fields)} WHERE name = ?",
                 params,
             )
-            conn.commit()
             return cursor.rowcount > 0
+
+    def update_account_games(self, name: str, games: list[str] | None) -> bool:
+        """Set the per-account "enabled games" filter.
+
+        Args:
+            name: Account name.
+            games: JSON-serialisable list of game ids, or None to reset to the
+                "all games" default.
+
+        Returns:
+            True if a row was updated, False if the account was not found.
+        """
+        encoded = json.dumps(games) if games is not None else None
+        with self._connection() as conn:
+            cursor = conn.execute(
+                "UPDATE accounts SET games = ?, updated_at = CURRENT_TIMESTAMP WHERE name = ?",
+                (encoded, name),
+            )
+            return cursor.rowcount > 0
+
+    def get_account_games(self, name: str) -> list[str] | None:
+        """Read the per-account games filter (None = all games)."""
+        with self._connection() as conn:
+            row = conn.execute(
+                "SELECT games FROM accounts WHERE name = ?", (name,)
+            ).fetchone()
+        if row is None:
+            return None
+        raw = row["games"]
+        if raw is None:
+            return None
+        try:
+            parsed = json.loads(raw)
+        except Exception:
+            return None
+        return parsed if isinstance(parsed, list) else None
 
     def delete_account(self, name: str) -> bool:
         """Delete an account by name (cascades to sessions)."""
         with self._connection() as conn:
             cursor = conn.execute("DELETE FROM accounts WHERE name = ?", (name,))
-            conn.commit()
             return cursor.rowcount > 0
 
     # --- Sessions CRUD ---
-
-    def add_session(
-        self,
-        account_id: int,
-        cookies_encrypted: str,
-        user_agent: str | None = None,
-        expires_at: datetime | None = None,
-    ) -> int:
-        """Add a new session for an account."""
-        with self._connection() as conn:
-            cursor = conn.execute(
-                """
-                INSERT INTO sessions (account_id, cookies_encrypted, user_agent, expires_at)
-                VALUES (?, ?, ?, ?)
-                """,
-                (
-                    account_id,
-                    cookies_encrypted,
-                    user_agent,
-                    expires_at.isoformat() if expires_at else None,
-                ),
-            )
-            conn.commit()
-            return int(cursor.lastrowid or 0)
-
-    def get_active_session(self, account_id: int) -> dict[str, Any] | None:
-        """Get the active session for an account."""
-        with self._connection() as conn:
-            row = conn.execute(
-                """
-                SELECT * FROM sessions
-                WHERE account_id = ? AND is_active = 1
-                ORDER BY created_at DESC LIMIT 1
-                """,
-                (account_id,),
-            ).fetchone()
-            return dict(row) if row else None
-
-    def deactivate_sessions(self, account_id: int) -> int:
-        """Deactivate all sessions for an account."""
-        with self._connection() as conn:
-            cursor = conn.execute(
-                "UPDATE sessions SET is_active = 0 WHERE account_id = ?",
-                (account_id,),
-            )
-            conn.commit()
-            return cursor.rowcount
 
     # --- Redemption Log CRUD ---
 
@@ -924,7 +927,10 @@ class Storage:
     ) -> int:
         """Add a redemption log entry."""
         if attempted_at is None:
-            attempted_at = datetime.now()
+            # UTC-aware so codes_per_day's date('now') UTC cutoff lines up with
+            # what we write here. Legacy local-clock rows are accepted forward-
+            # only; no backfill.
+            attempted_at = datetime.now(UTC)
 
         # Truncate error_message to 300 chars with ellipsis if needed
         if error_message and len(error_message) > 300:
@@ -946,7 +952,6 @@ class Storage:
                     redeemed_at.isoformat() if redeemed_at else None,
                 ),
             )
-            conn.commit()
             return int(cursor.lastrowid or 0)
 
     def get_redemption_logs(
@@ -987,7 +992,6 @@ class Storage:
                 """,
                 (key, value),
             )
-            conn.commit()
 
     def get_config(self, key: str, default: str | None = None) -> str | None:
         """Get a configuration value.
@@ -1014,7 +1018,6 @@ class Storage:
         """
         with self._connection() as conn:
             cursor = conn.execute("DELETE FROM config WHERE key = ?", (key,))
-            conn.commit()
             return cursor.rowcount > 0
 
     def list_config(self) -> dict[str, str]:
@@ -1151,7 +1154,6 @@ class Storage:
                     error,
                 ),
             )
-            conn.commit()
             return int(cursor.lastrowid or 0)
 
     def get_checkin_logs(
@@ -1194,6 +1196,58 @@ class Storage:
             rows = conn.execute(query, params).fetchall()
             return [dict(row) for row in rows]
 
+    def upsert_checkin_log(
+        self,
+        account_id: int,
+        game: str,
+        claimed_date: str,
+        status: str,
+        reward_name: str | None = None,
+        reward_amount: int = 0,
+        error_message: str | None = None,
+    ) -> int:
+        """Insert or update one check-in entry in a single atomic statement.
+
+        Replaces the delete-then-insert pattern the scheduler used for retries;
+        the UNIQUE(account_id, game, claimed_date) constraint keys the conflict
+        so the row id is stable across retries.
+
+        Returns:
+            The id of the inserted or updated row.
+        """
+        with self._connection() as conn:
+            cursor = conn.execute(
+                """
+                INSERT INTO checkin_log
+                    (account_id, game, claimed_date, status,
+                     reward_name, reward_amount, error_message)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (account_id, game, claimed_date)
+                DO UPDATE SET
+                    status        = excluded.status,
+                    reward_name   = excluded.reward_name,
+                    reward_amount = excluded.reward_amount,
+                    error_message = excluded.error_message
+                """,
+                (
+                    account_id,
+                    game,
+                    claimed_date,
+                    status,
+                    reward_name,
+                    reward_amount,
+                    error_message,
+                ),
+            )
+            if cursor.lastrowid:
+                return int(cursor.lastrowid)
+            # UPDATE path: lastrowid can be 0, so fetch the existing row id.
+            row = conn.execute(
+                "SELECT id FROM checkin_log WHERE account_id = ? AND game = ? AND claimed_date = ?",
+                (account_id, game, claimed_date),
+            ).fetchone()
+            return int(row[0]) if row else 0
+
     def delete_checkin_log(self, account_id: int, game: str, claimed_date: str) -> bool:
         """Delete one check-in entry (used to clear failed/skipped rows before retry).
 
@@ -1208,7 +1262,6 @@ class Storage:
                 """,
                 (account_id, game, claimed_date),
             )
-            conn.commit()
             return cursor.rowcount > 0
 
     def last_checkin_status(self, account_id: int, game: str) -> dict[str, Any] | None:

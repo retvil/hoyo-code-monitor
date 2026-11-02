@@ -5,7 +5,7 @@ and attempts redemption if enabled.
 """
 
 import asyncio
-import contextlib
+import json
 import logging
 import random
 import sqlite3
@@ -206,6 +206,21 @@ class Scheduler:
             candidate += timedelta(days=1)
         return candidate
 
+    @staticmethod
+    def _enabled_games_for(acc: dict[str, Any]) -> set[str] | None:
+        """Parse an account's `games` JSON list; None/empty/invalid means all games."""
+        raw = acc.get("games")
+        if not raw:
+            return None
+        try:
+            parsed = json.loads(raw)
+        except (TypeError, ValueError):
+            logger.warning("Account %s has unparseable games %r; treating as all", acc["name"], raw)
+            return None
+        if not isinstance(parsed, list):
+            return None
+        return set(parsed)
+
     async def _run_checkin_slot(
         self, acc: dict[str, Any], game: str, today: str, summary: dict[str, Any]
     ) -> None:
@@ -232,11 +247,21 @@ class Scheduler:
                 summary["games_claimed"] += 1
                 return
             if existing and existing.get("claimed_date") == today:
-                # Stale failed/skipped row: clear it so the retry can insert fresh.
-                self.storage.delete_checkin_log(acc["id"], game, today)
+                # Stale failed/skipped row: the upsert below overwrites it in
+                # place, so no delete-then-insert (a kill between the two could
+                # lose the audit record).
+                logger.debug("Retrying stale check-in slot %s/%s for %s", acc["name"], game, today)
             result = await self.checkin_runner.run(game, cookies, device_id, today, lang=lang)
             try:
-                self.storage.add_checkin_log(acc["id"], result)
+                self.storage.upsert_checkin_log(
+                    acc["id"],
+                    result.game,
+                    result.claimed_date,
+                    result.status,
+                    reward_name=result.reward_name,
+                    reward_amount=result.reward_amount,
+                    error_message=result.message if result.status == STATUS_FAILED else None,
+                )
             except sqlite3.IntegrityError:
                 summary["already"] += 1
                 summary["games_claimed"] += 1
@@ -248,10 +273,13 @@ class Scheduler:
             logger.exception("Check-in slot failed for %s/%s", acc["name"], game)
             summary["failed"] += 1
             summary["errors"].append(f"{acc['name']}/{game}: {e}")
-            with contextlib.suppress(sqlite3.IntegrityError):
-                self.storage.add_checkin_log(
-                    acc["id"], CheckinResult(game, today, STATUS_FAILED, message=str(e))
-                )
+            self.storage.upsert_checkin_log(
+                acc["id"],
+                game,
+                today,
+                STATUS_FAILED,
+                error_message=str(e),
+            )
 
     @staticmethod
     def _tally_result(
@@ -364,9 +392,18 @@ class Scheduler:
 
         gap = getattr(self.config, "redemption_min_gap_seconds", 8)
         for acc in accounts:
+            enabled_games = self._enabled_games_for(acc)
             for game in GAME_CHECKIN_CONF:
+                if enabled_games is not None and game not in enabled_games:
+                    logger.debug("Skipping %s for %s (not in enabled games)", game, acc["name"])
+                    continue
                 await self._run_checkin_slot(acc, game, today, summary)
-                await asyncio.sleep(gap)
+                # Poll for stop instead of sleeping the whole gap blind, so
+                # stop() can cancel a long daily pass between slots.
+                for _ in range(gap):
+                    if self._stop_event.is_set():
+                        return summary
+                    await asyncio.sleep(1)
 
         summary["success"] = summary["failed"] == 0
         self._update_status(
@@ -456,7 +493,7 @@ class Scheduler:
         Returns:
             Dictionary with cycle results.
         """
-        gap = 8
+        gap = int(getattr(self.config, "redemption_min_gap_seconds", 8) or 8)
         codes_found = 0
         codes_redeemed = 0
         errors = []
@@ -491,12 +528,7 @@ class Scheduler:
             redeem_accounts = [
                 a for a in accounts if self.storage.is_account_redeem_enabled(a["name"])
             ]
-            if redeem_accounts:
-                acc0 = redeem_accounts[0]
-                ac = self.storage.load_account_cookies(acc0["name"])
-                if ac:
-                    self.config.cookies = ac
-            else:
+            if not redeem_accounts:
                 logger.warning("Redemption enabled but no accounts have auto-redeem on")
                 can_redeem = False
 
@@ -550,19 +582,22 @@ class Scheduler:
                     if can_redeem:
                         try:
                             # Log redemption per account
-                            for idx, acc in enumerate(redeem_accounts):
+                            for acc in redeem_accounts:
                                 try:
                                     from src.constants import GAME_CONF
 
                                     acc_game = acc.get("game") or "genshin"
                                     gconf = GAME_CONF.get(acc_game, GAME_CONF["genshin"])
-                                    cookies = (
-                                        self.storage.load_account_cookies(acc["name"])
-                                        or self.config.cookies
-                                    )
+                                    acc_cookies = self.storage.load_account_cookies(acc["name"])
+                                    if not acc_cookies:
+                                        logger.warning(
+                                            "No cookies saved for account %s; skipping redemption",
+                                            acc["name"],
+                                        )
+                                        continue
                                     res = await self.redeemer.redeem_code(
                                         code=code,
-                                        cookies=cookies,
+                                        cookies=acc_cookies,
                                         uid=acc["uid"],
                                         region=acc["region"],
                                         game_biz=acc.get("game_biz") or gconf["game_biz"],
@@ -574,10 +609,16 @@ class Scheduler:
                                         -2017,
                                         -2018,
                                     )
+                                    existing = self.storage.get_code(code, game=code_game)
+                                    new_reward = (
+                                        res.reward
+                                        if res.success
+                                        else (existing or {}).get("reward")
+                                    )
                                     self.storage.update_code_redemption(
                                         code=code,
                                         redeemed=claimed,
-                                        reward=res.reward if res.success else None,
+                                        reward=new_reward,
                                         game=code_game,
                                     )
                                     self.storage.add_redemption_log(
@@ -664,19 +705,22 @@ class Scheduler:
         for code in new_codes:
             try:
                 # Log redemption per account
-                for idx, acc in enumerate(redeem_accounts):
+                for acc in redeem_accounts:
                     try:
                         from src.constants import GAME_CONF
 
                         acc_game = acc.get("game") or "genshin"
                         gconf = GAME_CONF.get(acc_game, GAME_CONF["genshin"])
-                        cookies = (
-                            self.storage.load_account_cookies(acc["name"])
-                            or self.config.cookies
-                        )
+                        acc_cookies = self.storage.load_account_cookies(acc["name"])
+                        if not acc_cookies:
+                            logger.warning(
+                                "No cookies saved for account %s; skipping redemption",
+                                acc["name"],
+                            )
+                            continue
                         res = await self.redeemer.redeem_code(
                             code=code,
-                            cookies=cookies,
+                            cookies=acc_cookies,
                             uid=acc["uid"],
                             region=acc["region"],
                             game_biz=acc.get("game_biz") or gconf["game_biz"],
@@ -688,10 +732,16 @@ class Scheduler:
                             -2017,
                             -2018,
                         )
+                        existing = self.storage.get_code(code, game=acc_game)
+                        new_reward = (
+                            res.reward
+                            if res.success
+                            else (existing or {}).get("reward")
+                        )
                         self.storage.update_code_redemption(
                             code=code,
                             redeemed=claimed,
-                            reward=res.reward if res.success else None,
+                            reward=new_reward,
                             game=acc_game,
                         )
                         self.storage.add_redemption_log(
@@ -870,11 +920,13 @@ class Scheduler:
         # is the only remaining chance to release the pool and its sockets.
         await close_current()
 
-    def stop(self, timeout: float = 10.0) -> bool:
+    def stop(self, timeout: float = 300.0) -> bool:
         """Stop the scheduler gracefully.
 
         Args:
-            timeout: Maximum time to wait for thread to stop.
+            timeout: Maximum time to wait for thread to stop. Defaults to 300s
+                to cover the worst case of a long daily check-in pass
+                (multiple games x accounts x inter-slot gap).
 
         Returns:
             True if stopped successfully, False if not running or timeout.

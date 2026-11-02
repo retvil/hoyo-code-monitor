@@ -16,7 +16,6 @@ from src.sources import (
     SourceConfig,
     SourceFetcher,
     XPathExtractor,
-    create_default_sources,
     get_extractor,
     list_presets,
     register_extractor,
@@ -228,46 +227,6 @@ class TestExtractorRegistry:
         assert get_extractor("nonexistent") is None
 
 
-class TestCreateDefaultSources:
-    """Tests for default source creation."""
-
-    def test_creates_expected_sources(self) -> None:
-        sources = create_default_sources()
-        assert len(sources) >= 2
-        names = {s.name for s in sources}
-        assert "wiki" in names
-        assert "wiki_api" in names
-        assert "hoyo_codes_api" in names
-        assert "ennead_codes_api" in names
-        assert "ennead_mihoyo_api" in names
-
-    def test_new_guide_presets_exist(self) -> None:
-        from src.sources import SOURCE_PRESETS, get_preset
-
-        for name in (
-            "ennead_mihoyo_api",
-            "pockettactics_guides",
-            "theclick_guides",
-            "eurogamer_guides",
-            "mmoculture_guides",
-        ):
-            preset = get_preset(name)
-            assert preset is not None
-            preset.validate()
-        assert "hoyo_codes_api" in SOURCE_PRESETS
-        assert "ennead_codes_api" in SOURCE_PRESETS
-
-    def test_sources_have_required_fields(self) -> None:
-        sources = create_default_sources()
-        for source in sources:
-            assert source.name
-            assert source.url
-            assert source.selector_type
-            if source.selector_type != "json":
-                assert source.selector
-            source.validate()  # Should not raise
-
-
 class TestSourceFetcher:
     """Tests for SourceFetcher."""
 
@@ -446,6 +405,75 @@ class TestSourceFetcher:
         source = storage.get_source("good")
         assert source is not None
         assert source["error_count"] == 0
+
+    @pytest.mark.asyncio
+    async def test_zero_retries_still_attempts_and_logs_failure(
+        self, storage: Storage, source_config: SourceConfig
+    ) -> None:
+        """A source with max_retries=0 still makes one attempt and raises on failure.
+
+        The failure must surface through the normal error path (aiohttp.ClientError)
+        so ``run_one`` in ``fetch_all_enabled`` logs the error and increments the
+        source's error counter. Before the fix the retry loop body never executed
+        and the function silently returned ``[]`` with no error log.
+        """
+        import aiohttp
+
+        source_config.max_retries = 0
+        source_config.retry_base_delay = 0.0
+
+        mock_response = AsyncMock()
+        mock_response.__aenter__ = AsyncMock(
+            side_effect=aiohttp.ClientError("Connection refused")
+        )
+        mock_response.__aexit__ = AsyncMock(return_value=None)
+        mock_session = AsyncMock()
+        mock_session.get = MagicMock(return_value=mock_response)
+
+        async with SourceFetcher(storage, session=mock_session) as fetcher:
+            with pytest.raises(aiohttp.ClientError):
+                await fetcher.fetch_source(source_config)
+
+        # One attempt was made despite max_retries=0.
+        assert mock_session.get.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_zero_retries_all_paths_increments_error_count(
+        self, storage: Storage, source_config: SourceConfig
+    ) -> None:
+        """``fetch_all_enabled`` with max_retries=0 must still bump the error counter.
+
+        Regression for S4: a 0-retry source that fails on its only attempt must
+        surface through the same error path (logger + increment_source_error) as
+        a 1-retry source that fails.
+        """
+        import aiohttp
+
+        storage.add_source(
+            "zero",
+            "https://zero.example",
+            "css",
+            ".code",
+            max_retries=0,
+            retry_base_delay=0.0,
+        )
+        # Configure the actual aiohttp session so fetch_source runs the real
+        # retry loop with max_retries=0 and fails.
+        mock_response = AsyncMock()
+        mock_response.__aenter__ = AsyncMock(
+            side_effect=aiohttp.ClientError("Connection refused")
+        )
+        mock_response.__aexit__ = AsyncMock(return_value=None)
+        mock_session = AsyncMock()
+        mock_session.get = MagicMock(return_value=mock_response)
+
+        async with SourceFetcher(storage, session=mock_session) as fetcher:
+            results = await fetcher.fetch_all_enabled()
+
+        assert results == {"zero": []}
+        source = storage.get_source("zero")
+        assert source is not None
+        assert source["error_count"] == EXPECTED_SINGLE_ERROR_COUNT
 
 
 class TestSeedDefaultSources:

@@ -10,7 +10,7 @@ from src.migrations import CURRENT_VERSION
 from src.storage import Storage
 
 #: Shared expectations (avoid PLR2004 magic values).
-EXPECTED_SCHEMA_VERSION: int = 14
+EXPECTED_SCHEMA_VERSION: int = 16
 EXPECTED_REWARD_AMOUNT: int = 100
 EXPECTED_LOG_COUNT: int = 2
 UUID_HEX_LENGTH: int = 32
@@ -65,6 +65,20 @@ class TestCheckinMigration:
                 "SELECT sql FROM sqlite_master WHERE name='checkin_log'"
             ).fetchone()[0]
             assert "UNIQUE(account_id, game, claimed_date)" in sql
+
+    def test_accounts_games_column_added_in_v15(self, storage: Storage) -> None:
+        """Migration v15 adds the nullable per-account games filter column."""
+        with storage._connection() as conn:
+            cols = {
+                row["name"]
+                for row in conn.execute("PRAGMA table_info(accounts)").fetchall()
+            }
+            assert "games" in cols
+            # Existing accounts keep the default (all games) sentinel: NULL.
+            storage.add_account("solo", "123456", "os_euro")
+            row = storage.get_account("solo")
+            assert row is not None
+            assert row["games"] is None
 
 
 class TestCheckinLogCRUD:
@@ -124,6 +138,47 @@ class TestCheckinLogCRUD:
         assert storage.delete_checkin_log(account_id, "genshin", "2026-09-24") is True
         assert storage.get_checkin_logs() == []
         assert storage.delete_checkin_log(account_id, "genshin", "2026-09-24") is False
+
+    def test_upsert_checkin_log_updates_in_place(self, storage: Storage, account_id: int) -> None:
+        """Upsert twice on the same (account, game, date) keeps the same row id.
+
+        The second call must UPDATE the existing row, not delete+re-insert, so
+        the audit-trail primary key stays stable across retries.
+        """
+        first = storage.upsert_checkin_log(
+            account_id,
+            "genshin",
+            "2026-09-24",
+            "success",
+            reward_name="Primogem",
+            reward_amount=EXPECTED_REWARD_AMOUNT,
+        )
+        assert first > 0
+        second = storage.upsert_checkin_log(
+            account_id,
+            "genshin",
+            "2026-09-24",
+            "failed",
+            error_message="boom",
+        )
+        # Same row id (in-place update, no delete+re-insert).
+        assert second == first
+
+        logs = storage.get_checkin_logs()
+        assert len(logs) == 1
+        row = logs[0]
+        assert row["id"] == first
+        assert row["status"] == "failed"
+        assert row["error_message"] == "boom"
+        assert row["reward_name"] is None
+
+    def test_upsert_checkin_log_inserts_when_absent(self, storage: Storage, account_id: int) -> None:
+        """Upsert on a missing (account, game, date) inserts a fresh row."""
+        row_id = storage.upsert_checkin_log(account_id, "hsr", "2026-09-24", "success")
+        assert row_id > 0
+        logs = storage.get_checkin_logs()
+        assert len(logs) == 1
+        assert logs[0]["id"] == row_id
 
 
 class TestCheckinToggles:

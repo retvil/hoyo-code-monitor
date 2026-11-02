@@ -125,6 +125,16 @@ class TestCheckForUpdate:
         assert await check_for_update(force=True) is None
 
     @pytest.mark.asyncio
+    async def test_update_check_disabled_skips_network(self, monkeypatch) -> None:
+        """update_check_enabled=False: no GitHub request, returns None."""
+        session = MagicMock()
+        monkeypatch.setattr(version_check, "get_session", lambda: session)
+        monkeypatch.setattr(version_check, "_update_check_enabled", lambda: False)
+
+        assert await check_for_update(force=True) is None
+        session.get.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_cache_avoids_second_request(self, monkeypatch) -> None:
         response = MagicMock(status=200)
         response.json = AsyncMock(

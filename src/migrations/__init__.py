@@ -162,9 +162,9 @@ MIGRATIONS: list[Migration] = [
         """
         -- Migration v8: Code deduplication across sources
         -- Remove UNIQUE constraint on codes.code, add code_sources junction table
-        
+
         -- Create new codes table without UNIQUE constraint on code
-        CREATE TABLE codes_new (
+        CREATE TABLE IF NOT EXISTS codes_new (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             code TEXT NOT NULL,
             attempted_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -172,38 +172,38 @@ MIGRATIONS: list[Migration] = [
             reward TEXT,
             redeemed_at TIMESTAMP
         );
-        
+
         -- Copy data from old codes table
         INSERT INTO codes_new (id, code, attempted_at, redeemed, reward, redeemed_at)
         SELECT id, code, attempted_at, redeemed, reward, redeemed_at FROM codes;
-        
+
         -- Create code_sources junction table
         CREATE TABLE code_sources (
             code_id INTEGER NOT NULL REFERENCES codes_new(id) ON DELETE CASCADE,
             source TEXT NOT NULL,
             PRIMARY KEY (code_id, source)
         );
-        
+
         -- Populate code_sources from old codes table
         INSERT INTO code_sources (code_id, source)
         SELECT id, source FROM codes;
-        
+
         -- Drop old codes table and rename new one
-        DROP TABLE codes;
+        DROP TABLE IF EXISTS codes;
         ALTER TABLE codes_new RENAME TO codes;
-        
+
         -- Recreate indexes
         CREATE INDEX IF NOT EXISTS idx_codes_redeemed ON codes(redeemed);
         CREATE INDEX IF NOT EXISTS idx_codes_attempted_at ON codes(attempted_at);
         CREATE INDEX IF NOT EXISTS idx_code_sources_source ON code_sources(source);
-        
+
         UPDATE schema_version SET version = 8;
         """,
         """
         -- Rollback v8: Restore UNIQUE constraint on codes.code
         DROP INDEX IF EXISTS idx_code_sources_source;
         DROP TABLE IF EXISTS code_sources;
-        
+
         CREATE TABLE codes_old (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             code TEXT UNIQUE NOT NULL,
@@ -213,19 +213,19 @@ MIGRATIONS: list[Migration] = [
             reward TEXT,
             redeemed_at TIMESTAMP
         );
-        
+
         INSERT INTO codes_old (id, code, source, attempted_at, redeemed, reward, redeemed_at)
         SELECT c.id, c.code, cs.source, c.attempted_at, c.redeemed, c.reward, c.redeemed_at
         FROM codes c
         JOIN code_sources cs ON c.id = cs.code_id;
-        
+
         DROP TABLE codes;
         ALTER TABLE codes_old RENAME TO codes;
-        
+
         CREATE INDEX IF NOT EXISTS idx_codes_source ON codes(source);
         CREATE INDEX IF NOT EXISTS idx_codes_redeemed ON codes(redeemed);
         CREATE INDEX IF NOT EXISTS idx_codes_attempted_at ON codes(attempted_at);
-        
+
         UPDATE schema_version SET version = 7;
         """,
     ),
@@ -455,9 +455,57 @@ MIGRATIONS: list[Migration] = [
         UPDATE schema_version SET version = 13;
         """,
     ),
+    (
+        15,
+        """
+        -- Migration v15: per-account "enabled games" filter.
+        -- JSON array of game ids; NULL means "all games" (default behaviour).
+        -- The scheduler-loop and UI-toggle wiring that consumes this column is
+        -- intentionally deferred to a later wave; this migration only adds the
+        -- storage-level column so the scheduler/UI change can land without a
+        -- second migration.
+        ALTER TABLE accounts ADD COLUMN games TEXT;
+        UPDATE schema_version SET version = 15;
+        """,
+        """
+        -- Rollback v15: DROP COLUMN is available on SQLite >= 3.35 (the runtime
+        -- bundles 3.38+ via CPython 3.11). For older embedded runtimes the
+        -- rebuild-table pattern used in v9/v11/v14 is the safe fallback, but
+        -- keeping the column is harmless (NULL = "all games" = default behaviour)
+        -- so a no-op rollback is acceptable for now.
+        ALTER TABLE accounts DROP COLUMN games;
+        UPDATE schema_version SET version = 14;
+        """,
+    ),
+    (
+        16,
+        """
+        -- Migration v16: per-source last-success timestamp.
+        -- web_ui/web_views read `source.get("last_success")` to compute a
+        -- source's "active" display status; the column existed only as a
+        -- read, never as a schema object, so the lookup was always None and
+        -- the "active" branch was dead. Adding the column (nullable, no
+        -- default — NULL means "never succeeded") makes the read
+        -- legitimate. The scheduler-side write
+        -- (`update_source(last_success=...)`) is intentionally deferred to
+        -- a follow-up; until then the value stays NULL, which the UI
+        -- treats as "idle" (never succeeded), the correct semantics.
+        ALTER TABLE sources ADD COLUMN last_success TIMESTAMP;
+        UPDATE schema_version SET version = 16;
+        """,
+        """
+        -- Rollback v16: DROP COLUMN is available on SQLite >= 3.35 (the runtime
+        -- bundles 3.38+ via CPython 3.11). For older embedded runtimes the
+        -- rebuild-table pattern used in v9/v11/v14 is the safe fallback, but
+        -- keeping the column is harmless (NULL = "never succeeded" = default
+        -- behaviour) so a no-op rollback is acceptable for now.
+        ALTER TABLE sources DROP COLUMN last_success;
+        UPDATE schema_version SET version = 15;
+        """,
+    ),
 ]
 
-CURRENT_VERSION = 14
+CURRENT_VERSION = 16
 
 
 def get_db_version(conn: sqlite3.Connection) -> int:

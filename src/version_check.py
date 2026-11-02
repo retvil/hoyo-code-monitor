@@ -260,15 +260,36 @@ async def _build_update_info() -> UpdateInfo | None:
     )
 
 
+def _update_check_enabled() -> bool:
+    """Read the ``update_check_enabled`` config flag.
+
+    Defaults to True (banner shown) when config cannot be read: the check is
+    the documented off-switch, but failing closed on a config error would hide
+    the banner for unrelated reasons.
+    """
+    try:
+        from src.config import ConfigManager
+
+        return bool(ConfigManager().get("update_check_enabled", True))
+    except Exception:
+        return True
+
+
 async def check_for_update(force: bool = False) -> UpdateInfo | None:
     """Return an available update, or ``None``.
 
     Serves from cache unless ``force`` is set. Never raises.
 
+    When ``update_check_enabled`` is false in config the GitHub API is never
+    contacted and ``None`` is returned immediately, matching the existing
+    "nothing to show" shape.
+
     Concurrent callers on the same event loop share a single in-flight request
     rather than stampeding the API; the first caller's result is what everyone
     observes once the cache is populated.
     """
+    if not _update_check_enabled():
+        return None
     if not force:
         cached = cached_update()
         if cached is not None:

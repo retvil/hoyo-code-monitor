@@ -370,7 +370,12 @@ class SourceFetcher:
         max_retries = getattr(source, "max_retries", 3)
         base_delay = getattr(source, "retry_base_delay", 1.0)
 
-        for attempt in range(max_retries):
+        # A source with max_retries=0 must still make one attempt and run the
+        # standard error path on failure; without this floor the loop body
+        # never executes and a total fetch failure silently becomes "no codes".
+        attempts = max(1, max_retries)
+
+        for attempt in range(attempts):
             try:
                 async with self._session.get(source.url, headers=headers) as response:
                     response.raise_for_status()
@@ -392,7 +397,7 @@ class SourceFetcher:
                 if e.status != 429 and 400 <= e.status < 500:
                     logger.error("HTTP %s fetching %s (no retry): %s", e.status, source.name, e)
                     raise
-                if attempt == max_retries - 1:
+                if attempt == attempts - 1:
                     logger.error(
                         "HTTP error fetching %s after %d retries: %s", source.name, max_retries, e
                     )
@@ -401,14 +406,14 @@ class SourceFetcher:
                 logger.warning(
                     "Fetch attempt %d/%d failed for %s: %s. Retrying in %.1fs",
                     attempt + 1,
-                    max_retries,
+                    attempts,
                     source.name,
                     e,
                     delay,
                 )
                 await asyncio.sleep(delay)
             except aiohttp.ClientError as e:
-                if attempt == max_retries - 1:
+                if attempt == attempts - 1:
                     logger.error(
                         "HTTP error fetching %s after %d retries: %s", source.name, max_retries, e
                     )
@@ -417,7 +422,7 @@ class SourceFetcher:
                 logger.warning(
                     "Fetch attempt %d/%d failed for %s: %s. Retrying in %.1fs",
                     attempt + 1,
-                    max_retries,
+                    attempts,
                     source.name,
                     e,
                     delay,
@@ -427,8 +432,8 @@ class SourceFetcher:
                 logger.error("Error extracting from %s: %s", source.name, e)
                 raise
 
-        # All retry paths either return codes or raise; reach here only
-        # when max_retries is 0 (caller configured zero retries).
+        # Unreachable in practice: every loop exit raises or returns. The
+        # explicit fallback keeps the function return-total for type checkers.
         return []
 
     async def _fetch_with_browser(self, source: SourceConfig) -> list[str]:
@@ -544,254 +549,21 @@ class SourceFetcher:
 
 
 def register_extractor(name: str, extractor: Extractor) -> None:
-    """Register a custom extractor."""
+    """Register a custom extractor.
+
+    Public extension point for custom-source/plugin use; not used by the
+    built-in fetch flow (which reads from EXTRACTORS only via default sources).
+    """
     EXTRACTORS[name] = extractor
 
 
 def get_extractor(name: str) -> Extractor | None:
-    """Get extractor by name."""
+    """Get extractor by name.
+
+    Public extension point for custom-source/plugin use; not used by the
+    built-in fetch flow (which reads from EXTRACTORS only via default sources).
+    """
     return EXTRACTORS.get(name)
-
-
-def create_default_sources() -> list[SourceConfig]:
-    """Create default source configurations."""
-    return [
-        SourceConfig(
-            name="wiki",
-            url="https://genshin-impact.fandom.com/wiki/Promotional_Code",
-            selector_type="css",
-            selector="table.wikitable.sortable tbody tr td:first-child code, table.wikitable.sortable tbody tr td:first-child b code",
-            enabled=True,
-            timeout_seconds=30,
-            rate_limit_seconds=2.0,
-            max_retries=3,
-            retry_base_delay=1.0,
-        ),
-        SourceConfig(
-            name="wiki_api",
-            url="https://genshin-impact.fandom.com/api.php",
-            selector_type="json",
-            selector="",
-            enabled=True,
-            headers={"User-Agent": "HoYoCodeMonitor/1.0"},
-            timeout_seconds=30,
-            rate_limit_seconds=2.0,
-            max_retries=3,
-            retry_base_delay=1.0,
-        ),
-        SourceConfig(
-            name="genshin_codes_github",
-            url="https://raw.githubusercontent.com/GenshinCodeArchive/codes/main/codes.json",
-            selector_type="json",
-            selector="",
-            enabled=False,  # Repo removed (404 as of 2026-09) - kept for manual URL fix
-            timeout_seconds=30,
-            rate_limit_seconds=1.0,
-            max_retries=3,
-            retry_base_delay=1.0,
-        ),
-        SourceConfig(
-            name="ennead_mihoyo_api",
-            url="https://api.ennead.cc/mihoyo/genshin/codes",
-            selector_type="json",
-            selector="active",
-            enabled=True,
-            headers={"User-Agent": "HoYoCodeMonitor/1.0"},
-            timeout_seconds=30,
-            rate_limit_seconds=2.0,
-            max_retries=3,
-            retry_base_delay=1.0,
-        ),
-        SourceConfig(
-            name="pockettactics_guides",
-            url="https://www.pockettactics.com/genshin-impact/codes",
-            selector_type="css",
-            selector="li strong",
-            enabled=True,
-            headers={"User-Agent": "HoYoCodeMonitor/1.0"},
-            timeout_seconds=30,
-            rate_limit_seconds=5.0,
-            max_retries=3,
-            retry_base_delay=1.0,
-        ),
-        SourceConfig(
-            name="theclick_guides",
-            url="https://www.theclick.gg/genshin-impact-codes-2/",
-            selector_type="css",
-            selector=".entry-content code",
-            enabled=True,
-            headers={"User-Agent": "HoYoCodeMonitor/1.0"},
-            timeout_seconds=30,
-            rate_limit_seconds=5.0,
-            max_retries=3,
-            retry_base_delay=1.0,
-        ),
-        SourceConfig(
-            name="eurogamer_guides",
-            url="https://www.eurogamer.net/genshin-impact-codes-livestream-active-working-how-to-redeem-9026",
-            selector_type="css",
-            selector="article ul li",
-            enabled=True,
-            headers={"User-Agent": "HoYoCodeMonitor/1.0"},
-            timeout_seconds=30,
-            rate_limit_seconds=5.0,
-            max_retries=3,
-            retry_base_delay=1.0,
-        ),
-        SourceConfig(
-            name="mmoculture_guides",
-            url="https://mmoculture.com/2026/08/genshin-impact-redeem-codes/",
-            selector_type="css",
-            selector="article li",
-            enabled=True,
-            headers={"User-Agent": "HoYoCodeMonitor/1.0"},
-            timeout_seconds=30,
-            rate_limit_seconds=5.0,
-            max_retries=3,
-            retry_base_delay=1.0,
-        ),
-        SourceConfig(
-            name="playnforge_guides",
-            url="https://www.playnforge.com/genshin-codes",
-            selector_type="css",
-            selector="table td",
-            enabled=True,
-            headers={"User-Agent": "HoYoCodeMonitor/1.0"},
-            timeout_seconds=30,
-            rate_limit_seconds=5.0,
-            max_retries=3,
-            retry_base_delay=1.0,
-        ),
-        SourceConfig(
-            name="hoyo_codes_api",
-            url="https://hoyo-codes.seria.moe/codes?game=genshin",
-            selector_type="json",
-            selector="",
-            enabled=True,
-            headers={"User-Agent": "HoYoCodeMonitor/1.0"},
-            timeout_seconds=30,
-            rate_limit_seconds=2.0,
-            max_retries=3,
-            retry_base_delay=1.0,
-        ),
-        SourceConfig(
-            name="ennead_codes_api",
-            url="https://api.ennead.cc/codes/genshin",
-            selector_type="json",
-            selector="",
-            enabled=True,
-            headers={"User-Agent": "HoYoCodeMonitor/1.0"},
-            timeout_seconds=30,
-            rate_limit_seconds=2.0,
-            max_retries=3,
-            retry_base_delay=1.0,
-            game="genshin",
-        ),
-        SourceConfig(
-            name="hoyo_codes_hsr",
-            url="https://hoyo-codes.seria.moe/codes?game=hkrpg",
-            selector_type="json",
-            selector="",
-            enabled=True,
-            headers={"User-Agent": "HoYoCodeMonitor/1.0"},
-            timeout_seconds=30,
-            rate_limit_seconds=2.0,
-            max_retries=3,
-            retry_base_delay=1.0,
-            game="hsr",
-        ),
-        SourceConfig(
-            name="ennead_hsr_api",
-            url="https://api.ennead.cc/mihoyo/starrail/codes",
-            selector_type="json",
-            selector="active",
-            enabled=True,
-            headers={"User-Agent": "HoYoCodeMonitor/1.0"},
-            timeout_seconds=30,
-            rate_limit_seconds=2.0,
-            max_retries=3,
-            retry_base_delay=1.0,
-            game="hsr",
-        ),
-        SourceConfig(
-            name="ennead_hi3_api",
-            url="https://api.ennead.cc/mihoyo/honkai/codes",
-            selector_type="json",
-            selector="active",
-            enabled=True,
-            headers={"User-Agent": "HoYoCodeMonitor/1.0"},
-            timeout_seconds=30,
-            rate_limit_seconds=2.0,
-            max_retries=3,
-            retry_base_delay=1.0,
-            game="hi3",
-        ),
-        SourceConfig(
-            name="hoyo_codes_tot",
-            url="https://hoyo-codes.seria.moe/codes?game=tot",
-            selector_type="json",
-            selector="",
-            enabled=True,
-            headers={"User-Agent": "HoYoCodeMonitor/1.0"},
-            timeout_seconds=30,
-            rate_limit_seconds=2.0,
-            max_retries=3,
-            retry_base_delay=1.0,
-            game="tot",
-        ),
-        SourceConfig(
-            name="ennead_tot_api",
-            url="https://api.ennead.cc/mihoyo/themis/codes",
-            selector_type="json",
-            selector="active",
-            enabled=True,
-            headers={"User-Agent": "HoYoCodeMonitor/1.0"},
-            timeout_seconds=30,
-            rate_limit_seconds=2.0,
-            max_retries=3,
-            retry_base_delay=1.0,
-            game="tot",
-        ),
-        SourceConfig(
-            name="hoyo_codes_zzz",
-            url="https://hoyo-codes.seria.moe/codes?game=nap",
-            selector_type="json",
-            selector="",
-            enabled=True,
-            headers={"User-Agent": "HoYoCodeMonitor/1.0"},
-            timeout_seconds=30,
-            rate_limit_seconds=2.0,
-            max_retries=3,
-            retry_base_delay=1.0,
-            game="zzz",
-        ),
-        SourceConfig(
-            name="ennead_zzz_api",
-            url="https://api.ennead.cc/mihoyo/zenless/codes",
-            selector_type="json",
-            selector="active",
-            enabled=True,
-            headers={"User-Agent": "HoYoCodeMonitor/1.0"},
-            timeout_seconds=30,
-            rate_limit_seconds=2.0,
-            max_retries=3,
-            retry_base_delay=1.0,
-            game="zzz",
-        ),
-        SourceConfig(
-            name="hoyolab",
-            url="https://www.hoyolab.com/article/",
-            selector_type="css",
-            selector=".article-content code, .article-content .code-block",
-            enabled=False,  # Requires auth
-            requires_browser=True,
-            browser_wait_selector=".article-content",
-            timeout_seconds=60,
-            rate_limit_seconds=5.0,
-            max_retries=3,
-            retry_base_delay=1.0,
-        ),
-    ]
 
 
 # Source presets for common sites
@@ -1114,7 +886,11 @@ def get_preset(name: str) -> SourceConfig | None:
 
 
 def list_presets() -> list[str]:
-    """List available source preset names."""
+    """List available source preset names.
+
+    Public extension point for custom-source/plugin use; not used by the
+    built-in fetch flow (which reads from SOURCE_PRESETS only via presets).
+    """
     return list(SOURCE_PRESETS.keys())
 
 

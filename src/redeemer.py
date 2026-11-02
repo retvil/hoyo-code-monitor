@@ -277,15 +277,12 @@ class Redeemer:
         resolved_biz = game_biz or conf["game_biz"]
         endpoint = f"https://{conf['api_host']}/common/apicdkey/api/webExchangeCdkey"
         if game == "zzz":
-            return await self._redeem_risk(code, cookies, uid, region, conf, lang, s_lang_key)
-        original_endpoint = self.endpoint
-        self.endpoint = endpoint
-        try:
-            return await self._redeem_get(
-                code, cookies, uid, region, resolved_biz, lang, s_lang_key
+            return await self._redeem_risk(
+                code, cookies, uid, region, conf, lang, s_lang_key, endpoint
             )
-        finally:
-            self.endpoint = original_endpoint
+        return await self._redeem_get(
+            code, cookies, uid, region, resolved_biz, lang, s_lang_key, endpoint
+        )
 
     async def _redeem_get(
         self,
@@ -296,6 +293,7 @@ class Redeemer:
         game_biz: str,
         lang: str,
         s_lang_key: str,
+        endpoint: str | None = None,
     ) -> RedemptionResult:
         """Redeem via GET webExchangeCdkey (Genshin/HSR/HI3/ToT)."""
         session = await self._get_session()
@@ -315,7 +313,10 @@ class Redeemer:
         params = dict(form_data)
         try:
             async with session.get(
-                self.endpoint, headers=headers, params=params, timeout=self.timeout
+                endpoint or self.endpoint,
+                headers=headers,
+                params=params,
+                timeout=self.timeout,
             ) as response:
                 response.raise_for_status()
                 json_data = await response.json()
@@ -337,15 +338,19 @@ class Redeemer:
 
                 return result
 
-        except aiohttp.ClientResponseError as e:
-            logger.error("HTTP error redeeming code %s: %s", code[:4] + "****", e)
-            return RedemptionResult(
-                success=False,
-                reward="",
-                message=f"HTTP {e.status}: {e.message}",
-                raw_response={"retcode": -1, "message": str(e), "data": {}},
-            )
         except aiohttp.ClientError as e:
+            # ``status``/``message`` exist only on ClientResponseError (the
+            # HTTP-status subclass); getattr keeps the base ClientError path
+            # (pure connection errors) mypy-clean.
+            status = getattr(e, "status", None)
+            if status is not None:
+                logger.error("HTTP error redeeming code %s: %s", code[:4] + "****", e)
+                return RedemptionResult(
+                    success=False,
+                    reward="",
+                    message=f"HTTP {status}: {getattr(e, 'message', '')}",
+                    raw_response={"retcode": -1, "message": str(e), "data": {}},
+                )
             logger.error("Network error redeeming code %s: %s", code[:4] + "****", e)
             return RedemptionResult(
                 success=False,
@@ -371,6 +376,7 @@ class Redeemer:
         conf: dict[str, str],
         lang: str,
         s_lang_key: str,
+        endpoint: str | None = None,
     ) -> RedemptionResult:
         """Redeem via POST webExchangeCdkeyRisk (ZZZ)."""
         session = await self._get_session()
@@ -383,7 +389,7 @@ class Redeemer:
             "cdkey": code,
             "lang": lang,
         }
-        url = f"https://{conf['api_host']}/common/apicdkey/api/webExchangeCdkeyRisk"
+        url = endpoint or f"https://{conf['api_host']}/common/apicdkey/api/webExchangeCdkeyRisk"
 
         logger.info("Attempting to redeem ZZZ code: %s", code[:4] + "****")
 
@@ -398,15 +404,19 @@ class Redeemer:
                         "ZZZ redemption failed: %s - %s", code[:4] + "****", result.message
                     )
                 return result
-        except aiohttp.ClientResponseError as e:
-            logger.error("HTTP error redeeming ZZZ code %s: %s", code[:4] + "****", e)
-            return RedemptionResult(
-                success=False,
-                reward="",
-                message=f"HTTP {e.status}: {e.message}",
-                raw_response={"retcode": -1, "message": str(e), "data": {}},
-            )
         except aiohttp.ClientError as e:
+            # ``status``/``message`` exist only on ClientResponseError (the
+            # HTTP-status subclass); getattr keeps the base ClientError path
+            # (pure connection errors) mypy-clean.
+            status = getattr(e, "status", None)
+            if status is not None:
+                logger.error("HTTP error redeeming ZZZ code %s: %s", code[:4] + "****", e)
+                return RedemptionResult(
+                    success=False,
+                    reward="",
+                    message=f"HTTP {status}: {getattr(e, 'message', '')}",
+                    raw_response={"retcode": -1, "message": str(e), "data": {}},
+                )
             logger.error("Network error redeeming ZZZ code %s: %s", code[:4] + "****", e)
             return RedemptionResult(
                 success=False,

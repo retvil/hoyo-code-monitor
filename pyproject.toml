@@ -135,36 +135,8 @@ exclude_lines = [
     "if __name__ == .__main__.:",
 ]
 
-[tool.pyinstaller]
-hidden-imports = [
-    "cryptography",
-    "keyring",
-    "playwright",
-    "psutil",
-    "portalocker",
-    "prometheus_client",
-    "fastapi",
-    "uvicorn",
-    "jinja2",
-    "pydantic",
-    "httpx",
-    "apscheduler",
-    "colorlog",
-    "lxml",
-    "bs4",
-    "tomli",
-    "tomli_w",
-]
-collect-data-files = [
-    "templates/*",
-    "config.toml",
-]
-exclude-modules = [
-    "tkinter",
-    "matplotlib",
-    "numpy",
-    "pandas",
-    "scipy",
-    "PIL",
-    "cv2",
-]
+# NOTE: There is no `[tool.pyinstaller]` section here on purpose. The
+# authoritative build config is `genshin-code-monitor.spec` (invoked
+# directly by CI); a PyInstaller "pyproject" block would be a stale,
+# diverging duplicate of that spec and has been removed (see commit
+# history / CI-D14 in the project plan).

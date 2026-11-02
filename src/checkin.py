@@ -16,6 +16,7 @@ import random
 import string
 import time
 from dataclasses import dataclass
+from datetime import datetime
 from typing import TYPE_CHECKING, Any, Protocol, Self
 
 import aiohttp
@@ -102,9 +103,15 @@ def _parse_today(raw: object) -> int:
     The API returns either a day number ("3") or a full date ("2026-10-02");
     both are accepted, anything else yields 0.
     """
+    value = str(raw) if raw is not None else ""
     try:
-        return int(str(raw).split("-")[-1])
-    except (TypeError, ValueError):
+        return datetime.strptime(value, "%Y-%m-%d").day
+    except ValueError:
+        pass
+    try:
+        return int(value)
+    except ValueError:
+        logger.warning("Unparseable `today` value %r; defaulting to 0", raw)
         return 0
 
 # Length of the random part in the DS signature.

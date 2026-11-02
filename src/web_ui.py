@@ -29,7 +29,7 @@ from src.http_session import close_all as close_http_sessions
 from src.http_session import get_session
 from src.i18n import get_lang, make_t
 from src.scheduler import create_scheduler_from_storage
-from src.sources import SOURCE_PRESETS, SourceConfig, SourceFetcher, seed_default_sources
+from src.sources import SourceConfig, SourceFetcher, seed_default_sources
 from src.storage import Storage
 from src.templates import templates
 from src.version_check import check_for_update
@@ -37,9 +37,9 @@ from src.web_views import (
     account_checkin_switch_html,
     account_redeem_switch_html,
     checkin_logs_with_names,
-    is_source_stale,
     page_ctx,
     source_health,
+    source_status,
 )
 from src.web_views import (
     safe_detail as _safe_detail,
@@ -342,7 +342,6 @@ async def dashboard(request: Request, game: str = "") -> HTMLResponse:
                 "logs": logs,
                 "config": config,
                 "scheduler": sched_status,
-                "source_presets": {k: v.__dict__ for k, v in SOURCE_PRESETS.items()},
             },
         ),
     )
@@ -361,7 +360,6 @@ async def sources_page(request: Request) -> HTMLResponse:
             {
                 "request": request,
                 "sources": sources,
-                "source_presets": {k: v.__dict__ for k, v in SOURCE_PRESETS.items()},
             },
         ),
     )
@@ -814,22 +812,19 @@ async def api_sources_status() -> list[dict[str, Any]]:
     sources = storage.list_sources()
 
     # Format for frontend consumption
-    source_status = []
+    statuses = []
     for source in sources:
-        source_status.append({
+        statuses.append({
             "name": source["name"],
             "enabled": bool(source["enabled"]),
             "game": source.get("game", "unknown"),
             "last_checked": source.get("last_checked"),
             "last_success": source.get("last_success"),
             "error_count": source.get("error_count", 0),
-            "status": "active" if source["enabled"] and source.get("last_success") else
-                     "error" if source.get("error_count", 0) > 3 else
-                     "warning" if is_source_stale(source.get("last_checked"))
-                     else "unknown"
-    })
+            "status": source_status(source),
+        })
 
-    return source_status
+    return statuses
 
 
 @app.get("/health")
@@ -867,8 +862,9 @@ async def health_check() -> dict[str, Any]:
             payload["connectivity"] = "error"
             logger.debug("External connectivity check failed: %s", exc)
 
-    if payload["sources"].get("state") == "missing" or any(
-        source.get("state") == "error" for source in payload["sources"].get("sources", [])
+    sources_payload = payload["sources"]
+    if sources_payload.get("error") or any(
+        source.get("state") == "error" for source in sources_payload.get("sources", [])
     ):
         payload["status"] = "degraded"
     if payload["connectivity"] == "error":
@@ -958,6 +954,64 @@ async def toggle_account_checkin(name: str) -> str:
     new_value = not storage.is_account_checkin_enabled(name)
     storage.set_account_checkin(name, new_value)
     return account_checkin_switch_html(name, new_value)
+
+
+@app.get("/accounts/{name}/games", response_class=HTMLResponse)
+async def account_games_state(name: str) -> str:
+    """Current per-account enabled-games checkboxes HTML (for initial load)."""
+    from src.constants import GAMES
+
+    storage = Storage()
+    if not storage.get_account(name):
+        raise HTTPException(status_code=404, detail="Account not found")
+    return _account_games_checkboxes_html(name, storage.get_account_games(name), GAMES)
+
+
+@app.post("/accounts/{name}/games", response_class=HTMLResponse)
+async def account_games_update(name: str, request: Request) -> str:
+    """Update per-account enabled-games filter from the checkbox group."""
+    from src.constants import GAMES
+
+    storage = Storage()
+    if not storage.get_account(name):
+        raise HTTPException(status_code=404, detail="Account not found")
+    form = await request.form()
+    picked = form.getlist("games")
+    # Keep only ids we know, so a hand-edited form can't write arbitrary values.
+    enabled = [g for g in picked if g in GAMES]
+    # Empty selection means "no games" -> store None so the scheduler runs all
+    # (NULL = "all games" default), matching the add-account form behaviour.
+    updated = storage.update_account_games(name, enabled if enabled else None)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Account not found")
+    return _account_games_checkboxes_html(name, storage.get_account_games(name), GAMES)
+
+
+def _account_games_checkboxes_html(
+    name: str, enabled: list[str] | None, games: tuple[str, ...]
+) -> str:
+    """Render the per-account "enabled games" checkbox group fragment.
+
+    The form is wired for HTMX so the page-wide CSRF listener attaches the
+    X-CSRF-Token header on submit.
+    """
+    boxes = []
+    for g in games:
+        checked = "" if enabled is None else ("checked" if g in enabled else "")
+        boxes.append(
+            f"<label style='display: flex; align-items: center; gap: 4px; margin-right: 8px;'>"
+            f"<input type='checkbox' name='games' value='{g}' {checked} "
+            f"style='width: 15px; height: 15px;'> {g}</label>"
+        )
+    return (
+        f"<div id='games-{name}'>"
+        f"<form hx-post='/accounts/{name}/games' hx-target='#games-{name}' hx-swap='outerHTML'>"
+        f"<button type='button' class='btn' style='padding: 2px 8px; font-size: 0.75rem;'>Games:</button> "
+        + "".join(boxes) +
+        "<button type='submit' class='btn btn-primary' "
+        "style='padding: 2px 8px; font-size: 0.75rem;'>Save</button>"
+        "</form></div>"
+    )
 
 
 @app.get("/checkins", response_class=HTMLResponse)
@@ -1133,7 +1187,8 @@ async def redeem_single_code(code: str) -> dict[str, Any]:
             except Exception as e:
                 results.append(f"{acc['name']}: error {e}")
             await asyncio.sleep(gap)
-    return {"success": True, "result": "; ".join(results)}
+    any_success = any(": OK" in r for r in results)
+    return {"success": any_success, "result": "; ".join(results)}
 
 
 @app.delete("/codes/{code}")
@@ -1167,7 +1222,7 @@ async def redeem_all_codes() -> dict[str, Any]:
     codes = [
         c
         for c in storage.list_codes(limit=500, only_unredeemed=True)
-        if c.get("display_status") in ("pending", "failed")
+        if c.get("display_status") == "pending"
     ]
     if not codes:
         return {"success": True, "result": "Nothing to redeem"}

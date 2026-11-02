@@ -215,6 +215,94 @@ class TestSchedulerRedemption:
         assert logs[0]["status"] == "failed"
         assert logs[0]["error_message"] == "Invalid code"
 
+    @pytest.mark.asyncio
+    async def test_already_claimed_does_not_clobber_stored_reward(
+        self, storage: Storage
+    ) -> None:
+        storage.add_source("test", "https://example.com", "css", ".code")
+        storage.add_account("test_account", "12345", "os_usa")
+        storage.add_account("test_account2", "67890", "os_usa")
+        storage.set_config("uid", "12345")
+        storage.set_config("region", "os_usa")
+        storage.set_config("redemption_enabled", "true")
+        storage.store_account_cookies("test_account", {"ltuid": "12345", "ltoken": "abcdef"})
+        storage.store_account_cookies(
+            "test_account2", {"ltuid": "67890", "ltoken": "ghijkl"}
+        )
+
+        from src.config import load_config_from_storage
+        config = load_config_from_storage(storage)
+        scheduler = Scheduler(storage=storage, config=config)
+
+        ok_result = RedemptionResult(
+            success=True,
+            reward="Intuition x1",
+            message="OK",
+            raw_response={"retcode": 0, "message": "OK", "data": {"award": "Intuition x1"}},
+        )
+        dup_result = RedemptionResult(
+            success=False,
+            reward="",
+            message="Already claimed",
+            raw_response={"retcode": -2017, "message": "Already claimed", "data": {}},
+        )
+        mock_redeemer = AsyncMock()
+        mock_redeemer.redeem_code = AsyncMock(side_effect=[ok_result, dup_result])
+        scheduler.redeemer = mock_redeemer
+
+        # First account successfully claims the code, second account sees -2017
+        # (already claimed). The stored reward must survive both redemptions.
+        storage.add_code("GENSHIN123", "test", game="genshin")
+        await scheduler._redeem_new_codes(["GENSHIN123"], storage.list_accounts(), gap=0)
+
+        row = storage.get_code("GENSHIN123", game="genshin")
+        assert row is not None
+        assert row["reward"] == "Intuition x1"
+
+    @pytest.mark.asyncio
+    async def test_no_cross_account_cookie_leak(
+        self, storage: Storage, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        storage.add_source("test", "https://example.com", "css", ".code")
+        storage.add_account("test_account", "12345", "os_usa")
+        storage.add_account("test_account2", "67890", "os_usa")
+        storage.set_config("uid", "12345")
+        storage.set_config("region", "os_usa")
+        storage.set_config("redemption_enabled", "true")
+        account1_cookies = {"ltuid": "12345", "ltoken": "abcdef"}
+        storage.store_account_cookies("test_account", account1_cookies)
+        # test_account2 intentionally has no cookie row of its own
+
+        from src.config import load_config_from_storage
+        config = load_config_from_storage(storage)
+        scheduler = Scheduler(storage=storage, config=config)
+
+        ok_result = RedemptionResult(
+            success=True,
+            reward="Intuition x1",
+            message="OK",
+            raw_response={"retcode": 0, "message": "OK", "data": {"award": "Intuition x1"}},
+        )
+        mock_redeemer = AsyncMock()
+        mock_redeemer.redeem_code = AsyncMock(return_value=ok_result)
+        scheduler.redeemer = mock_redeemer
+
+        storage.add_code("GENSHIN123", "test", game="genshin")
+        with caplog.at_level("WARNING"):
+            await scheduler._redeem_new_codes(["GENSHIN123"], storage.list_accounts(), gap=0)
+
+        # Only test_account (which has cookies) should have redeemed.
+        assert mock_redeemer.redeem_code.call_count == 1
+        passed_cookies = mock_redeemer.redeem_code.call_args.kwargs["cookies"]
+        assert passed_cookies == account1_cookies
+        # test_account2 has no cookie row of its own: its redemption must NOT
+        # have run at all — not skipped-with-fallback, not redeemed under
+        # account #1's capture.
+        assert storage.load_account_cookies("test_account2") == {}
+        assert mock_redeemer.redeem_code.call_args.kwargs["uid"] == "12345"
+        warnings = [r.message for r in caplog.records if r.levelname == "WARNING"]
+        assert any("No cookies saved for account test_account2" in m for m in warnings)
+
 
 class TestSchedulerStartStop:
     """Tests for scheduler start/stop."""

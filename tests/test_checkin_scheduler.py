@@ -386,3 +386,40 @@ class TestCatchUpMissedCheckins:
         result = await scheduler.catch_up_missed_checkins()
         assert result is None
         assert storage.get_checkin_logs() == []
+
+
+class TestStopCancelsCheckinPass:
+    """Tests that stop() interrupts a daily check-in pass between slots."""
+
+    def test_default_stop_timeout_covers_long_pass(self, storage: Storage) -> None:
+        """stop() default join wait covers a long check-in pass, not just 10s."""
+        scheduler = make_scheduler(storage, FakeTransport())
+        assert scheduler.stop.__defaults__[0] >= 300
+
+    @pytest.mark.asyncio
+    async def test_stop_event_returns_pass_early(
+        self, storage: Storage, account_id: int
+    ) -> None:
+        """A set _stop_event aborts the pass on the next inter-slot poll."""
+        assert account_id > 0
+        config = SimpleNamespace(redemption_min_gap_seconds=2)
+        runner = CheckinRunner(transport=FakeTransport(sign=[make_sign()] * len(GAME_CHECKIN_CONF)),
+                               retry_base_delay=0.0)
+        scheduler = Scheduler(storage=storage, config=config, checkin_runner=runner)
+
+        # Stop the pass right after the first slot is attempted.
+        scheduler._stop_event.set()
+        logs_before = len(storage.get_checkin_logs())
+
+        start = time.monotonic()
+        result = await scheduler.run_daily_checkins("2026-09-24")
+        elapsed = time.monotonic() - start
+
+        # Only the first slot ran before the stop event aborted the loop; the
+        # remaining slots and inter-slot gaps were never executed.
+        assert result["games_claimed"] <= 1
+        assert result["success"] is True  # no failed slots, pass cancelled cleanly
+        # Two-second gap polling must not have waited the full
+        # 2s x (len(GAME_CHECKIN_CONF) - 1) loop; ~1s per poll tick.
+        assert elapsed < 2.0
+        assert len(storage.get_checkin_logs()) == logs_before + 1
