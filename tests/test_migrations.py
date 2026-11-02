@@ -13,6 +13,11 @@ from src.migrations import (
 )
 from src.storage import Storage
 
+#: Migration versions under test.
+LATEST_MIGRATION_VERSION: int = CURRENT_VERSION
+PREVIOUS_MIGRATION_VERSION: int = CURRENT_VERSION - 1
+DEDUP_REWRITE_VERSION: int = 8
+
 
 @pytest.fixture
 def fresh_db(tmp_path: Path) -> str:
@@ -70,16 +75,16 @@ class TestMigrationUpChain:
 class TestMigrationDownStep:
     def test_v16_down_drops_last_success(self, fresh_db: str) -> None:
         """The newest step (v16) must actually roll back on its own down SQL."""
-        version, _, down_sql = [m for m in MIGRATIONS if m[0] == 16][0]
+        _, _, down_sql = next(m for m in MIGRATIONS if m[0] == LATEST_MIGRATION_VERSION)
         with sqlite3.connect(fresh_db) as conn:
             conn.executescript(down_sql)
             assert "last_success" not in _table_columns(conn, "sources")
-            assert get_db_version(conn) == 15
+            assert get_db_version(conn) == PREVIOUS_MIGRATION_VERSION
             # Re-applying the same up SQL restores the column (round-trip).
-            up_sql = [m for m in MIGRATIONS if m[0] == 16][0][1]
+            up_sql = next(m for m in MIGRATIONS if m[0] == LATEST_MIGRATION_VERSION)[1]
             conn.executescript(up_sql)
             assert "last_success" in _table_columns(conn, "sources")
-            assert get_db_version(conn) == 16
+            assert get_db_version(conn) == LATEST_MIGRATION_VERSION
 
 
 class TestMigrationV8Idempotent:
@@ -87,7 +92,7 @@ class TestMigrationV8Idempotent:
         """v8's up SQL is guarded (IF NOT EXISTS / IF EXISTS) like every other
         step, so a partial-apply crash mid-migration can be re-run without
         'table already exists' blowups."""
-        _, up_sql, _ = [m for m in MIGRATIONS if m[0] == 8][0]
+        _, up_sql, _ = next(m for m in MIGRATIONS if m[0] == DEDUP_REWRITE_VERSION)
         assert "CREATE TABLE IF NOT EXISTS codes_new" in up_sql
         assert "DROP TABLE IF EXISTS codes;" in up_sql
         # And the full up-chain still lands cleanly on a fresh DB.

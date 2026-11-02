@@ -22,6 +22,10 @@ PAST_HOUR: int = 1
 PAST_MINUTE: int = 0
 FALLBACK_HOUR: int = 4
 FALLBACK_MINUTE: int = 0
+#: Scheduler.stop()'s default join timeout must cover a full check-in pass.
+STOP_TIMEOUT_FLOOR: int = 300
+#: Abort must surface before any full inter-slot poll gap elapses (~1s/tick).
+STOP_EARLY_ABORT_BUDGET_SECONDS: float = 2.0
 
 
 @pytest.fixture
@@ -394,7 +398,7 @@ class TestStopCancelsCheckinPass:
     def test_default_stop_timeout_covers_long_pass(self, storage: Storage) -> None:
         """stop() default join wait covers a long check-in pass, not just 10s."""
         scheduler = make_scheduler(storage, FakeTransport())
-        assert scheduler.stop.__defaults__[0] >= 300
+        assert scheduler.stop.__defaults__[0] >= STOP_TIMEOUT_FLOOR
 
     @pytest.mark.asyncio
     async def test_stop_event_returns_pass_early(
@@ -421,5 +425,5 @@ class TestStopCancelsCheckinPass:
         assert result["success"] is True  # no failed slots, pass cancelled cleanly
         # Two-second gap polling must not have waited the full
         # 2s x (len(GAME_CHECKIN_CONF) - 1) loop; ~1s per poll tick.
-        assert elapsed < 2.0
+        assert elapsed < STOP_EARLY_ABORT_BUDGET_SECONDS
         assert len(storage.get_checkin_logs()) == logs_before + 1

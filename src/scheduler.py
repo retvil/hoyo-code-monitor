@@ -487,7 +487,48 @@ class Scheduler:
         self._last_checkin_date = today
         return result
 
-    async def _run_check_cycle(self) -> dict[str, Any]:
+    def _resolve_redemption_accounts(
+        self,
+    ) -> tuple[bool, list[dict[str, Any]]]:
+        """Determine whether auto-redeem is usable and which accounts apply.
+
+        Returns:
+            (can_redeem, redeem_accounts): whether redemption is enabled and
+            fully configured, and the list of accounts with auto-redeem on.
+        """
+        can_redeem: bool = bool(
+            getattr(self.config, "redemption_enabled", False)
+            and getattr(self.config, "uid", None)
+            and getattr(self.config, "region", None)
+            and self.config.cookies.get("ltuid")
+            and self.config.cookies.get("ltoken")
+        )
+
+        redeem_accounts: list[dict[str, Any]] = []
+        if can_redeem:
+            accounts = self.storage.list_accounts()
+            redeem_accounts = [
+                a for a in accounts if self.storage.is_account_redeem_enabled(a["name"])
+            ]
+            if not redeem_accounts:
+                logger.warning("Redemption enabled but no accounts have auto-redeem on")
+                can_redeem = False
+
+        if getattr(self.config, "redemption_enabled", False) and not can_redeem:
+            missing: list[str] = []
+            if not getattr(self.config, "uid", None):
+                missing.append("uid")
+            if not getattr(self.config, "region", None):
+                missing.append("region")
+            if not self.config.cookies.get("ltuid"):
+                missing.append("ltuid cookie")
+            if not self.config.cookies.get("ltoken"):
+                missing.append("ltoken cookie")
+            logger.warning("Redemption enabled but missing config: %s", ", ".join(missing))
+
+        return can_redeem, redeem_accounts
+
+    async def _run_check_cycle(self) -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 -- the fetch/store/redeem pipeline; sub-seams already extracted
         """Run a single check cycle: scrape sources, store codes, attempt redemption.
 
         Returns:
@@ -513,43 +554,14 @@ class Scheduler:
             }
 
         # Check if redemption is enabled and configured
-        can_redeem = (
-            getattr(self.config, "redemption_enabled", False)
-            and getattr(self.config, "uid", None)
-            and getattr(self.config, "region", None)
-            and self.config.cookies.get("ltuid")
-            and self.config.cookies.get("ltoken")
-        )
-
-        # Resolve accounts for redemption (per-account flags)
-        redeem_accounts: list[dict[str, Any]] = []
-        if can_redeem:
-            accounts = self.storage.list_accounts()
-            redeem_accounts = [
-                a for a in accounts if self.storage.is_account_redeem_enabled(a["name"])
-            ]
-            if not redeem_accounts:
-                logger.warning("Redemption enabled but no accounts have auto-redeem on")
-                can_redeem = False
-
-        if getattr(self.config, "redemption_enabled", False) and not can_redeem:
-            missing = []
-            if not getattr(self.config, "uid", None):
-                missing.append("uid")
-            if not getattr(self.config, "region", None):
-                missing.append("region")
-            if not self.config.cookies.get("ltuid"):
-                missing.append("ltuid cookie")
-            if not self.config.cookies.get("ltoken"):
-                missing.append("ltoken cookie")
-            logger.warning("Redemption enabled but missing config: %s", ", ".join(missing))
+        can_redeem, redeem_accounts = self._resolve_redemption_accounts()
 
         # Fetch codes from all sources using SourceFetcher
         try:
             async with SourceFetcher(self.storage) as fetcher:
                 results = await fetcher.fetch_all_enabled()
         except Exception as e:
-            logger.error("Error fetching from sources: %s", e)
+            logger.exception("Error fetching from sources")
             return {
                 "success": False,
                 "codes_found": 0,
@@ -564,8 +576,8 @@ class Scheduler:
 
         # Process results
         for source_name, codes in results.items():
-            for code in codes:
-                code = code.strip()
+            for raw in codes:
+                code = raw.strip()
                 if not code:
                     continue
 
@@ -584,7 +596,9 @@ class Scheduler:
                             # Log redemption per account
                             for acc in redeem_accounts:
                                 try:
-                                    from src.constants import GAME_CONF
+                                    from src.constants import (
+                                        GAME_CONF,
+                                    )
 
                                     acc_game = acc.get("game") or "genshin"
                                     gconf = GAME_CONF.get(acc_game, GAME_CONF["genshin"])
@@ -645,24 +659,23 @@ class Scheduler:
                                         except Exception:
                                             pass
                                 except Exception as e:
-                                    logger.error(
-                                        "Error redeeming code %s for %s: %s",
+                                    logger.exception(
+                                        "Error redeeming code %s for %s",
                                         code[:4] + "****",
                                         acc["name"],
-                                        e,
                                     )
                                     errors.append(
                                         f"Redemption error for {code[:4]}**** ({acc['name']}): {e}"
                                     )
                                 await asyncio.sleep(gap)
                         except Exception as e:
-                            logger.error("Error redeeming code %s: %s", code[:4] + "****", e)
+                            logger.exception("Error redeeming code %s", code[:4] + "****")
                             errors.append(f"Redemption error for {code[:4]}****: {e}")
 
                 except sqlite3.IntegrityError:
                     continue
                 except Exception as e:
-                    logger.error("Error storing code %s: %s", code[:4] + "****", e)
+                    logger.exception("Error storing code %s", code[:4] + "****")
                     errors.append(f"Storage error for {code[:4]}****: {e}")
 
         if new_codes:
@@ -707,7 +720,9 @@ class Scheduler:
                 # Log redemption per account
                 for acc in redeem_accounts:
                     try:
-                        from src.constants import GAME_CONF
+                        from src.constants import (
+                            GAME_CONF,
+                        )
 
                         acc_game = acc.get("game") or "genshin"
                         gconf = GAME_CONF.get(acc_game, GAME_CONF["genshin"])
@@ -768,18 +783,17 @@ class Scheduler:
                             except Exception:
                                 pass
                     except Exception as e:
-                        logger.error(
-                            "Error redeeming code %s for %s: %s",
+                        logger.exception(
+                            "Error redeeming code %s for %s",
                             code[:4] + "****",
                             acc["name"],
-                            e,
                         )
                         errors.append(
                             f"Redemption error for {code[:4]}**** ({acc['name']}): {e}"
                         )
                     await asyncio.sleep(gap)
             except Exception as e:
-                logger.error("Error redeeming code %s: %s", code[:4] + "****", e)
+                logger.exception("Error redeeming code %s", code[:4] + "****")
                 errors.append(f"Redemption error for {code[:4]}****: {e}")
 
         return codes_redeemed, errors

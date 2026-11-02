@@ -49,13 +49,14 @@ class Redeemer:
         "Chrome/120.0.0.0 Safari/537.36"
     )
     DEFAULT_REFERER = "https://webstatic-sea.mihoyo.com/"
+    DEFAULT_TIMEOUT_SECONDS: float = 30.0
 
     def __init__(
         self,
         endpoint: str | None = None,
         user_agent: str | None = None,
         referer: str | None = None,
-        timeout: float = 30.0,
+        timeout: float = DEFAULT_TIMEOUT_SECONDS,
     ) -> None:
         """Initialize the Redeemer client.
 
@@ -143,7 +144,7 @@ class Redeemer:
             "x-rpc-client_type": "4",
         }
 
-    def _build_form_data(
+    def _build_form_data(  # noqa: PLR0913 -- 6 form fields mirror the API's query params
         self,
         code: str,
         uid: str,
@@ -174,7 +175,7 @@ class Redeemer:
             "sLangKey": s_lang_key,
         }
 
-    def _parse_response(self, data: dict[str, Any]) -> RedemptionResult:
+    def _parse_response(self, data: dict[str, Any]) -> RedemptionResult:  # noqa: C901 -- response shape varies (dict/list/absent); keep the classification inline
         """Parse Hoyolab API response into RedemptionResult.
 
         Hoyolab API response format:
@@ -233,7 +234,7 @@ class Redeemer:
             raw_response=data,
         )
 
-    async def redeem_code(
+    async def redeem_code(  # noqa: PLR0913 -- mirrors the Hoyolab API's own query surface (game selects the endpoint)
         self,
         code: str,
         cookies: dict[str, str],
@@ -265,7 +266,9 @@ class Redeemer:
             aiohttp.ClientError: On network/connection errors.
             ValueError: If required cookies are missing.
         """
-        from src.constants import GAME_CONF
+        from src.constants import (
+            GAME_CONF,
+        )
 
         # Validate required cookies first
         required_cookies = ["ltuid", "ltoken"]
@@ -284,7 +287,7 @@ class Redeemer:
             code, cookies, uid, region, resolved_biz, lang, s_lang_key, endpoint
         )
 
-    async def _redeem_get(
+    async def _redeem_get(  # noqa: PLR0913 -- internal helper, params mirror the redemption request fields
         self,
         code: str,
         cookies: dict[str, str],
@@ -344,14 +347,14 @@ class Redeemer:
             # (pure connection errors) mypy-clean.
             status = getattr(e, "status", None)
             if status is not None:
-                logger.error("HTTP error redeeming code %s: %s", code[:4] + "****", e)
+                logger.exception("HTTP error redeeming code %s", code[:4] + "****")
                 return RedemptionResult(
                     success=False,
                     reward="",
                     message=f"HTTP {status}: {getattr(e, 'message', '')}",
                     raw_response={"retcode": -1, "message": str(e), "data": {}},
                 )
-            logger.error("Network error redeeming code %s: %s", code[:4] + "****", e)
+            logger.exception("Network error redeeming code %s", code[:4] + "****")
             return RedemptionResult(
                 success=False,
                 reward="",
@@ -367,7 +370,7 @@ class Redeemer:
                 raw_response={"retcode": -1, "message": str(e), "data": {}},
             )
 
-    async def _redeem_risk(
+    async def _redeem_risk(  # noqa: PLR0913 -- internal helper, params mirror the redemption request fields
         self,
         code: str,
         cookies: dict[str, str],
@@ -375,7 +378,7 @@ class Redeemer:
         region: str,
         conf: dict[str, str],
         lang: str,
-        s_lang_key: str,
+        s_lang_key: str,  # noqa: ARG002 -- accepted for signature symmetry with _redeem_get; risk payload has no sLangKey field
         endpoint: str | None = None,
     ) -> RedemptionResult:
         """Redeem via POST webExchangeCdkeyRisk (ZZZ)."""
@@ -410,14 +413,14 @@ class Redeemer:
             # (pure connection errors) mypy-clean.
             status = getattr(e, "status", None)
             if status is not None:
-                logger.error("HTTP error redeeming ZZZ code %s: %s", code[:4] + "****", e)
+                logger.exception("HTTP error redeeming ZZZ code %s", code[:4] + "****")
                 return RedemptionResult(
                     success=False,
                     reward="",
                     message=f"HTTP {status}: {getattr(e, 'message', '')}",
                     raw_response={"retcode": -1, "message": str(e), "data": {}},
                 )
-            logger.error("Network error redeeming ZZZ code %s: %s", code[:4] + "****", e)
+            logger.exception("Network error redeeming ZZZ code %s", code[:4] + "****")
             return RedemptionResult(
                 success=False,
                 reward="",

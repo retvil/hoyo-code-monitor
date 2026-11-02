@@ -15,6 +15,7 @@ from typing import Any, ClassVar
 
 from src.constants import MIN_REDEMPTION_GAP
 from src.exceptions import ConfigError
+from src.paths import default_config_path
 
 try:
     import tomllib  # Python 3.11+
@@ -34,7 +35,9 @@ except ImportError:
 
 def _default(fn_name: str) -> str:
     """Lazy default from src.paths (keeps import graph acyclic)."""
-    from importlib import import_module
+    from importlib import (
+        import_module,
+    )
 
     return str(getattr(import_module("src.paths"), fn_name)())
 
@@ -90,8 +93,6 @@ class ConfigManager:
 
     def __init__(self, config_path: str | Path | None = None) -> None:
         if config_path is None:
-            from src.paths import default_config_path
-
             config_path = os.environ.get("CONFIG_PATH", default_config_path())
         self.config_path = Path(config_path)
         self._settings = Settings()
@@ -184,57 +185,73 @@ class ConfigManager:
             self._validate_value(key, getattr(self._settings, key))
 
     def _validate_value(self, key: str, value: Any) -> None:
-        if key == "poll_interval_seconds":
-            if not isinstance(value, int) or value <= 0:
-                raise ConfigError(f"poll_interval_seconds must be a positive integer, got: {value}")  # noqa: TRY003 -- validation message needs interpolation
-        elif key == "source_timeout_seconds":
-            if not isinstance(value, int) or value <= 0:
-                raise ConfigError(  # noqa: TRY003 -- validation message needs interpolation
-                    f"source_timeout_seconds must be a positive integer, got: {value}"
-                )
-        elif key == "redemption_enabled":
-            if not isinstance(value, bool):
-                raise ConfigError(f"redemption_enabled must be a boolean, got: {value}")  # noqa: TRY003 -- validation message needs interpolation
-        elif key == "redemption_min_gap_seconds":
-            if not isinstance(value, int) or value < MIN_REDEMPTION_GAP:
-                raise ConfigError(  # noqa: TRY003 -- validation message needs interpolation
-                    f"redemption_min_gap_seconds must be >= {MIN_REDEMPTION_GAP}, got: {value}"
-                )
-        elif key == "max_retry_attempts":
-            if not isinstance(value, int) or value < 0:
-                raise ConfigError(  # noqa: TRY003 -- validation message needs interpolation
-                    f"max_retry_attempts must be a non-negative integer, got: {value}"
-                )
-        elif key == "retry_backoff_seconds":
-            if not isinstance(value, list) or not all(isinstance(x, int) and x > 0 for x in value):
-                raise ConfigError(  # noqa: TRY003 -- validation message needs interpolation
-                    f"retry_backoff_seconds must be a list of positive integers, got: {value}"
-                )
-        elif key == "heartbeat_seconds":
-            if not isinstance(value, int) or value <= 0:
-                raise ConfigError(f"heartbeat_seconds must be a positive integer, got: {value}")  # noqa: TRY003 -- validation message needs interpolation
-        elif key == "heartbeat_timeout_seconds":
-            if not isinstance(value, int) or value <= 0:
-                raise ConfigError(  # noqa: TRY003 -- validation message needs interpolation
-                    f"heartbeat_timeout_seconds must be a positive integer, got: {value}"
-                )
-        elif key == "db_path":
-            if not isinstance(value, str) or not value.strip():
-                raise ConfigError(f"db_path must be a non-empty string, got: {value}")  # noqa: TRY003 -- validation message needs interpolation
-        elif key == "log_level":
-            if not isinstance(value, str) or value.upper() not in self.VALID_LOG_LEVELS:
-                raise ConfigError(f"log_level must be one of {self.VALID_LOG_LEVELS}, got: {value}")  # noqa: TRY003 -- validation message needs interpolation
-        elif key == "log_file":
-            if not isinstance(value, str) or not value.strip():
-                raise ConfigError(f"log_file must be a non-empty string, got: {value}")  # noqa: TRY003 -- validation message needs interpolation
-        elif key == "update_check_enabled":
-            if not isinstance(value, bool):
-                raise ConfigError(f"update_check_enabled must be a boolean, got: {value}")  # noqa: TRY003 -- validation message needs interpolation
-        elif key == "max_log_size":
-            if not isinstance(value, int) or value <= 0:
-                raise ConfigError(f"max_log_size must be a positive integer, got: {value}")  # noqa: TRY003 -- validation message needs interpolation
-        elif key == "backup_count" and (not isinstance(value, int) or value < 0):
-            raise ConfigError(f"backup_count must be a non-negative integer, got: {value}")  # noqa: TRY003 -- validation message needs interpolation
+        # (checker, error message) per key; one entry per validated setting.
+        checkers: dict[str, tuple[Any, str]] = {
+            "poll_interval_seconds": (
+                lambda v: isinstance(v, int) and v > 0,
+                "poll_interval_seconds must be a positive integer",
+            ),
+            "source_timeout_seconds": (
+                lambda v: isinstance(v, int) and v > 0,
+                "source_timeout_seconds must be a positive integer",
+            ),
+            "redemption_enabled": (
+                lambda v: isinstance(v, bool),
+                "redemption_enabled must be a boolean",
+            ),
+            "redemption_min_gap_seconds": (
+                lambda v: isinstance(v, int) and v >= MIN_REDEMPTION_GAP,
+                f"redemption_min_gap_seconds must be >= {MIN_REDEMPTION_GAP}",
+            ),
+            "max_retry_attempts": (
+                lambda v: isinstance(v, int) and v >= 0,
+                "max_retry_attempts must be a non-negative integer",
+            ),
+            "retry_backoff_seconds": (
+                lambda v: isinstance(v, list) and all(isinstance(x, int) and x > 0 for x in v),
+                "retry_backoff_seconds must be a list of positive integers",
+            ),
+            "heartbeat_seconds": (
+                lambda v: isinstance(v, int) and v > 0,
+                "heartbeat_seconds must be a positive integer",
+            ),
+            "heartbeat_timeout_seconds": (
+                lambda v: isinstance(v, int) and v > 0,
+                "heartbeat_timeout_seconds must be a positive integer",
+            ),
+            "db_path": (
+                lambda v: isinstance(v, str) and bool(v.strip()),
+                "db_path must be a non-empty string",
+            ),
+            "log_level": (
+                lambda v: isinstance(v, str) and v.upper() in self.VALID_LOG_LEVELS,
+                f"log_level must be one of {self.VALID_LOG_LEVELS}",
+            ),
+            "log_file": (
+                lambda v: isinstance(v, str) and bool(v.strip()),
+                "log_file must be a non-empty string",
+            ),
+            "update_check_enabled": (
+                lambda v: isinstance(v, bool),
+                "update_check_enabled must be a boolean",
+            ),
+            "max_log_size": (
+                lambda v: isinstance(v, int) and v > 0,
+                "max_log_size must be a positive integer",
+            ),
+            "backup_count": (
+                lambda v: isinstance(v, int) and v >= 0,
+                "backup_count must be a non-negative integer",
+            ),
+        }
+        entry = checkers.get(key)
+        if entry is None:
+            return
+        check, message = entry
+        if not check(value):
+            raise ConfigError(  # noqa: TRY003 -- validation message needs interpolation
+                f"{message}, got: {value}"
+            )
 
     def reset_to_defaults(self) -> None:
         with self._lock:
@@ -242,22 +259,23 @@ class ConfigManager:
             self.save()
 
 
-_config_manager: ConfigManager | None = None
+# Mutable container instead of a module global: avoids `global` statements
+# (ruff PLW0603) while keeping the same singleton semantics.
+_config_manager: list[ConfigManager | None] = [None]
 _config_lock = threading.Lock()
 
 
 def get_config_manager(config_path: str | Path | None = None) -> ConfigManager:
-    global _config_manager
     with _config_lock:
-        if _config_manager is None:
-            _config_manager = ConfigManager(config_path)
-        return _config_manager
+        if _config_manager[0] is None:
+            _config_manager[0] = ConfigManager(config_path)
+        assert _config_manager[0] is not None
+        return _config_manager[0]
 
 
 def reset_config_manager() -> None:
-    global _config_manager
     with _config_lock:
-        _config_manager = None
+        _config_manager[0] = None
 
 
 # --- Backward compatibility aliases (to be removed in later todos) ---

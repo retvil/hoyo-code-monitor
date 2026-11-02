@@ -6,6 +6,7 @@ _normalize (auth-cookie picking + _v2 aliasing + junk filtering).
 
 from unittest.mock import patch
 
+from src.config import ConfigManager
 from src.cookies_login import (
     SKIP_EXACT,
     SKIP_PREFIXES,
@@ -23,17 +24,11 @@ def _with_config(raw: dict | None, *, error: bool = False):
     if error:
         return patch(
             _CFG_TARGET,
-            side_effect=lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")),
+            side_effect=lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("boom")),
         )
     return patch.object(
-        _get_cfg_class(), "get_all", return_value=raw, autospec=True
+        ConfigManager, "get_all", return_value=raw, autospec=True
     )
-
-
-def _get_cfg_class():
-    from src.config import ConfigManager
-
-    return ConfigManager
 
 
 class TestCookieSkipFilters:

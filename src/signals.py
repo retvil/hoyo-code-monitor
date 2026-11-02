@@ -60,12 +60,13 @@ class GracefulShutdown:
 
         logger.debug("Signal handlers registered for graceful shutdown")
 
-    def _signal_handler(self, signum: int, frame: Any) -> None:
+    def _signal_handler(self, signum: int, _frame: Any) -> None:
         """Signal handler that schedules shutdown on the event loop.
 
         This is called from the signal context, so it must be async-safe.
         We use call_soon_threadsafe to schedule the actual shutdown logic
-        on the event loop thread.
+        on the event loop thread. The ``_frame`` parameter is part of the
+        signal.signal callback signature and is intentionally unused.
         """
         if self._shutdown_requested:
             # Force exit on second signal
@@ -105,8 +106,8 @@ class GracefulShutdown:
             await self._run_cleanup_callbacks()
 
             logger.info("Graceful shutdown completed")
-        except Exception as e:
-            logger.exception("Error during graceful shutdown: %s", e)
+        except Exception:
+            logger.exception("Error during graceful shutdown")
         finally:
             self._shutdown_complete.set()
 
@@ -137,8 +138,8 @@ class GracefulShutdown:
                 await asyncio.to_thread(self.scheduler.shutdown, True)
 
             logger.info("Scheduler stopped")
-        except Exception as e:
-            logger.exception("Error stopping scheduler: %s", e)
+        except Exception:
+            logger.exception("Error stopping scheduler")
 
     async def _run_cleanup_callbacks(self) -> None:
         """Execute all registered cleanup callbacks."""
@@ -149,9 +150,8 @@ class GracefulShutdown:
                 result = callback()
                 if asyncio.iscoroutine(result):
                     await result
-            except Exception as e:
-                callback_name = getattr(callback, "__name__", str(callback))
-                logger.exception("Error in cleanup callback %s: %s", callback_name, e)
+            except Exception:
+                logger.exception("Error in cleanup callback %s", callback_name)
 
     def _force_exit(self) -> None:
         """Force immediate exit (called on second signal)."""

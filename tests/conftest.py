@@ -1,9 +1,9 @@
 """Shared pytest fixtures for HoYo Code Monitor tests."""
 
 import gc
-import os
 import tempfile
 import time
+from pathlib import Path
 
 import pytest
 
@@ -21,15 +21,15 @@ def temp_db() -> str:
         db_path = f.name
     yield db_path
     gc.collect()
-    if os.path.exists(db_path):
+    if Path(db_path).exists():
         for _ in range(10):
             try:
-                os.unlink(db_path)
+                Path(db_path).unlink()
                 break
             except PermissionError:
                 time.sleep(0.25)
         else:
-            os.unlink(db_path)
+            Path(db_path).unlink()
 
 
 @pytest.fixture

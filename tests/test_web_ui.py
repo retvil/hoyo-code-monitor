@@ -27,18 +27,22 @@ def temp_db() -> str:
 
 @pytest.fixture
 def client(temp_db: str, monkeypatch) -> TestClient:
-    from src import web_ui
-    from src.scheduler import SchedulerStatus
+    from src import (
+        web_ui,
+    )
+    from src.scheduler import (
+        SchedulerStatus,
+    )
 
     async def _mock_seed(*_args, **_kwargs):
         return None
 
-    monkeypatch.setattr(web_ui, "Storage", lambda *a, **k: Storage(temp_db))
+    monkeypatch.setattr(web_ui, "Storage", lambda *_a, **_k: Storage(temp_db))
     monkeypatch.setattr(web_ui, "seed_default_sources", _mock_seed)
     monkeypatch.setattr(
         web_ui,
         "create_scheduler_from_storage",
-        lambda storage: __import__("unittest.mock").MagicMock(status=SchedulerStatus()),
+        lambda _storage: __import__("unittest.mock").MagicMock(status=SchedulerStatus()),
     )
     web_ui.scheduler = None
     return TestClient(web_ui.app, raise_server_exceptions=False)
@@ -151,10 +155,10 @@ class TestImportExportApi:
 
         target_db = tempfile.NamedTemporaryFile(suffix=".db", delete=False).name
         try:
-            from src import web_ui
+            from src import web_ui  # noqa: PLC0415 -- test-local import kept near its use
 
             original_storage = web_ui.Storage
-            web_ui.Storage = lambda *a, **k: Storage(target_db)
+            web_ui.Storage = lambda *_a, **_k: Storage(target_db)
             imported = client.post("/import", data={"payload": json.dumps(payload)})
             assert imported.status_code == 200
             assert "Imported 1" in imported.json()["result"]
@@ -227,7 +231,9 @@ class TestMiscApi:
         assert r.json()[0]["status"] == "idle"
 
     def test_redeem_single_mocked(self, client: TestClient, temp_db: str) -> None:
-        from src.redeemer import RedemptionResult
+        from src.redeemer import (
+            RedemptionResult,
+        )
 
         s = Storage(temp_db)
         s.add_account("ra", "1", "os_usa")

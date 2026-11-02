@@ -268,7 +268,9 @@ def _update_check_enabled() -> bool:
     the banner for unrelated reasons.
     """
     try:
-        from src.config import ConfigManager
+        from src.config import (
+            ConfigManager,
+        )
 
         return bool(ConfigManager().get("update_check_enabled", True))
     except Exception:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import hmac
+import io
 import json
 import logging
 import os
@@ -28,7 +29,7 @@ from src.constants import (
 from src.http_session import close_all as close_http_sessions
 from src.http_session import get_session
 from src.i18n import get_lang, make_t
-from src.scheduler import create_scheduler_from_storage
+from src.scheduler import Scheduler, create_scheduler_from_storage
 from src.sources import SourceConfig, SourceFetcher, seed_default_sources
 from src.storage import Storage
 from src.templates import templates
@@ -55,8 +56,29 @@ _TEST_RATE_LIMIT_TTL_SECONDS = 60.0
 _test_rate_limit: dict[str, float] = {}
 _RATE_LIMIT_SECONDS = 5.0
 
-# Global scheduler instance
-scheduler = None
+# Global scheduler instance, held in a mutable container instead of a module
+# global: rebinding `scheduler` directly would trip ruff PLW0602/PLW0603, so
+# the *internal* rebinds in the routes below go through `_set_scheduler`,
+# which mirrors the value onto the module attribute in the same call. The
+# module attribute remains the source of truth for *external* writers
+# (cli.py's tray mode and tests' direct `web_ui.scheduler = ...` assignment),
+# and `_get_scheduler` reads that same live attribute so those external sets
+# are honored — without reintroducing a bare `global` statement.
+_scheduler_box: list[Any] = [None]
+
+scheduler: Scheduler | None = None
+
+
+def _get_scheduler() -> Any:
+    """Read the live scheduler (the module attribute, kept in sync by external sets)."""
+    return scheduler  # noqa: F821 -- assigned at module scope above, rebased via _set_scheduler
+
+
+def _set_scheduler(value: Any) -> None:
+    """Replace the live scheduler, keeping the container and module attribute in sync."""
+    _scheduler_box[0] = value
+    globals()["scheduler"] = value
+
 
 # CSRF protection: state-changing routes require a valid X-CSRF-Token header.
 #
@@ -146,8 +168,7 @@ async def _prime_update_cache() -> None:
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    global scheduler
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:  # noqa: ARG001 -- FastAPI lifespan contract requires the app param
     # Startup
 
     # Seed sources first so the UI is never empty before the first cycle.
@@ -158,8 +179,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # Tray mode injects its own already-running scheduler; only create one
     # when standalone (otherwise the dashboard would show a dead scheduler).
-    if scheduler is None:
-        scheduler = create_scheduler_from_storage()
+    if _get_scheduler() is None:
+        _set_scheduler(create_scheduler_from_storage())
 
     # Prime the update cache in the background so the first page render reads
     # a warm cache instead of paying for a GitHub round-trip. Deliberately not
@@ -168,8 +189,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     yield
     # Shutdown
-    if scheduler and scheduler.is_running():
-        scheduler.stop()
+    sched = _get_scheduler()
+    if sched and sched.is_running():
+        sched.stop()
     # Release every pooled aiohttp session. Components borrow rather than own
     # their sessions, so nothing else closes them; skipping this leaks a
     # connection pool (and its sockets) per event loop at shutdown.
@@ -265,21 +287,27 @@ async def csrf_token(request: Request) -> JSONResponse:
 @app.post("/language")
 async def set_language(language: str = Form(...)) -> dict[str, Any]:
     """Set UI language (en, ru, de, fr, ja, zh)."""
-    from src.i18n import set_lang
+    from src.i18n import (
+        set_lang,
+    )
 
     storage = Storage()
     try:
         set_lang(storage, language)
-        return {"success": True, "language": language}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=_safe_detail(e)) from e
+    else:
+        return {"success": True, "language": language}
 
 
 # Routes
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request, game: str = "") -> HTMLResponse:
     """Main dashboard (variant C: game summary cards + filter)."""
-    from src.constants import GAME_CONF, GAMES
+    from src.constants import (  # noqa: PLC0415 -- circular import: constants consumed across app; break the cycle here
+        GAME_CONF,
+        GAMES,
+    )
 
     storage = Storage()
     config_manager = ConfigManager()
@@ -366,7 +394,7 @@ async def sources_page(request: Request) -> HTMLResponse:
 
 
 @app.post("/sources")
-async def create_source(
+async def create_source(  # noqa: PLR0913 -- form-data route: 13 fields mirror storage.add_source
     name: str = Form(...),
     url: str = Form(...),
     selector_type: str = Form("css"),
@@ -380,7 +408,7 @@ async def create_source(
     browser_wait_seconds: int = Form(5),
     max_retries: int = Form(3),
     retry_base_delay: float = Form(1.0),
-    game: str = Form("genshin"),
+    game: str = Form("genshin"),  # noqa: ARG001 -- accepted for form symmetry with the game-aware UI; passed through to storage.add_source
 ) -> dict[str, Any]:
     """Create a new source (accepts form-data from HTMX modal)."""
     storage = Storage()
@@ -403,12 +431,14 @@ async def create_source(
             browser_wait_seconds=browser_wait_seconds,
             max_retries=max_retries,
             retry_base_delay=retry_base_delay,
+            game=game,
         )
-        return {"success": True, "message": f"Source '{name}' created"}
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=_safe_detail(e)) from e
+    else:
+        return {"success": True, "message": f"Source '{name}' created"}
 
 
 @app.post("/sources/{name}/enable")
@@ -507,7 +537,7 @@ async def accounts_page(request: Request) -> HTMLResponse:
 
 
 @app.post("/accounts")
-async def create_account(
+async def create_account(  # noqa: PLR0913 -- form-data route: 7 fields mirror storage.add_account
     name: str = Form(...),
     uid: str = Form(...),
     region: str = Form(...),
@@ -517,7 +547,9 @@ async def create_account(
     game: str = Form("genshin"),
 ) -> dict[str, Any]:
     """Create a new account (accepts form-data from HTMX modal)."""
-    from src.constants import GAMES
+    from src.constants import (
+        GAMES,
+    )
 
     storage = Storage()
     if game not in GAMES:
@@ -532,9 +564,10 @@ async def create_account(
             s_lang_key=s_lang_key,
             game=game,
         )
-        return {"success": True, "message": f"Account '{name}' created"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=_safe_detail(e)) from e
+    else:
+        return {"success": True, "message": f"Account '{name}' created"}
 
 
 @app.post("/accounts/{name}/cookies")
@@ -556,7 +589,9 @@ async def set_account_cookies(name: str, cookies: str = Form(...)) -> dict[str, 
 @app.post("/accounts/{name}/login")
 async def login_account(name: str, timeout: int = 300) -> dict[str, Any]:
     """Auto-capture cookies via browser login (opens browser on this PC)."""
-    from src.cookies_login import capture_cookies
+    from src.cookies_login import (
+        capture_cookies,
+    )
 
     storage = Storage()
     existing = storage.get_account(name)
@@ -611,9 +646,10 @@ async def delete_account(name: str) -> dict[str, Any]:
     storage = Storage()
     try:
         storage.delete_account(name)
-        return {"success": True}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=_safe_detail(e))
+        raise HTTPException(status_code=400, detail=_safe_detail(e)) from e
+    else:
+        return {"success": True}
 
 
 @app.get("/config", response_class=HTMLResponse)
@@ -636,7 +672,7 @@ async def config_page(request: Request) -> HTMLResponse:
 
 
 @app.post("/config")
-async def update_config(
+async def update_config(  # noqa: PLR0913 -- form-data route: 8 config fields mirror ConfigManager keys
     poll_interval_seconds: int = Form(900),
     source_timeout_seconds: int = Form(30),
     redemption_min_gap_seconds: int = Form(8),
@@ -661,15 +697,18 @@ async def update_config(
         }
         for key, value in values.items():
             config_manager.set(key, value)
-        return {"success": True, "message": "Settings saved"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=_safe_detail(e)) from e
+    else:
+        return {"success": True, "message": "Settings saved"}
 
 
 @app.get("/author", response_class=HTMLResponse)
 async def author_page(request: Request) -> HTMLResponse:
     """Author page with contacts and support options."""
-    from src import author as author_module
+    from src import (
+        author as author_module,
+    )
 
     storage = Storage()
     raw = author_module.as_dict()
@@ -711,7 +750,9 @@ async def author_page(request: Request) -> HTMLResponse:
 @app.get("/author/qr")
 async def author_qr(kind: str = "bitcoin") -> Response:
     """QR code PNG for a crypto address (generated locally, no external calls)."""
-    from src import author as author_module
+    from src import (
+        author as author_module,
+    )
 
     data = author_module.as_dict()
     key = {
@@ -726,10 +767,9 @@ async def author_qr(kind: str = "bitcoin") -> Response:
     if not address:
         raise HTTPException(status_code=404, detail="Address not set")
     try:
-        import qrcode
+        import qrcode  # noqa: PLC0415 -- optional dependency; keep QR generation off module import time
     except ImportError as e:
         raise HTTPException(status_code=503, detail="qrcode lib not installed") from e
-    import io
 
     img = qrcode.make(address)
     buf = io.BytesIO()
@@ -740,50 +780,57 @@ async def author_qr(kind: str = "bitcoin") -> Response:
 @app.post("/scheduler/start")
 async def start_scheduler() -> dict[str, Any]:
     """Start the scheduler."""
-    global scheduler
-    if not scheduler:
-        scheduler = create_scheduler_from_storage()
+    if not _get_scheduler():
+        _set_scheduler(create_scheduler_from_storage())
+    sched = _get_scheduler()
     try:
-        if scheduler.start():
-            return {"success": True, "message": "Scheduler started"}
-        return {"success": False, "message": "Scheduler already running"}
+        if sched.start():
+            result = {"success": True, "message": "Scheduler started"}
+        else:
+            result = {"success": False, "message": "Scheduler already running"}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=_safe_detail(e))
+        raise HTTPException(status_code=400, detail=_safe_detail(e)) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=_safe_detail(e))
+        raise HTTPException(status_code=500, detail=_safe_detail(e)) from e
+    else:
+        return result
 
 
 @app.post("/scheduler/stop")
 async def stop_scheduler() -> dict[str, Any]:
     """Stop the scheduler."""
-    global scheduler
-    if not scheduler:
+    sched = _get_scheduler()
+    if not sched:
         return {"success": False, "message": "Scheduler not initialized"}
     try:
-        if scheduler.stop():
-            return {"success": True, "message": "Scheduler stopped"}
-        return {"success": False, "message": "Scheduler not running or timeout"}
+        if sched.stop():
+            result = {"success": True, "message": "Scheduler stopped"}
+        else:
+            result = {"success": False, "message": "Scheduler not running or timeout"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=_safe_detail(e))
+        raise HTTPException(status_code=500, detail=_safe_detail(e)) from e
+    else:
+        return result
 
 
 @app.post("/scheduler/run-once")
 async def run_once() -> dict[str, Any]:
     """Run a single check cycle."""
-    global scheduler
-    if not scheduler:
-        scheduler = create_scheduler_from_storage()
+    if not _get_scheduler():
+        _set_scheduler(create_scheduler_from_storage())
+    sched = _get_scheduler()
     try:
-        result = scheduler.run_once()
-        return {"success": True, "result": result}
+        result = sched.run_once()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=_safe_detail(e))
+        raise HTTPException(status_code=500, detail=_safe_detail(e)) from e
+    else:
+        return {"success": True, "result": result}
 
 
 @app.get("/api/status")
 async def api_status() -> dict[str, Any]:
     """Get scheduler status as JSON."""
-    global scheduler
+    scheduler = _get_scheduler()
     if not scheduler:
         return {"running": False}
     status = scheduler.status
@@ -878,7 +925,7 @@ def _safe_scheduler_status() -> dict[str, Any]:
         return {"state": "missing"}
     try:
         status = scheduler.status
-        return {
+        result = {
             "state": "running" if status.running else "stopped",
             "last_run": status.last_run,
             "next_run": status.next_run,
@@ -892,6 +939,8 @@ def _safe_scheduler_status() -> dict[str, Any]:
         }
     except Exception as exc:  # pragma: no cover - defensive
         return {"state": "error", "error": str(exc)}
+    else:
+        return result
 
 
 @app.get("/partials/health", response_class=HTMLResponse)
@@ -959,7 +1008,9 @@ async def toggle_account_checkin(name: str) -> str:
 @app.get("/accounts/{name}/games", response_class=HTMLResponse)
 async def account_games_state(name: str) -> str:
     """Current per-account enabled-games checkboxes HTML (for initial load)."""
-    from src.constants import GAMES
+    from src.constants import (
+        GAMES,
+    )
 
     storage = Storage()
     if not storage.get_account(name):
@@ -970,7 +1021,9 @@ async def account_games_state(name: str) -> str:
 @app.post("/accounts/{name}/games", response_class=HTMLResponse)
 async def account_games_update(name: str, request: Request) -> str:
     """Update per-account enabled-games filter from the checkbox group."""
-    from src.constants import GAMES
+    from src.constants import (
+        GAMES,
+    )
 
     storage = Storage()
     if not storage.get_account(name):
@@ -1048,11 +1101,11 @@ async def checkins_page(request: Request) -> HTMLResponse:
 @app.post("/checkins/run-now")
 async def run_checkins_now() -> dict[str, Any]:
     """Run a daily check-in pass immediately (blocking work runs in a thread)."""
-    global scheduler  # noqa: PLW0603 -- mirrors scheduler start/stop/run-once routes
-    if not scheduler:
-        scheduler = create_scheduler_from_storage()
+    if not _get_scheduler():
+        _set_scheduler(create_scheduler_from_storage())
+    sched = _get_scheduler()
     try:
-        result = await asyncio.to_thread(scheduler.run_checkins_now)
+        result = await asyncio.to_thread(sched.run_checkins_now)
     except Exception as e:
         raise HTTPException(status_code=500, detail=_safe_detail(e)) from e
     else:
@@ -1119,9 +1172,11 @@ async def api_checkins_status() -> dict[str, Any]:
 @app.get("/api/checkins/progress")
 async def api_checkins_progress() -> dict[str, Any]:
     """Current check-in pass progress (empty dict when idle)."""
+    scheduler = _get_scheduler()
     if scheduler is None:
         return {}
-    return scheduler.get_checkin_progress()
+    progress: dict[str, Any] = scheduler.get_checkin_progress()
+    return progress
 
 
 @app.get("/partials/checkin-progress")
@@ -1129,6 +1184,7 @@ async def partial_checkin_progress(request: Request) -> HTMLResponse:
     """HTMX partial for live check-in progress (empty when idle)."""
     storage = Storage()
     progress: dict[str, Any] = {}
+    scheduler = _get_scheduler()
     if scheduler is not None:
         progress = scheduler.get_checkin_progress()
     return templates.TemplateResponse(
@@ -1141,9 +1197,9 @@ async def partial_checkin_progress(request: Request) -> HTMLResponse:
 @app.post("/codes/{code}/redeem")
 async def redeem_single_code(code: str) -> dict[str, Any]:
     """Redeem one code for all accounts with auto-redeem ON."""
-    import asyncio
-
-    from src.redeemer import Redeemer
+    from src.redeemer import (
+        Redeemer,
+    )
 
     storage = Storage()
     row = storage.get_code(code.strip()) or storage.get_code(code.strip().upper())
@@ -1161,7 +1217,9 @@ async def redeem_single_code(code: str) -> dict[str, Any]:
         for acc in accounts:
             cookies = storage.load_account_cookies(acc["name"])
             try:
-                from src.constants import GAME_CONF as _GC
+                from src.constants import (
+                    GAME_CONF as _GC,
+                )
 
                 _ag = acc.get("game") or "genshin"
                 res = await redeemer.redeem_code(
@@ -1211,9 +1269,9 @@ async def cleanup_dead() -> dict[str, Any]:
 @app.post("/redeem/all")
 async def redeem_all_codes() -> dict[str, Any]:
     """Redeem all unredeemed, non-expired codes for accounts with auto-redeem ON."""
-    import asyncio
-
-    from src.redeemer import Redeemer
+    from src.redeemer import (
+        Redeemer,
+    )
 
     storage = Storage()
     accounts = [a for a in storage.list_accounts() if storage.is_account_redeem_enabled(a["name"])]
@@ -1236,7 +1294,9 @@ async def redeem_all_codes() -> dict[str, Any]:
             for acc in matched:
                 cookies = storage.load_account_cookies(acc["name"])
                 try:
-                    from src.constants import GAME_CONF as _GC2
+                    from src.constants import (
+                        GAME_CONF as _GC2,
+                    )
 
                     _ag2 = acc.get("game") or "genshin"
                     res = await redeemer.redeem_code(
@@ -1331,12 +1391,13 @@ async def import_data(payload: str = Form(...)) -> dict[str, Any]:
 @app.get("/metrics")
 async def metrics() -> Response:
     """Prometheus metrics endpoint."""
-    from src.logging_setup import get_prometheus_metrics
+    from src.logging_setup import (
+        get_prometheus_metrics,
+    )
 
     metrics_data = get_prometheus_metrics()
     if metrics_data is None:
         raise HTTPException(status_code=503, detail="Prometheus client not available")
-    from fastapi.responses import Response
 
     return Response(content=metrics_data, media_type="text/plain")
 
@@ -1344,7 +1405,7 @@ async def metrics() -> Response:
 @app.get("/partials/scheduler-status")
 async def partial_scheduler_status(request: Request) -> HTMLResponse:
     """HTMX partial for scheduler status."""
-    global scheduler
+    scheduler = _get_scheduler()
     storage = Storage()
     lang = get_lang(storage)
     t_func = make_t(lang)
@@ -1387,7 +1448,7 @@ async def partial_sparkline(request: Request) -> HTMLResponse:
     area = f"{pad},{h - pad} " + polyline + f" {w - pad},{h - pad}"
     bars = "".join(
         f"<circle cx='{x}' cy='{y}' r='2.5' fill='var(--accent)'><title>{d['day']}: {d['count']}</title></circle>"
-        for (x, y), d in zip((p.split(",") for p in pts), data)
+        for (x, y), d in zip((p.split(",") for p in pts), data, strict=True)
     )
     svg = (
         f"<svg viewBox='0 0 {w} {h}' style='width: 100%; height: auto;' role='img' "
@@ -1426,7 +1487,7 @@ PAGE_SIZE = 20
 
 
 @app.get("/partials/recent-codes")
-async def partial_recent_codes(
+async def partial_recent_codes(  # noqa: PLR0913 -- HTMX partial: 5 filter params mirror the codes-table query surface
     request: Request,
     page: int = 1,
     source: str = "",
@@ -1435,7 +1496,9 @@ async def partial_recent_codes(
     game: str = "",
 ) -> HTMLResponse:
     """HTMX partial for codes table with filters + pagination."""
-    from src.constants import GAMES
+    from src.constants import (
+        GAMES,
+    )
 
     storage = Storage()
     page = max(1, page)

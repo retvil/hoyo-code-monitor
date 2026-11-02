@@ -37,7 +37,7 @@ class SystemTray:
         ("Every 60 minutes", 3600),
     )
 
-    def __init__(
+    def __init__(  # noqa: PLR0913 -- 8 tray callbacks keep the factory signature flat (cli.py passes all 8 positionally)
         self,
         on_start: Callable[[], None],
         on_stop: Callable[[], None],
@@ -121,10 +121,14 @@ class SystemTray:
             pystray.MenuItem("Run check now", self._on_run_once),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(
-                "Enable monitoring", self._on_start, enabled=lambda item: not self._monitoring()
+                "Enable monitoring",
+                self._on_start,
+                enabled=lambda _item: not self._monitoring(),
             ),
             pystray.MenuItem(
-                "Disable monitoring", self._on_stop, enabled=lambda item: self._monitoring()
+                "Disable monitoring",
+                self._on_stop,
+                enabled=lambda _item: self._monitoring(),
             ),
         ]
         if self.on_set_interval is not None:
@@ -133,13 +137,15 @@ class SystemTray:
             for label, seconds in self.INTERVALS:
 
                 def _make_action(s: int) -> Any:
-                    def _action(icon: pystray.Icon, item: pystray.MenuItem) -> None:
-                        self._on_set_interval(icon, item, s)
+                    def _action(_icon: pystray.Icon, _item: pystray.MenuItem) -> None:
+                        # pystray passes (icon, item) to the callback; only
+                        # the closure-captured interval is used.
+                        self._on_set_interval(_icon, _item, s)
 
                     return _action
 
                 def _make_checked(s: int) -> Any:
-                    def _checked(item: pystray.MenuItem) -> bool:
+                    def _checked(_item: pystray.MenuItem) -> bool:
                         return current == s
 
                     return _checked
@@ -154,38 +160,40 @@ class SystemTray:
         ]
         return pystray.Menu(*items)
 
-    def _on_show(self, icon: pystray.Icon, item: pystray.MenuItem) -> None:
-        """Handle show dashboard action."""
+    def _on_show(self, _icon: pystray.Icon, _item: pystray.MenuItem) -> None:
+        """Handle show dashboard action. pystray passes (icon, item); both unused here."""
         logger.info("Show dashboard requested")
         self.on_show()
 
-    def _on_run_once(self, icon: pystray.Icon, item: pystray.MenuItem) -> None:
+    def _on_run_once(self, _icon: pystray.Icon, _item: pystray.MenuItem) -> None:
         """Handle run once action."""
         logger.info("Run once requested")
         self.on_run_once()
 
-    def _on_start(self, icon: pystray.Icon, item: pystray.MenuItem) -> None:
+    def _on_start(self, _icon: pystray.Icon, _item: pystray.MenuItem) -> None:
         """Handle start monitoring action."""
         logger.info("Start monitoring requested")
         self.on_start()
         self._running = True
         self._update_menu()
 
-    def _on_stop(self, icon: pystray.Icon, item: pystray.MenuItem) -> None:
+    def _on_stop(self, _icon: pystray.Icon, _item: pystray.MenuItem) -> None:
         """Handle stop monitoring action."""
         logger.info("Stop monitoring requested")
         self.on_stop()
         self._running = False
         self._update_menu()
 
-    def _on_set_interval(self, icon: pystray.Icon, item: pystray.MenuItem, seconds: int) -> None:
+    def _on_set_interval(
+        self, _icon: pystray.Icon, _item: pystray.MenuItem, seconds: int
+    ) -> None:
         """Handle scan interval change."""
         logger.info("Set scan interval requested: %ds", seconds)
         if self.on_set_interval is not None:
             self.on_set_interval(seconds)
         self._update_menu()
 
-    def _on_quit(self, icon: pystray.Icon, item: pystray.MenuItem) -> None:
+    def _on_quit(self, _icon: pystray.Icon, _item: pystray.MenuItem) -> None:
         """Handle quit action."""
         logger.info("Quit requested")
         self.on_quit()
@@ -236,7 +244,7 @@ class SystemTray:
         self._update_menu()
 
 
-def create_tray_icon(
+def create_tray_icon(  # noqa: PLR0913 -- flat factory surface mirroring SystemTray.__init__ (8 callbacks)
     on_start: Callable[[], None],
     on_stop: Callable[[], None],
     on_show: Callable[[], None],

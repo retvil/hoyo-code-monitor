@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import os
 import tempfile
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -24,7 +24,7 @@ class TestSchedulerInitialization:
         assert scheduler.redeemer is not None
 
     def test_init_with_custom_config(self, storage: Storage) -> None:
-        from src.config import Settings
+        from src.config import Settings  # noqa: PLC0415 -- test-local import kept near its use
         custom_config = Settings(poll_interval_seconds=600)
         scheduler = Scheduler(storage=storage, config=custom_config)
         assert scheduler.config.poll_interval_seconds == 600
@@ -86,7 +86,7 @@ class TestSchedulerRunOnce:
             result = scheduler.run_once()
 
         assert result["success"] is True
-        assert result["codes_found"] == 2
+        assert result["codes_found"] == 2  # one code per mocked source result above
         assert result["codes_redeemed"] == 0  # Redemption not enabled by default
 
     def test_run_once_stores_codes(self, storage: Storage) -> None:
@@ -142,7 +142,9 @@ class TestSchedulerRedemption:
         storage.set_config("redemption_enabled", "true")
         storage.store_account_cookies("test_account", {"ltuid": "12345", "ltoken": "abcdef"})
 
-        from src.config import load_config_from_storage
+        from src.config import (
+            load_config_from_storage,
+        )
         config = load_config_from_storage(storage)
         scheduler = Scheduler(storage=storage, config=config)
 
@@ -164,10 +166,7 @@ class TestSchedulerRedemption:
 
             with patch("src.scheduler.seed_default_sources", new_callable=AsyncMock) as mock_seed:
                 mock_seed.return_value = 0
-                print("DEBUG list_accounts before run_once:", storage.list_accounts())
-                print("DEBUG config uid:", getattr(config, "uid", "MISSING"), "region:", getattr(config, "region", "MISSING"))
                 result = scheduler.run_once()
-                print("DEBUG result:", result)
 
         assert result["codes_redeemed"] == 1
         mock_redeemer.redeem_code.assert_called_once()
@@ -183,7 +182,9 @@ class TestSchedulerRedemption:
         storage.set_config("redemption_enabled", "true")
         storage.store_account_cookies("test_account", {"ltuid": "12345", "ltoken": "abcdef"})
 
-        from src.config import load_config_from_storage
+        from src.config import (
+            load_config_from_storage,
+        )
         config = load_config_from_storage(storage)
         scheduler = Scheduler(storage=storage, config=config)
 
@@ -230,7 +231,9 @@ class TestSchedulerRedemption:
             "test_account2", {"ltuid": "67890", "ltoken": "ghijkl"}
         )
 
-        from src.config import load_config_from_storage
+        from src.config import (
+            load_config_from_storage,
+        )
         config = load_config_from_storage(storage)
         scheduler = Scheduler(storage=storage, config=config)
 
@@ -273,7 +276,9 @@ class TestSchedulerRedemption:
         storage.store_account_cookies("test_account", account1_cookies)
         # test_account2 intentionally has no cookie row of its own
 
-        from src.config import load_config_from_storage
+        from src.config import (
+            load_config_from_storage,
+        )
         config = load_config_from_storage(storage)
         scheduler = Scheduler(storage=storage, config=config)
 
@@ -349,8 +354,8 @@ class TestSchedulerCheckCycle:
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
             db_path = f.name
         yield db_path
-        if os.path.exists(db_path):
-            os.unlink(db_path)
+        if Path(db_path).exists():
+            Path(db_path).unlink()
 
     @pytest.mark.asyncio
     async def test_check_cycle_seeds_default_sources(self, storage: Storage) -> None:

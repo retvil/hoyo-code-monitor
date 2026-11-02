@@ -31,7 +31,9 @@ POLL_SECONDS = 2.0
 
 def profile_dir() -> str:
     """Persistent browser profile dir (login survives restarts)."""
-    from src.paths import app_data_dir
+    from src.paths import (
+        app_data_dir,
+    )
 
     d = app_data_dir() / "browser-profile"
     d.mkdir(parents=True, exist_ok=True)
@@ -49,7 +51,9 @@ def browsers_dir() -> Path:
     if env:
         return Path(env)
     if getattr(sys, "frozen", False):
-        from src.paths import app_data_dir
+        from src.paths import (
+            app_data_dir,
+        )
 
         d = app_data_dir() / "ms-playwright"
         d.mkdir(parents=True, exist_ok=True)
@@ -75,7 +79,11 @@ def ensure_chromium() -> None:
     if chromium_executable():
         return
     try:
-        from playwright._impl._driver import compute_driver_executable, get_driver_env
+        from playwright._impl._driver import (  # noqa: PLC0415 -- heavy optional import, lazy
+            compute_driver_executable,
+            get_driver_env,
+        )
+
     except ImportError as e:
         raise RuntimeError("Playwright is not installed (pip install playwright)") from e  # noqa: TRY003 -- actionable install hint
     target = browsers_dir()
@@ -107,7 +115,9 @@ def _cookie_skip_filters() -> tuple[tuple[str, ...], frozenset[str]]:
     noise can be filtered without a code update.
     """
     try:
-        from src.config import ConfigManager
+        from src.config import (
+            ConfigManager,
+        )
 
         raw = ConfigManager().get_all()
     except Exception:
@@ -169,7 +179,10 @@ async def capture_cookies(
         RuntimeError: If Playwright is unavailable.
     """
     try:
-        from playwright.async_api import async_playwright
+        from playwright.async_api import (
+            async_playwright,
+        )
+
     except ImportError as e:
         raise RuntimeError("Playwright is not installed (pip install playwright)") from e  # noqa: TRY003 -- actionable install hint
 

@@ -2,10 +2,10 @@
 
 import gc
 import json
-import os
 import sqlite3
 import tempfile
 import time
+from pathlib import Path
 
 import pytest
 
@@ -24,15 +24,15 @@ def temp_db() -> str:
     # Drop strong references to any Storage instances that might still hold
     # the sqlite3 connection open (Windows locks the file until the handle is closed).
     gc.collect()
-    if os.path.exists(db_path):
+    if Path(db_path).exists():
         for _ in range(10):
             try:
-                os.unlink(db_path)
+                Path(db_path).unlink()
                 break
             except PermissionError:
                 time.sleep(0.25)
         else:
-            os.unlink(db_path)
+            Path(db_path).unlink()
 
 
 @pytest.fixture
@@ -57,9 +57,9 @@ class TestStorageInitialization:
 
     def test_init_creates_parent_directory(self, temp_db: str) -> None:
         """Test that parent directory is created if it doesn't exist."""
-        nested_path = os.path.join(os.path.dirname(temp_db), "nested", "monitor.db")
-        Storage(nested_path)
-        assert os.path.exists(nested_path)
+        nested_path = Path(temp_db).parent / "nested" / "monitor.db"
+        Storage(str(nested_path))
+        assert nested_path.exists()
 
 
 class TestCodesCRUD:
@@ -114,9 +114,8 @@ class TestCodesCRUD:
     def test_add_code_duplicate_same_source_raises(self, storage: Storage) -> None:
         """Test that adding duplicate code from same source raises IntegrityError."""
         storage.add_code("GENSHIN123", "wiki")
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(Exception, match="already exists from source"):
             storage.add_code("GENSHIN123", "wiki")
-        assert "already exists from source" in str(exc_info.value)
 
     def test_add_code_same_code_different_source_allowed(self, storage: Storage) -> None:
         """Test that same code from different source is allowed (returns existing code_id)."""
@@ -211,12 +210,12 @@ class TestCodesCRUD:
             storage.add_code(f"CODE{i}", "wiki")
 
         codes = storage.list_codes(limit=2, offset=0)
-        assert len(codes) == 2
+        assert len(codes) == 2  # page size requested above
         assert codes[0]["code"] == "CODE4"  # Most recent first
         assert codes[1]["code"] == "CODE3"
 
         codes = storage.list_codes(limit=2, offset=2)
-        assert len(codes) == 2
+        assert len(codes) == 2  # page size requested above
         assert codes[0]["code"] == "CODE2"
         assert codes[1]["code"] == "CODE1"
 
@@ -257,9 +256,8 @@ class TestSourcesCRUD:
     def test_add_source_duplicate_raises_integrity_error(self, storage: Storage) -> None:
         """Test that adding duplicate source name raises IntegrityError."""
         storage.add_source("wiki", "https://example.com", "css", ".code-class")
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(Exception, match="UNIQUE constraint failed"):
             storage.add_source("wiki", "https://other.com", "xpath", "//div")
-        assert "UNIQUE constraint failed" in str(exc_info.value)
 
     def test_get_source_not_found_returns_none(self, storage: Storage) -> None:
         """Test that getting non-existent source returns None."""
@@ -273,10 +271,10 @@ class TestSourcesCRUD:
         storage.add_source("forum", "https://forum.com", "xpath", "//code", enabled=False)
 
         sources = storage.list_sources()
-        assert len(sources) == 3
+        assert len(sources) == 3  # three sources added above
 
         enabled_sources = storage.list_sources(enabled_only=True)
-        assert len(enabled_sources) == 2
+        assert len(enabled_sources) == 2  # 'forum' was added with enabled=False
         assert all(s["enabled"] == 1 for s in enabled_sources)
 
     def test_update_source(self, storage: Storage) -> None:
@@ -486,7 +484,7 @@ class TestContextManager:
                     "INSERT INTO codes (code, attempted_at, game) VALUES (?, ?, ?)",
                     ("ROLBACK", "2026-01-01T00:00:00", "genshin"),
                 )
-                raise ValueError("Test exception")
+                raise ValueError("Test exception")  # noqa: TRY003 -- test raises its own message
 
         assert storage.get_code("ROLBACK", game="genshin") is None
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -21,7 +22,13 @@ from src.sources import (
     register_extractor,
     seed_default_sources,
 )
-from src.storage import Storage
+
+if TYPE_CHECKING:
+    from src.storage import Storage
+
+#: Same-host inter-start gap asserted in test_fetch_all_enabled_spaces_same_host:
+#: the 0.5s configured spacing minus a 0.1s CI-jitter slack.
+MIN_INTERVAL_GAP_SLACK: float = 0.4
 
 #: Error count after a single failed fetch (avoids PLR2004 magic value).
 EXPECTED_SINGLE_ERROR_COUNT: int = 1
@@ -109,7 +116,7 @@ class TestCSSExtractor:
         codes = extractor.extract(html, ".code")
         assert "GENSHIN123" in codes
         assert "STARRAIL456" in codes
-        assert len(codes) == 2
+        assert len(codes) == 2  # two .code divs in the fixture HTML
 
     def test_extract_no_matches(self) -> None:
         extractor = CSSExtractor()
@@ -216,7 +223,7 @@ class TestExtractorRegistry:
 
     def test_register_custom_extractor(self) -> None:
         class CustomExtractor:
-            def extract(self, content: str, selector: str) -> list[str]:
+            def extract(self, _content: str, _selector: str) -> list[str]:
                 return ["custom"]
 
         register_extractor("custom", CustomExtractor())
@@ -265,7 +272,7 @@ class TestSourceFetcher:
 
     @pytest.mark.asyncio
     async def test_fetch_http_error(self, storage: Storage, source_config: SourceConfig) -> None:
-        import aiohttp
+        import aiohttp  # noqa: PLC0415 -- test-local import kept near its use
 
         mock_response = AsyncMock()
         mock_response.__aenter__ = AsyncMock(side_effect=aiohttp.ClientError("Connection failed"))
@@ -299,7 +306,7 @@ class TestSourceFetcher:
         assert "source1" in results
         assert "source2" in results
         assert "source3" not in results  # Disabled
-        assert mock_session.get.call_count == 2
+        assert mock_session.get.call_count == 2  # only the two enabled sources fetched
 
     @pytest.mark.asyncio
     async def test_fetch_all_enabled_overlaps_different_hosts(self, storage: Storage) -> None:
@@ -318,7 +325,7 @@ class TestSourceFetcher:
         fetcher.fetch_source = fake_fetch
         task = asyncio.create_task(fetcher.fetch_all_enabled())
         for _ in range(20):
-            if len(started) == 2:
+            if len(started) == 2:  # both hosts have started
                 break
             await asyncio.sleep(0)
         assert set(started) == {"one", "two"}
@@ -341,15 +348,16 @@ class TestSourceFetcher:
         fetcher.fetch_source = fake_fetch
         result = await fetcher.fetch_all_enabled()
         assert result == {"one": ["one"], "two": ["two"]}
-        assert len(starts) == 2
+        assert len(starts) == 2  # both sources started
         # Append order is nondeterministic (two concurrent tasks race to the
         # gate), so sort before asserting the *gap* between the two starts,
         # which is the actual invariant under test: same-host starts are
         # spaced at least the configured min_interval apart. A large interval
         # (0.5s) keeps the assertion far above the noise floor of process-
         # startup / CPU jitter on slow CI runners; the original 0.03s was too
-        # tight to be reliable under load.
-        assert max(starts) - min(starts) >= 0.4
+        # tight to be reliable under load. 0.4s leaves the same 0.1s
+        # slack (rate_limit_seconds - 0.4 == 0.1) as the original check.
+        assert max(starts) - min(starts) >= MIN_INTERVAL_GAP_SLACK
 
     @pytest.mark.asyncio
     async def test_fetch_all_enabled_failure_isolated(self, storage: Storage) -> None:
@@ -383,7 +391,7 @@ class TestSourceFetcher:
         storage.add_source("bad", "https://bad.example", "css", ".code", rate_limit_seconds=0)
         fetcher = SourceFetcher(storage, session=MagicMock())
 
-        async def fake_fetch(source: SourceConfig) -> list[str]:
+        async def fake_fetch(_source: SourceConfig) -> list[str]:
             raise RuntimeError("boom")
 
         fetcher.fetch_source = fake_fetch
@@ -402,7 +410,7 @@ class TestSourceFetcher:
         storage.add_source("good", "https://good.example", "css", ".code", rate_limit_seconds=0)
         fetcher = SourceFetcher(storage, session=MagicMock())
 
-        async def fake_fetch(source: SourceConfig) -> list[str]:
+        async def fake_fetch(_source: SourceConfig) -> list[str]:
             return ["GOODCODE"]
 
         fetcher.fetch_source = fake_fetch
@@ -422,7 +430,7 @@ class TestSourceFetcher:
         assert storage.get_source("good")["last_success"] is None
         fetcher = SourceFetcher(storage, session=MagicMock())
 
-        async def fake_fetch(source: SourceConfig) -> list[str]:
+        async def fake_fetch(_source: SourceConfig) -> list[str]:
             return ["GOODCODE"]
 
         fetcher.fetch_source = fake_fetch
@@ -441,7 +449,7 @@ class TestSourceFetcher:
 
         fetcher = SourceFetcher(storage, session=MagicMock())
 
-        async def failing_fetch(source: SourceConfig) -> list[str]:
+        async def failing_fetch(_source: SourceConfig) -> list[str]:
             raise RuntimeError("boom")
 
         fetcher.fetch_source = failing_fetch
@@ -460,7 +468,7 @@ class TestSourceFetcher:
         source's error counter. Before the fix the retry loop body never executed
         and the function silently returned ``[]`` with no error log.
         """
-        import aiohttp
+        import aiohttp  # noqa: PLC0415 -- test-local import kept near its use
 
         source_config.max_retries = 0
         source_config.retry_base_delay = 0.0
@@ -490,7 +498,7 @@ class TestSourceFetcher:
         surface through the same error path (logger + increment_source_error) as
         a 1-retry source that fails.
         """
-        import aiohttp
+        import aiohttp  # noqa: PLC0415 -- test-local import kept near its use
 
         storage.add_source(
             "zero",

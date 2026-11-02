@@ -40,15 +40,17 @@ def temp_db() -> str:
 @pytest.fixture
 def client(temp_db: str, monkeypatch) -> TestClient:
     """Client with CSRF enforcement active."""
-    from src import web_ui
+    from src import (
+        web_ui,
+    )
 
     monkeypatch.delenv("HCM_TESTING", raising=False)
-    monkeypatch.setattr(web_ui, "Storage", lambda *a, **k: Storage(temp_db))
+    monkeypatch.setattr(web_ui, "Storage", lambda *_a, **_k: Storage(temp_db))
     monkeypatch.setattr(web_ui, "seed_default_sources", _mock_seed)
     monkeypatch.setattr(
         web_ui,
         "create_scheduler_from_storage",
-        lambda storage: MagicMock(status=MagicMock()),
+        lambda _storage: MagicMock(status=MagicMock()),
     )
     web_ui.scheduler = None
     return TestClient(web_ui.app, raise_server_exceptions=False)
@@ -172,7 +174,7 @@ class TestRotation:
     """The token must expire, so an observed one cannot be replayed forever."""
 
     def test_token_differs_across_days(self, client: TestClient, monkeypatch) -> None:
-        from src import web_ui
+        from src import web_ui  # noqa: PLC0415 -- test-local import kept near its use
 
         monkeypatch.setattr(web_ui, "_csrf_day", lambda: "2026-01-01")
         first = web_ui._csrf_token()
@@ -181,7 +183,7 @@ class TestRotation:
 
     def test_stale_token_rejected_after_rotation(self, client: TestClient, monkeypatch) -> None:
         """A token leaked yesterday must not work today."""
-        from src import web_ui
+        from src import web_ui  # noqa: PLC0415 -- test-local import kept near its use
 
         monkeypatch.setattr(web_ui, "_csrf_day", lambda: "2026-01-01")
         stale = client.get("/api/csrf-token").json()["csrf_token"]
@@ -197,7 +199,7 @@ class TestRotation:
 
     def test_fresh_token_accepted_after_rotation(self, client: TestClient, monkeypatch) -> None:
         """Rotation must not lock the legitimate client out."""
-        from src import web_ui
+        from src import web_ui  # noqa: PLC0415 -- test-local import kept near its use
 
         monkeypatch.setattr(web_ui, "_csrf_day", lambda: "2026-01-01")
         client.get("/api/csrf-token")
@@ -213,7 +215,7 @@ class TestRotation:
 
     def test_token_stable_within_a_day(self, client: TestClient, monkeypatch) -> None:
         """Rotation is per-day, not per-request: one render must not break the next."""
-        from src import web_ui
+        from src import web_ui  # noqa: PLC0415 -- test-local import kept near its use
 
         monkeypatch.setattr(web_ui, "_csrf_day", lambda: "2026-01-01")
         first = client.get("/api/csrf-token").json()["csrf_token"]
@@ -224,7 +226,7 @@ class TestRotation:
         self, client: TestClient, monkeypatch
     ) -> None:
         """Token must be a one-way derivation, not the seed itself."""
-        from src import web_ui
+        from src import web_ui  # noqa: PLC0415 -- test-local import kept near its use
 
         monkeypatch.setattr(web_ui, "_csrf_day", lambda: "2026-01-01")
         assert web_ui._csrf_token() != web_ui._CSRF_SEED

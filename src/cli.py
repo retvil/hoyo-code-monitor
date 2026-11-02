@@ -8,6 +8,8 @@ import sys
 import threading
 import time
 import webbrowser
+from collections.abc import Callable
+from typing import Any
 
 import click
 import uvicorn
@@ -124,7 +126,15 @@ def list_accounts() -> None:
 @click.option("--lang", default="en-us", help="Language code.")
 @click.option("--s-lang-key", default="en-us", help="Secondary language key.")
 @click.option("--game", default="genshin", help="Game id: genshin, hsr, zzz, hi3, tot.")
-def add(name: str, uid: str, region: str, game_biz: str, lang: str, s_lang_key: str, game: str) -> None:
+def add(  # noqa: PLR0913 -- click command surface: 7 option flags keep the CLI positional-friendly
+    name: str,
+    uid: str,
+    region: str,
+    game_biz: str,
+    lang: str,
+    s_lang_key: str,
+    game: str,
+) -> None:
     """Add a new account <name> <uid> <region>."""
     storage = Storage()
     existing = storage.get_account(name)
@@ -172,7 +182,14 @@ def remove(name: str) -> None:
 @click.option("--game-biz", help="New game business identifier.")
 @click.option("--lang", help="New language code.")
 @click.option("--s-lang-key", help="New secondary language key.")
-def update(name: str, uid: str | None = None, region: str | None = None, game_biz: str | None = None, lang: str | None = None, s_lang_key: str | None = None) -> None:
+def update(  # noqa: PLR0913 -- click command surface: 6 optional flags keep the CLI positional-friendly
+    name: str,
+    uid: str | None = None,
+    region: str | None = None,
+    game_biz: str | None = None,
+    lang: str | None = None,
+    s_lang_key: str | None = None,
+) -> None:
     """Update an account <name>."""
     storage = Storage()
     existing = storage.get_account(name)
@@ -484,7 +501,12 @@ def notify_test() -> None:
 @notify.command("test-toast")
 def notify_test_toast() -> None:
     """Show a test Windows toast (no configuration needed)."""
-    from src.system_notify import is_configured, show_toast
+    # Optional-dependency lazy import: winotify may be absent on non-Windows or
+    # missing-extra installs; is_configured() probes it, so it must be deferred.
+    from src.system_notify import (  # noqa: PLC0415 -- optional dependency (winotify) probe
+        is_configured,
+        show_toast,
+    )
 
     if not is_configured():
         click.echo("Toast unavailable. Install with: pip install .[toast]", err=True)
@@ -545,7 +567,7 @@ def run_once() -> None:
         asyncio.set_event_loop(loop)
 
         try:
-            # NOTE: the `accounts list` command below shadows the builtin `list`,
+            # NOTE: the `accounts list` command above shadows the builtin `list`,
             # so a runtime-subscriptable annotation (e.g. list[str]) is not safe
             # here; _fetch_codes keeps no return annotation on purpose.
             async def _fetch_codes() -> dict[str, list[str]]:
@@ -557,66 +579,23 @@ def run_once() -> None:
             # Store new codes and collect the ones actually added this cycle
             new_code_list: list[str] = []
             for source_name, codes in results.items():
-                for code in codes:
-                    code = code.strip()
-                    if not code:
+                for raw in codes:
+                    stripped = raw.strip()
+                    if not stripped:
                         continue
                     try:
-                        storage.add_code(code, source_name)
-                        new_code_list.append(code)
+                        storage.add_code(stripped, source_name)
+                        new_code_list.append(stripped)
                     except Exception:
                         pass  # Duplicate or other error
 
             new_codes = len(new_code_list)
-            codes_redeemed = 0
-            errors: list[str] = []
-            click.echo(f"Stored {new_codes} new code(s).")
-
-            # Get accounts eligible for redemption
-            redeem_accounts = [
-                a for a in storage.list_accounts()
-                if storage.is_account_redeem_enabled(a["name"])
-            ]
-
-            if redemption_enabled and new_codes > 0:
-                # Check if redemption is fully configured
-                can_redeem = (
-                    getattr(scheduler.config, "redemption_enabled", False)
-                    and getattr(scheduler.config, "uid", None)
-                    and getattr(scheduler.config, "region", None)
-                    and scheduler.config.cookies.get("ltuid")
-                    and scheduler.config.cookies.get("ltoken")
-                )
-
-                if can_redeem:
-                    # Read gap from config, default to 8
-                    gap = getattr(scheduler.config, "redemption_min_gap_seconds", 8)
-
-                    # Use asyncio to run the async redemption method
-                    redeem_loop = asyncio.new_event_loop()
-                    try:
-                        codes_redeemed, errors = redeem_loop.run_until_complete(
-                            scheduler._redeem_new_codes(
-                                new_codes=new_code_list,
-                                redeem_accounts=redeem_accounts,
-                                gap=gap,
-                            )
-                        )
-                    finally:
-                        redeem_loop.close()
-
-                    # Update stats
-                    click.echo(f"Redeemed {codes_redeemed} code(s).")
-                    if errors:
-                        click.echo(f"Errors during redemption: {len(errors)}")
-                else:
-                    click.echo("Redemption enabled but missing configuration (uid, region, or cookies).")
-            elif redemption_enabled and new_codes == 0:
-                click.echo("Redemption enabled but no new codes found.")
-            elif redemption_enabled and redeem_accounts:
-                click.echo("Redemption enabled but redemption did not claim any codes.")
-            else:
-                click.echo("Redemption not enabled or no new codes.")
+            codes_redeemed, errors = _run_redemption(
+                scheduler,
+                new_code_list,
+                storage,
+                redemption_enabled,
+            )
 
             click.echo(f"Found {new_codes} code(s), {codes_redeemed} redeemed.")
         finally:
@@ -626,6 +605,68 @@ def run_once() -> None:
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
+
+
+def _run_redemption(
+    scheduler: Any,
+    new_code_list: list[str],
+    storage: Any,
+    redemption_enabled: bool,
+) -> tuple[int, list[str]]:
+    """Run the redemption step of a check cycle; returns (redeemed, errors)."""
+    new_codes = len(new_code_list)
+    codes_redeemed = 0
+    errors: list[str] = []
+    click.echo(f"Stored {new_codes} new code(s).")
+
+    redeem_accounts = [
+        a for a in storage.list_accounts() if storage.is_account_redeem_enabled(a["name"])
+    ]
+
+    if not (redemption_enabled and new_codes > 0):
+        if redemption_enabled:
+            if new_codes == 0:
+                click.echo("Redemption enabled but no new codes found.")
+            elif redeem_accounts:
+                click.echo("Redemption enabled but redemption did not claim any codes.")
+        else:
+            click.echo("Redemption not enabled or no new codes.")
+        return codes_redeemed, errors
+
+    # Check if redemption is fully configured
+    can_redeem = (
+        getattr(scheduler.config, "redemption_enabled", False)
+        and getattr(scheduler.config, "uid", None)
+        and getattr(scheduler.config, "region", None)
+        and scheduler.config.cookies.get("ltuid")
+        and scheduler.config.cookies.get("ltoken")
+    )
+
+    if not can_redeem:
+        click.echo("Redemption enabled but missing configuration (uid, region, or cookies).")
+        return codes_redeemed, errors
+
+    # Read gap from config, default to 8
+    gap = getattr(scheduler.config, "redemption_min_gap_seconds", 8)
+
+    # Use asyncio to run the async redemption method
+    redeem_loop = asyncio.new_event_loop()
+    try:
+        codes_redeemed, errors = redeem_loop.run_until_complete(
+            scheduler._redeem_new_codes(
+                new_codes=new_code_list,
+                redeem_accounts=redeem_accounts,
+                gap=gap,
+            )
+        )
+    finally:
+        redeem_loop.close()
+
+    # Update stats
+    click.echo(f"Redeemed {codes_redeemed} code(s).")
+    if errors:
+        click.echo(f"Errors during redemption: {len(errors)}")
+    return codes_redeemed, errors
 
 
 @cli.group()
@@ -668,7 +709,7 @@ def autostart_status_cli() -> None:
 
 
 @cli.command()
-def tray() -> None:
+def tray() -> None:  # noqa: C901 -- glue command: wires a live scheduler into web_ui, a web thread, 6 menu callbacks and a blocking run loop
     """Run in system tray with live menu and embedded settings server."""
     _ensure_single_instance()
     scheduler = create_scheduler_from_storage()
@@ -722,16 +763,8 @@ def tray() -> None:
             f"Check done: {result['codes_found']} found, {result['codes_redeemed']} redeemed."
         )
 
-    def on_set_interval(seconds: int) -> None:
-        config_manager.set("poll_interval_seconds", seconds)
-        minutes = seconds // 60
-        click.echo(f"Scan interval set to every {minutes} minutes.")
-
-    def get_interval() -> int:
-        try:
-            return int(config_manager.get("poll_interval_seconds", 900))
-        except (TypeError, ValueError):
-            return 900
+    on_set_interval = _make_on_set_interval(config_manager)
+    get_interval = _make_get_interval(config_manager)
 
     tray_icon = create_tray_icon(
         on_start,
@@ -753,6 +786,34 @@ def tray() -> None:
 
     tray_icon.run()
 
+    _exit_tray_cleanly(scheduler)
+
+
+def _make_on_set_interval(config_manager: ConfigManager) -> Callable[[int], None]:
+    """Build the tray-menu interval setter around a ConfigManager."""
+
+    def on_set_interval(seconds: int) -> None:
+        config_manager.set("poll_interval_seconds", seconds)
+        minutes = seconds // 60
+        click.echo(f"Scan interval set to every {minutes} minutes.")
+
+    return on_set_interval
+
+
+def _make_get_interval(config_manager: ConfigManager) -> Callable[[], int]:
+    """Build the tray-menu interval getter around a ConfigManager."""
+
+    def get_interval() -> int:
+        try:
+            return int(config_manager.get("poll_interval_seconds", 900))
+        except (TypeError, ValueError):
+            return 900
+
+    return get_interval
+
+
+def _exit_tray_cleanly(scheduler: Any) -> None:
+    """Block until the user interrupts, then stop the scheduler cleanly."""
     try:
         while True:
             time.sleep(1)

@@ -12,9 +12,11 @@ import random
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from types import TracebackType
-from typing import Any, Protocol, Self
+from typing import TYPE_CHECKING, Any, Protocol, Self
 from urllib.parse import urlparse
+
+if TYPE_CHECKING:
+    from types import TracebackType
 
 import aiohttp
 from bs4 import BeautifulSoup
@@ -99,8 +101,8 @@ class JSONExtractor:
     Values of exact `code`-like keys are taken verbatim (case preserved).
     """
 
-    def extract(self, content: str, selector: str) -> list[str]:
-        import json
+    def extract(self, content: str, selector: str) -> list[str]:  # noqa: C901 -- dict/list/str recursion covers the JSON shapes
+        import json  # noqa: PLC0415 -- stdlib import kept lazy to mirror the module's import-light design
 
         data = json.loads(content)
         target: Any = data
@@ -186,7 +188,9 @@ class SourceConfig:
 
     def validate(self) -> None:
         """Validate source configuration."""
-        from src.constants import GAMES
+        from src.constants import (
+            GAMES,
+        )
 
         if self.game not in GAMES:
             raise SourceValidationError(f"Unknown game: {self.game}")  # noqa: TRY003 -- validation message needs interpolation
@@ -265,7 +269,7 @@ class _HostGate:
         # requests, never before the first one.
         self._next_slot: float | None = None
 
-    async def __aenter__(self) -> _HostGate:
+    async def __aenter__(self) -> Self:
         await self._semaphore.acquire()
         if self.min_interval > 0:
             loop = asyncio.get_running_loop()
@@ -282,7 +286,7 @@ class _HostGate:
         self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
-        exc_tb: object | None,
+        exc_tb: TracebackType | None,
     ) -> None:
         self._semaphore.release()
 
@@ -347,7 +351,9 @@ class SourceFetcher:
             # Re-check under the lock: the first caller's await can suspend long
             # enough for others to queue up behind it.
             if self._browser is None:
-                from playwright.async_api import async_playwright
+                from playwright.async_api import (
+                    async_playwright,
+                )
 
                 self._playwright = await async_playwright().start()
                 self._browser = await self._playwright.chromium.launch(headless=True)
@@ -383,23 +389,14 @@ class SourceFetcher:
 
                 extractor = EXTRACTORS[source.selector_type]
                 codes = extractor.extract(content, source.selector)
-
-                logger.info(
-                    "Fetched %d codes from %s (%s)",
-                    len(codes),
-                    source.name,
-                    source.selector_type,
-                )
-                return codes
-
             except aiohttp.ClientResponseError as e:
                 # 4xx (except 429) will not recover — fail fast without retries
                 if e.status != 429 and 400 <= e.status < 500:
-                    logger.error("HTTP %s fetching %s (no retry): %s", e.status, source.name, e)
+                    logger.exception("HTTP %s fetching %s (no retry)", e.status, source.name)
                     raise
                 if attempt == attempts - 1:
-                    logger.error(
-                        "HTTP error fetching %s after %d retries: %s", source.name, max_retries, e
+                    logger.exception(
+                        "HTTP error fetching %s after %d retries", source.name, max_retries
                     )
                     raise
                 delay = base_delay * (2**attempt) * random.uniform(0.5, 1.0)
@@ -414,8 +411,8 @@ class SourceFetcher:
                 await asyncio.sleep(delay)
             except aiohttp.ClientError as e:
                 if attempt == attempts - 1:
-                    logger.error(
-                        "HTTP error fetching %s after %d retries: %s", source.name, max_retries, e
+                    logger.exception(
+                        "HTTP error fetching %s after %d retries", source.name, max_retries
                     )
                     raise
                 delay = base_delay * (2**attempt) * random.uniform(0.5, 1.0)
@@ -428,9 +425,17 @@ class SourceFetcher:
                     delay,
                 )
                 await asyncio.sleep(delay)
-            except Exception as e:
-                logger.error("Error extracting from %s: %s", source.name, e)
+            except Exception:
+                logger.exception("Error extracting from %s", source.name)
                 raise
+            else:
+                logger.info(
+                    "Fetched %d codes from %s (%s)",
+                    len(codes),
+                    source.name,
+                    source.selector_type,
+                )
+                return codes
 
         # Unreachable in practice: every loop exit raises or returns. The
         # explicit fallback keeps the function return-total for type checkers.
@@ -458,6 +463,10 @@ class SourceFetcher:
             extractor = EXTRACTORS[source.selector_type]
             codes = extractor.extract(content, source.selector)
 
+        except Exception:
+            logger.exception("Browser error fetching %s", source.name)
+            raise
+        else:
             logger.info(
                 "Fetched %d codes from %s (browser, %s)",
                 len(codes),
@@ -465,10 +474,6 @@ class SourceFetcher:
                 source.selector_type,
             )
             return codes
-
-        except Exception as e:
-            logger.error("Browser error fetching %s: %s", source.name, e)
-            raise
         finally:
             await page.close()
 
@@ -495,7 +500,7 @@ class SourceFetcher:
             for host, interval in intervals.items()
         }
 
-    async def fetch_all_enabled(self) -> dict[str, list[str]]:
+    async def fetch_all_enabled(self) -> dict[str, list[str]]:  # noqa: C901 -- gate-building + per-source error paths; extract would obscure the flow
         """Fetch codes from every enabled source, overlapping unrelated hosts.
 
         Requests to *different* hosts run concurrently. Requests sharing a host
@@ -521,8 +526,8 @@ class SourceFetcher:
             name = str(row.get("name") or "?")
             try:
                 parsed.append((name, SourceConfig.from_row(row)))
-            except Exception as e:
-                logger.error("Skipping malformed source %r: %s", name, e)
+            except Exception:
+                logger.exception("Skipping malformed source %r", name)
                 parsed.append((name, None))
 
         self._host_gates = self._build_host_gates([s for _, s in parsed if s is not None])
@@ -534,13 +539,8 @@ class SourceFetcher:
             try:
                 async with gate:
                     codes = await self.fetch_source(source)
-                try:
-                    self.storage.mark_source_success(source.name)
-                except Exception:
-                    logger.debug("Could not record last_success for %s", source.name)
-                return name, codes
-            except Exception as e:
-                logger.error("Failed to fetch from %s: %s", source.name, e)
+            except Exception:
+                logger.exception("Failed to fetch from %s", source.name)
                 try:
                     self.storage.increment_source_error(source.name)
                 except Exception:
@@ -553,6 +553,12 @@ class SourceFetcher:
                 except Exception:
                     logger.debug("Could not clear last_success for %s", source.name)
                 return name, []
+            else:
+                try:
+                    self.storage.mark_source_success(source.name)
+                except Exception:
+                    logger.debug("Could not record last_success for %s", source.name)
+                return name, codes
 
         # run_one swallows every exception, so gather never leaves a sibling
         # coroutine with an unretrieved exception.

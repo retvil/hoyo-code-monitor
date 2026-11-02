@@ -35,24 +35,22 @@ def _is_process_alive(pid: int) -> bool:
             return bool(psutil.Process(pid).is_running())
         except Exception:
             return False
-    # ctypes fallback – Windows API only
+    # ctypes fallback - Windows API only
     try:
-        import ctypes
+        import ctypes  # noqa: PLC0415 -- Windows-only stdlib fallback, kept lazy to stay importable everywhere
+
         kernel32 = ctypes.windll.kernel32
         # OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION=0x1000, FALSE, pid)
         handle = kernel32.OpenProcess(0x1000, False, pid)
         if not handle:
             return False
         exit_code = ctypes.c_uint(0)
-        if kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
-            # A process with exit code STILL_ACTIVE (0x00000001) is alive.
-            closed = exit_code.value == 0x00000001
-            kernel32.CloseHandle(handle)
-            return closed
+        alive = kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code))
         kernel32.CloseHandle(handle)
-        return False
     except Exception:
         return False
+    else:
+        return alive and exit_code.value == 0x00000001
 
 
 class SingleInstance:
@@ -65,7 +63,9 @@ class SingleInstance:
             lock_path: Lock file path (defaults to app data dir).
         """
         if lock_path is None:
-            from src.paths import app_data_dir
+            from src.paths import (
+                app_data_dir,
+            )
 
             lock_path = app_data_dir() / "app.lock"
         self.lock_path = Path(lock_path)
@@ -82,6 +82,37 @@ class SingleInstance:
         finally:
             self._fh = None
 
+    def _handle_stale_lock(self) -> bool | None:
+        """Check a lock we couldn't grab: handle it here when both lockers failed.
+
+        Returns:
+            True if the lock was acquired after a stale-lock recovery,
+            False if it must be treated as held by a live process,
+            None if the holder PID could not be read.
+        """
+        try:
+            content = self.lock_path.read_text(encoding="utf-8").strip()
+            if not content:
+                return None
+            holder_pid = int(content)
+            if _is_process_alive(holder_pid):
+                # Holder is alive - another instance is truly running.
+                self._close_quietly()
+                return False
+            # Holder is dead - stale lock. Remove the lock file and retry
+            # acquisition once.
+            try:
+                self.lock_path.unlink()
+            except Exception:
+                logger.warning("Could not remove stale lock file %s", self.lock_path)
+            # Release our (empty) file handle and retry
+            self._close_quietly()
+            return self.acquire()
+        except (ValueError, OSError):
+            # If we can't read/parse the PID, just give up.
+            self._close_quietly()
+            return False
+
     def acquire(self) -> bool:
         """Try to acquire the lock. Returns True if this is the only instance."""
 
@@ -92,44 +123,23 @@ class SingleInstance:
             logger.warning("Single-instance lock file unavailable: %s", e)
             return False
         try:
-            import portalocker
+            import portalocker  # noqa: PLC0415 -- optional dependency, lazy import
 
             portalocker.lock(self._fh, portalocker.LOCK_EX | portalocker.LOCK_NB)
             self._use_portalocker = True
         except ImportError:
             try:
-                import msvcrt
+                import msvcrt  # noqa: PLC0415 -- Windows-only stdlib, lazy import
 
                 msvcrt.locking(self._fh.fileno(), msvcrt.LK_NBLCK, 1)
                 self._use_portalocker = False
             except (ImportError, OSError):
                 # Both portalocker and msvcrt failed.
-                # Read the PID from the lock file and check if the holder is still alive.
-                # If the holder is dead, the lock is stale: remove it and retry once.
-                # If the holder is alive, another instance is truly running.
-                try:
-                    content = self.lock_path.read_text(encoding="utf-8").strip()
-                    if content:
-                        holder_pid = int(content)
-                        if _is_process_alive(holder_pid):
-                            # Holder is alive – another instance is truly running.
-                            self._close_quietly()
-                            return False
-                        # Holder is dead – stale lock. Remove the lock file
-                        # and retry acquisition once.
-                        try:
-                            self.lock_path.unlink()
-                        except Exception:
-                            logger.warning(
-                                "Could not remove stale lock file %s", self.lock_path
-                            )
-                        # Release our (empty) file handle and retry
-                        self._close_quietly()
-                        return self.acquire()
-                except (ValueError, OSError):
-                    # If we can't read/parse the PID, just give up.
+                outcome = self._handle_stale_lock()
+                if outcome is None:
                     self._close_quietly()
                     return False
+                return outcome
         except Exception:
             self._close_quietly()
             return False
@@ -149,14 +159,14 @@ class SingleInstance:
             if self._fh:
                 if self._use_portalocker:
                     try:
-                        import portalocker
+                        import portalocker  # noqa: PLC0415 -- optional dependency, lazy import
 
                         portalocker.unlock(self._fh)
                     except Exception:
                         pass
                 else:
                     try:
-                        import msvcrt
+                        import msvcrt  # noqa: PLC0415 -- Windows-only stdlib, lazy import
 
                         msvcrt.locking(self._fh.fileno(), msvcrt.LK_UNLCK, 1)
                     except Exception:

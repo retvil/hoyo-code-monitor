@@ -102,7 +102,7 @@ class TestRedeemerInitialization:
         assert redeemer.endpoint == Redeemer.DEFAULT_ENDPOINT
         assert redeemer.user_agent == Redeemer.DEFAULT_USER_AGENT
         assert redeemer.referer == Redeemer.DEFAULT_REFERER
-        assert redeemer.timeout.total == 30.0
+        assert redeemer.timeout.total == Redeemer.DEFAULT_TIMEOUT_SECONDS
 
     def test_custom_initialization(self) -> None:
         """Test custom initialization values."""
@@ -333,22 +333,20 @@ class TestRedeemerRedeemCode:
         """Test redemption with missing ltuid cookie raises ValueError."""
         cookies = {"ltoken": "abcdef"}
 
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError, match="ltuid"):
             await redeemer.redeem_code(
                 code="GENSHIN123",
                 cookies=cookies,
                 uid="123456789",
                 region="os_usa",
             )
-
-        assert "ltuid" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_redeem_code_missing_ltoken(self, redeemer: Redeemer) -> None:
         """Test redemption with missing ltoken cookie raises ValueError."""
         cookies = {"ltuid": "12345"}
 
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError, match="ltoken"):
             await redeemer.redeem_code(
                 code="GENSHIN123",
                 cookies=cookies,
@@ -356,14 +354,12 @@ class TestRedeemerRedeemCode:
                 region="os_usa",
             )
 
-        assert "ltoken" in str(exc_info.value)
-
     @pytest.mark.asyncio
     async def test_redeem_code_http_error(
         self, redeemer: Redeemer, valid_cookies: dict
     ) -> None:
         """Test handling of HTTP error response."""
-        import aiohttp
+        import aiohttp  # noqa: PLC0415 -- test-local import kept near its use
 
         mock_response = AsyncMock()
         mock_response.raise_for_status = MagicMock(
@@ -395,7 +391,7 @@ class TestRedeemerRedeemCode:
         self, redeemer: Redeemer, valid_cookies: dict
     ) -> None:
         """Test handling of network error."""
-        import aiohttp
+        import aiohttp  # noqa: PLC0415 -- test-local import kept near its use
 
         mock_session = AsyncMock()
         mock_session.get = MagicMock(
@@ -498,14 +494,13 @@ class TestRedeemerLogging:
         mock_session.get = AsyncMock(return_value=mock_async_context_manager(mock_response))
         mock_session.closed = False
 
-        with patch.object(redeemer, "_get_session", return_value=mock_session):
-            with caplog.at_level("INFO"):
-                await redeemer.redeem_code(
-                    code="GENSHIN123",
-                    cookies=valid_cookies,
-                    uid="123456789",
-                    region="os_usa",
-                )
+        with patch.object(redeemer, "_get_session", return_value=mock_session), caplog.at_level("INFO"):
+            await redeemer.redeem_code(
+                code="GENSHIN123",
+                cookies=valid_cookies,
+                uid="123456789",
+                region="os_usa",
+            )
 
         # Check that code is masked in logs
         log_messages = [record.message for record in caplog.records]
@@ -523,11 +518,11 @@ class TestRedeemerConcurrentGames:
         redeemer: Redeemer,
         valid_cookies: dict,
     ) -> None:
-        from src.constants import GAME_CONF
+        from src.constants import GAME_CONF  # noqa: PLC0415 -- test-local import kept near its use
 
         called_urls: list[str] = []
 
-        def fake_get_cm(url, *args, **kwargs):
+        def fake_get_cm(url, *_args, **_kwargs):
             called_urls.append(url)
             return mock_async_context_manager(
                 AsyncMock(
@@ -560,7 +555,7 @@ class TestRedeemerConcurrentGames:
         finally:
             real_session.get = real_get
 
-        assert len(called_urls) == 2
+        assert len(called_urls) == 2  # one fetch per game
         genshin_host = GAME_CONF["genshin"]["api_host"]
         hsr_host = GAME_CONF["hsr"]["api_host"]
         assert any(f"https://{genshin_host}/" in u for u in called_urls)

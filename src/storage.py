@@ -19,6 +19,7 @@ from cryptography.fernet import Fernet
 
 from src.checkin import STATUS_FAILED, CheckinResult
 from src.migrations import CURRENT_VERSION, run_migrations
+from src.paths import default_db_path
 
 logger = logging.getLogger(__name__)
 
@@ -37,14 +38,12 @@ class Storage:
             db_path: Path to SQLite database file. Defaults to the app data dir
                 (repo `data/` in source mode, %LOCALAPPDATA% when frozen).
         """
-        from src.paths import default_db_path
-
         self.db_path = Path(db_path) if db_path else Path(default_db_path())
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._fernet = self._get_or_create_fernet()
         run_migrations(str(self.db_path), CURRENT_VERSION)
 
-    def _get_or_create_fernet(self) -> Fernet:
+    def _get_or_create_fernet(self) -> Fernet:  # noqa: C901 -- 4 ordered key-lookup fallbacks; splitting would obscure the sequence
         """Get or create Fernet instance for cookie encryption.
 
         Tries in order:
@@ -64,9 +63,9 @@ class Storage:
             except Exception as e:
                 logger.warning("Invalid GENSHIN_ENCRYPTION_KEY: %s, falling back", e)
 
-        # Try keyring
+        # Try keyring (optional dependency, kept lazy so missing it never blocks storage)
         try:
-            import keyring
+            import keyring  # noqa: PLC0415 -- optional dependency, lazy import
 
             key = keyring.get_password("genshin-code-monitor", "encryption-key")
             if key:
@@ -87,7 +86,7 @@ class Storage:
         # 4. Generate new key and persist
         key = Fernet.generate_key().decode()
         try:
-            import keyring
+            import keyring  # noqa: PLC0415 -- optional dependency, lazy import
 
             keyring.set_password("genshin-code-monitor", "encryption-key", key)
             logger.info("Generated new encryption key and stored in keyring")
@@ -143,7 +142,7 @@ class Storage:
 
     # --- Codes CRUD ---
 
-    def add_code(
+    def add_code(  # noqa: PLR0913 -- 5 params mirror the codes-table write surface (code, source, 3 optional timestamps)
         self,
         code: str,
         source: str,
@@ -361,7 +360,7 @@ class Storage:
                 )
             return cursor.rowcount > 0
 
-    def list_codes(
+    def list_codes(  # noqa: PLR0913 -- 7 filter params mirror the codes-table query surface
         self,
         limit: int = 100,
         offset: int = 0,
@@ -573,7 +572,7 @@ class Storage:
 
     # --- Sources CRUD ---
 
-    def add_source(
+    def add_source(  # noqa: PLR0913 -- 13 params mirror the sources-table write surface
         self,
         name: str,
         url: str,
@@ -671,7 +670,7 @@ class Storage:
         data["requires_browser"] = bool(data.get("requires_browser", 0))
         return data
 
-    def update_source(
+    def update_source(  # noqa: PLR0913, C901, PLR0912 -- 12 optional-field kwargs mirror the sources-table write surface
         self,
         name: str,
         url: str | None = None,
@@ -810,7 +809,7 @@ class Storage:
 
     # --- Accounts CRUD ---
 
-    def add_account(
+    def add_account(  # noqa: PLR0913 -- 6 params mirror the accounts-table write surface
         self,
         name: str,
         uid: str,
@@ -863,7 +862,7 @@ class Storage:
                 rows = conn.execute("SELECT * FROM accounts ORDER BY name").fetchall()
             return [dict(row) for row in rows]
 
-    def update_account(
+    def update_account(  # noqa: PLR0913 -- 5 optional-field kwargs mirror the accounts-table write surface
         self,
         name: str,
         uid: str | None = None,
@@ -951,7 +950,7 @@ class Storage:
 
     # --- Redemption Log CRUD ---
 
-    def add_redemption_log(
+    def add_redemption_log(  # noqa: PLR0913 -- 6 params mirror the redemption_log-table write surface
         self,
         code: str,
         account_id: int,
@@ -1232,7 +1231,7 @@ class Storage:
             rows = conn.execute(query, params).fetchall()
             return [dict(row) for row in rows]
 
-    def upsert_checkin_log(
+    def upsert_checkin_log(  # noqa: PLR0913 -- 6 params mirror the checkin_log-table write surface
         self,
         account_id: int,
         game: str,

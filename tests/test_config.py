@@ -1,16 +1,23 @@
 """Unit tests for the ConfigManager / Settings class."""
 
-import os
 import tempfile
 from pathlib import Path
 
 import pytest
+import toml
 
 from src.config import (
     ConfigManager,
     Settings,
     get_config_manager,
     reset_config_manager,
+)
+from src.constants import (
+    DEFAULT_BACKUP_COUNT,
+    DEFAULT_MAX_LOG_SIZE,
+    DEFAULT_POLL_INTERVAL_SECONDS,
+    DEFAULT_REDEMPTION_MIN_GAP_SECONDS,
+    DEFAULT_SOURCE_TIMEOUT_SECONDS,
 )
 
 
@@ -19,8 +26,8 @@ def temp_config_file() -> str:
     with tempfile.NamedTemporaryFile(suffix=".toml", delete=False) as f:
         config_path = f.name
     yield config_path
-    if os.path.exists(config_path):
-        os.unlink(config_path)
+    if Path(config_path).exists():
+        Path(config_path).unlink()
 
 
 @pytest.fixture
@@ -38,10 +45,10 @@ def reset_global_config() -> None:
 class TestSettingsDefaults:
     def test_default_values_are_seconds_based(self) -> None:
         s = Settings()
-        assert s.poll_interval_seconds == 900
-        assert s.source_timeout_seconds == 30
+        assert s.poll_interval_seconds == DEFAULT_POLL_INTERVAL_SECONDS
+        assert s.source_timeout_seconds == DEFAULT_SOURCE_TIMEOUT_SECONDS
         assert s.redemption_enabled is False
-        assert s.redemption_min_gap_seconds == 8
+        assert s.redemption_min_gap_seconds == DEFAULT_REDEMPTION_MIN_GAP_SECONDS
         assert s.max_retry_attempts == 3
         assert s.retry_backoff_seconds == [30, 120, 600]
         assert s.heartbeat_seconds == 5
@@ -49,8 +56,8 @@ class TestSettingsDefaults:
         assert s.db_path.endswith("monitor.db")
         assert s.log_level == "INFO"
         assert s.log_file.endswith("app.log")
-        assert s.max_log_size == 10485760
-        assert s.backup_count == 5
+        assert s.max_log_size == DEFAULT_MAX_LOG_SIZE
+        assert s.backup_count == DEFAULT_BACKUP_COUNT
 
     def test_no_auth_fields_in_settings(self) -> None:
         s = Settings()
@@ -84,7 +91,7 @@ class TestConfigManagerInit:
 class TestConfigManagerLoad:
     def test_load_creates_default_config(self, config_manager: ConfigManager) -> None:
         s = config_manager.load()
-        assert s.poll_interval_seconds == 900
+        assert s.poll_interval_seconds == DEFAULT_POLL_INTERVAL_SECONDS
         assert s.redemption_enabled is False
 
     def test_load_creates_config_file(self, config_manager: ConfigManager) -> None:
@@ -98,7 +105,6 @@ class TestConfigManagerLoad:
             "redemption_min_gap_seconds": 10,
         }
         with open(config_manager.config_path, "w", encoding="utf-8") as f:
-            import toml
             toml.dump(custom, f)
 
         s = config_manager.load()
@@ -109,7 +115,6 @@ class TestConfigManagerLoad:
     def test_load_partial_config_merges_defaults(self, config_manager: ConfigManager) -> None:
         partial = {"poll_interval_seconds": 7200}
         with open(config_manager.config_path, "w", encoding="utf-8") as f:
-            import toml
             toml.dump(partial, f)
 
         s = config_manager.load()
@@ -182,7 +187,7 @@ class TestConfigManagerReset:
         config_manager.load()
         config_manager.set("poll_interval_seconds", 3600)
         config_manager.reset_to_defaults()
-        assert config_manager.get("poll_interval_seconds") == 900
+        assert config_manager.get("poll_interval_seconds") == DEFAULT_POLL_INTERVAL_SECONDS
 
 
 class TestGlobalConfigManager:

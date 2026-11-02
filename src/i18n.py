@@ -6,8 +6,10 @@ Language is stored in storage config under key "language".
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 SUPPORTED: dict[str, str] = {
     "en": "English",
@@ -34,7 +36,7 @@ LOCALE_MAP = {
 def system_lang() -> str:
     """Detect OS language, mapped to supported codes (fallback: en)."""
     try:
-        import locale
+        import locale  # noqa: PLC0415 -- stdlib, but deferred so the module stays import-light on embedded targets
 
         loc = (locale.getdefaultlocale()[0] or "").lower()
         prefix = loc.split("_")[0]

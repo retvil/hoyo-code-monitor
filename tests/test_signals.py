@@ -53,7 +53,7 @@ class TestGracefulShutdown:
         manager = GracefulShutdown(
             loop=event_loop, cleanup_callbacks=[callback1, callback2]
         )
-        assert len(manager.cleanup_callbacks) == 2
+        assert len(manager.cleanup_callbacks) == 2  # the two callbacks registered above
         assert callback1 in manager.cleanup_callbacks
         assert callback2 in manager.cleanup_callbacks
 
@@ -118,7 +118,7 @@ class TestGracefulShutdown:
              patch("sys.exit") as mock_exit:
             shutdown_manager._force_exit()
 
-            # Should restore original handlers
+            # Should restore the two handlers saved in _original_handlers
             assert mock_signal.call_count == 2
             # Should call sys.exit(1)
             mock_exit.assert_called_once_with(1)

@@ -23,7 +23,7 @@ SEND_TIMEOUT = 15.0
 
 async def send_telegram(bot_token: str, chat_id: str, text: str) -> bool:
     """Send a Telegram message with retry + backoff. Returns True on success."""
-    import aiohttp
+    import aiohttp  # noqa: PLC0415 -- heavy client import kept out of module import time
 
     if not bot_token or not chat_id:
         return False
