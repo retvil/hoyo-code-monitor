@@ -8,7 +8,7 @@
 
 ## Was ist das?
 
-HoYoverse-Spiele veröffentlichen regelmäßig zeitlich begrenzte Promocodes — und sie laufen schnell ab. **HoYo Code Monitor** überwacht 25 Code-Quellen in 5 Spielen (Genshin Impact, Honkai: Star Rail, Zenless Zone Zero, Honkai Impact 3rd, Tears of Themis) und löst neue Codes automatisch auf Ihren Konten ein. Alles läuft lokal auf Ihrem PC: SQLite-Datenbank, verschlüsselte Cookies, keine Telemetrie, keine Cloud.
+HoYoverse-Spiele veröffentlichen regelmäßig zeitlich begrenzte Promocodes — und sie laufen schnell ab. **HoYo Code Monitor** überwacht 16 Code-Quellen in 5 Spielen (Genshin Impact, Honkai: Star Rail, Zenless Zone Zero, Honkai Impact 3rd, Tears of Themis) und löst neue Codes automatisch auf Ihren Konten ein. Alles läuft lokal auf Ihrem PC: SQLite-Datenbank, verschlüsselte Cookies, keine Telemetrie, keine Cloud.
 
 ### So funktioniert es
 
@@ -22,10 +22,13 @@ HoYoverse-Spiele veröffentlichen regelmäßig zeitlich begrenzte Promocodes —
 
 - **Hintergrundüberwachung** — prüft Quellen alle N Minuten (konfigurierbar, Standard 15)
 - **Auto-Einlösung** — löst neue Codes über die Hoyolab `webExchangeCdkey` API ein (opt-in, pro Konto)
-- **Tägliche Check-ins** — automatische Anmeldung bei HoYoLAB für Genshin, Star Rail, ZZZ + HI3 (opt-in, pro Konto, eigener Zeitplan, idempotent)
-- **Multi-Source** — Wiki, Wiki-API, Community-JSON-APIs, Guide-Seiten (25 Presets)
+- **Tägliche Check-ins** — automatische Anmeldung bei HoYoLAB für alle 5 Spiele: Genshin, Star Rail, ZZZ, HI3, Tears of Themis (opt-in, pro Konto, eigener Zeitplan, idempotent)
+- **Multi-Source** — Wiki, Wiki-API, Community-JSON-APIs, Guide-Seiten (16 Presets)
 - **Multi-Account** — jedes Konto hat eigene verschlüsselte Cookies und eigenen Schalter
+- **Filter für aktivierte Spiele** — je Konto kann festgelegt werden, in welchen Spielen Check-ins laufen sollen (`accounts.games`, Migration v15); der Scheduler überspringt nicht aktivierte Spiele — kein unnötiges „-10002 no-character" im Log
 - **Automatische Cookie-Aktualisierung** — wenn eine Check-in an abgelaufenen Cookies scheitert, werden sie im Headless-Modus aus dem gespeicherten Browserprofil neu erfasst (optional, Cooldown pro Konto), sodass der Betrieb ohne manuelles erneutes Anmelden läuft
+- **„Aktiv"-Status bei Quellen** — erfolgreich abgefragte Quellen werden als „aktiv" angezeigt; bei Fehlschlag wird der Status sofort auf „idle" zurückgesetzt (Spalte `last_success`, Migration v16)
+- **Update-Prüfung abschaltbar** — `update_check_enabled = false` in der config deaktiviert den GitHub-Abfrage komplett; das Banner wird nicht angezeigt
 - **Statistik** — gesamt / eingelöst / fehlgeschlagen, pro Quelle, Einlöseprotokoll
 - **Web UI** — lokales Dashboard unter `http://127.0.0.1:8000` in 6 Sprachen
 - **System Tray** — Symbol mit Ein/Aus, Scanintervall-Menü, Einstellungen per Klick

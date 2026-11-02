@@ -8,7 +8,7 @@
 
 ## De quoi s'agit-il ?
 
-Les jeux HoYoverse publient régulièrement des codes promo à durée limitée — et ils expirent vite. **HoYo Code Monitor** surveille 25 sources de codes dans 5 jeux (Genshin Impact, Honkai: Star Rail, Zenless Zone Zero, Honkai Impact 3rd, Tears of Themis) et échange automatiquement les nouveaux codes sur vos comptes. Tout fonctionne en local sur votre PC : base SQLite, cookies chiffrés, aucune télémétrie, aucun cloud.
+Les jeux HoYoverse publient régulièrement des codes promo à durée limitée — et ils expirent vite. **HoYo Code Monitor** surveille 16 sources de codes dans 5 jeux (Genshin Impact, Honkai: Star Rail, Zenless Zone Zero, Honkai Impact 3rd, Tears of Themis) et échange automatiquement les nouveaux codes sur vos comptes. Tout fonctionne en local sur votre PC : base SQLite, cookies chiffrés, aucune télémétrie, aucun cloud.
 
 ### Comment ça marche
 
@@ -23,10 +23,13 @@ Thème sombre
 
 - **Surveillance en arrière-plan** — vérifie les sources toutes les N minutes (configurable, 15 par défaut)
 - **Échange auto** — échange les nouveaux codes via l'API Hoyolab `webExchangeCdkey` (opt-in, par compte)
-- **Check-ins quotidiens** — connexion auto sur HoYoLAB pour Genshin, Star Rail, ZZZ + HI3 (opt-in, par compte, planning dédié, idempotent)
-- **Multi-sources** — Wiki, Wiki API, API JSON communautaires, sites de guides (25 préréglages)
+- **Check-ins quotidiens** — connexion auto sur HoYoLAB pour les 5 jeux : Genshin, Star Rail, ZZZ, HI3, Tears of Themis (opt-in, par compte, planning dédié, idempotent)
+- **Multi-sources** — Wiki, Wiki API, API JSON communautaires, sites de guides (16 préréglages)
 - **Multi-comptes** — chaque compte a ses cookies chiffrés et son interrupteur
+- **Filtre des jeux activés par compte** — chaque compte peut restreindre les check-ins aux jeux choisis (`accounts.games`, migration v15) ; le planificateur passe outre les jeux non activés — plus de lignes « -10002 no-character » inutiles
 - **Actualisation auto des cookies** — si un check-in échoue à cause de cookies expirés, ils sont recapturés en mode headless depuis le profil navigateur sauvegardé (option, délai par compte) — la surveillance ne s'interrompt pas sans reconnexion manuelle
+- **Statut « actif » par source** — une source interrogée avec succès est marquée « active » ; un échec recentre immédiatement le statut sur « idle » (colonne `last_success`, migration v16)
+- **Désactiver la vérification des mises à jour** — `update_check_enabled = false` dans la config désactive complètement l'appel à GitHub, le bandeau n'est plus affiché
 - **Statistiques** — total / échangés / échoués, par source, journal d'échange
 - **Web UI** — tableau de bord local sur `http://127.0.0.1:8000` en 6 langues
 - **Barre système** — icône avec activer/désactiver, menu d'intervalle, réglages en un clic
