@@ -1,5 +1,47 @@
 # Changelog
 
+## [1.5.0] - 2026-10-29
+
+### Added
+- **Per-account "enabled games" filter**: new `accounts.games` column
+  (migration v15) stores a JSON array of game ids; `NULL` (the default) means
+  "all games". The scheduler loop now reads this column before the check-in
+  pass and skips any game the account hasn't enabled (`scheduler.py`
+  `_enabled_games_for` / `_run_checkin_slot` gating). The Accounts page
+  gains an "Enabled Games" checkbox group per account
+  (`GET/POST /accounts/{name}/games`). Concrete benefit: an account that only
+  plays Genshin no longer generates daily `-10002 no-character` "skipped"
+  log rows for HSR/ZZZ/HI3/ToT — the check-in pass now only attempts the
+  games actually in use.
+- **Sources "active" status is now real**: `sources.last_success` was a
+  read-only column that `web_ui`/`web_views` read to decide whether a source
+  shows "active" vs "idle"/"warning", but nothing ever wrote to it, so the
+  "active" branch was permanently dead. Two new `Storage` methods —
+  `mark_source_success(name, at=None)` (writes a UTC ISO-8601 timestamp) and
+  `clear_source_success(name)` (resets to NULL) — are now called from
+  `SourceFetcher.fetch_all_enabled`'s per-source success/failure paths: a
+  successful `fetch_source` records the timestamp; a caught exception calls
+  both `increment_source_error` and `clear_source_success` so a fresh
+  failure immediately drops the source out of "active" rather than letting a
+  stale success linger until the next error_count threshold. Migration v16
+  adds the column itself (nullable, no default). Two new tests lock in the
+  behaviour (`test_fetch_all_enabled_success_records_last_success`,
+  `test_fetch_all_enabled_failure_clears_last_success`).
+
+### Changed
+- **`update_check_enabled` config flag is now a real off-switch**:
+  `version_check.py` now reads the flag via `ConfigManager` and short-circuits
+  the GitHub API call when it's `false` (returns `None` immediately, no
+  outbound request, banner stays hidden). Previously the flag existed in
+  `Settings` and was documented in the module docstring, but no code ever
+  read it, so the banner was always active regardless of the config value.
+
+### Docs
+- Check-in UI strings now translated in all 6 languages
+  (de/fr/ja/zh previously fell back to English on the Check-ins page; the
+  14+ missing `checkin_*` keys were added to each of the four language
+  blocks, plus `checkin_auto_refresh` and `checkin_manual_hint`).
+
 ## [1.4.1] - 2026-10-28
 
 ### Changed

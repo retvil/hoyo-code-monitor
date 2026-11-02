@@ -486,10 +486,9 @@ MIGRATIONS: list[Migration] = [
         -- read, never as a schema object, so the lookup was always None and
         -- the "active" branch was dead. Adding the column (nullable, no
         -- default — NULL means "never succeeded") makes the read
-        -- legitimate. The scheduler-side write
-        -- (`update_source(last_success=...)`) is intentionally deferred to
-        -- a follow-up; until then the value stays NULL, which the UI
-        -- treats as "idle" (never succeeded), the correct semantics.
+        -- legitimate. It is now written by SourceFetcher.fetch_all_enabled
+        -- via Storage.mark_source_success / clear_source_success on the
+        -- per-source success/failure paths.
         ALTER TABLE sources ADD COLUMN last_success TIMESTAMP;
         UPDATE schema_version SET version = 16;
         """,

@@ -533,13 +533,25 @@ class SourceFetcher:
             gate = self._host_gates[self._host_of(source.url)]
             try:
                 async with gate:
-                    return name, await self.fetch_source(source)
+                    codes = await self.fetch_source(source)
+                try:
+                    self.storage.mark_source_success(source.name)
+                except Exception:
+                    logger.debug("Could not record last_success for %s", source.name)
+                return name, codes
             except Exception as e:
                 logger.error("Failed to fetch from %s: %s", source.name, e)
                 try:
                     self.storage.increment_source_error(source.name)
                 except Exception:
                     logger.debug("Could not increment error count for %s", source.name)
+                # A fresh failure supersedes any earlier "last_success": a source
+                # that has just failed should not keep showing "active" on the
+                # dashboard until it succeeds again.
+                try:
+                    self.storage.clear_source_success(source.name)
+                except Exception:
+                    logger.debug("Could not clear last_success for %s", source.name)
                 return name, []
 
         # run_one swallows every exception, so gather never leaves a sibling

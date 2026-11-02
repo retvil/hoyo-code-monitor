@@ -328,8 +328,8 @@ class TestSourceFetcher:
     @pytest.mark.asyncio
     async def test_fetch_all_enabled_spaces_same_host(self, storage: Storage) -> None:
         """Sources sharing a host keep their configured minimum spacing."""
-        storage.add_source("one", "https://same.example/a", "css", ".code", rate_limit_seconds=0.03)
-        storage.add_source("two", "https://same.example/b", "css", ".code", rate_limit_seconds=0.03)
+        storage.add_source("one", "https://same.example/a", "css", ".code", rate_limit_seconds=0.5)
+        storage.add_source("two", "https://same.example/b", "css", ".code", rate_limit_seconds=0.5)
         fetcher = SourceFetcher(storage, session=MagicMock())
         starts: list[float] = []
         loop = asyncio.get_running_loop()
@@ -342,7 +342,14 @@ class TestSourceFetcher:
         result = await fetcher.fetch_all_enabled()
         assert result == {"one": ["one"], "two": ["two"]}
         assert len(starts) == 2
-        assert starts[1] - starts[0] >= 0.025
+        # Append order is nondeterministic (two concurrent tasks race to the
+        # gate), so sort before asserting the *gap* between the two starts,
+        # which is the actual invariant under test: same-host starts are
+        # spaced at least the configured min_interval apart. A large interval
+        # (0.5s) keeps the assertion far above the noise floor of process-
+        # startup / CPU jitter on slow CI runners; the original 0.03s was too
+        # tight to be reliable under load.
+        assert max(starts) - min(starts) >= 0.4
 
     @pytest.mark.asyncio
     async def test_fetch_all_enabled_failure_isolated(self, storage: Storage) -> None:
@@ -405,6 +412,42 @@ class TestSourceFetcher:
         source = storage.get_source("good")
         assert source is not None
         assert source["error_count"] == 0
+
+    @pytest.mark.asyncio
+    async def test_fetch_all_enabled_success_records_last_success(
+        self, storage: Storage
+    ) -> None:
+        """A successful fetch must record a non-NULL last_success timestamp."""
+        storage.add_source("good", "https://good.example", "css", ".code", rate_limit_seconds=0)
+        assert storage.get_source("good")["last_success"] is None
+        fetcher = SourceFetcher(storage, session=MagicMock())
+
+        async def fake_fetch(source: SourceConfig) -> list[str]:
+            return ["GOODCODE"]
+
+        fetcher.fetch_source = fake_fetch
+        await fetcher.fetch_all_enabled()
+
+        assert storage.get_source("good")["last_success"] is not None
+
+    @pytest.mark.asyncio
+    async def test_fetch_all_enabled_failure_clears_last_success(
+        self, storage: Storage
+    ) -> None:
+        """A failed fetch must reset last_success to NULL (no stale 'active' state)."""
+        storage.add_source("bad", "https://bad.example", "css", ".code", rate_limit_seconds=0)
+        storage.mark_source_success("bad")
+        assert storage.get_source("bad")["last_success"] is not None
+
+        fetcher = SourceFetcher(storage, session=MagicMock())
+
+        async def failing_fetch(source: SourceConfig) -> list[str]:
+            raise RuntimeError("boom")
+
+        fetcher.fetch_source = failing_fetch
+        await fetcher.fetch_all_enabled()
+
+        assert storage.get_source("bad")["last_success"] is None
 
     @pytest.mark.asyncio
     async def test_zero_retries_still_attempts_and_logs_failure(

@@ -11,3 +11,5 @@ log_level = "INFO"
 log_file = "logs/app.log"
 max_log_size = 10485760
 backup_count = 5
+# Set to false to disable the GitHub Releases update check / in-app update banner
+update_check_enabled = true

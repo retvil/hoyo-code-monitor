@@ -1,7 +1,7 @@
 # HoYo Code Monitor — Project Overview
 
 ## Working title
-HoYo Code Monitor (HCM), current release **1.1.6**.
+HoYo Code Monitor (HCM), current release **1.5.0**.
 
 ## Problem
 HoYoverse promo codes are scattered across wikis, HoYoLAB, socials and streams,
@@ -16,16 +16,27 @@ redemption are tedious.
 ## Use cases
 1. Background monitoring every N minutes → new codes in local DB (25 presets).
 2. Auto-redeem via Hoyolab API (opt-in per account, encrypted cookies).
-3. Daily HoYoLAB check-ins on own schedule (Genshin, HSR, ZZZ, HI3), per-account toggles.
+3. Daily HoYoLAB check-ins on own schedule (Genshin, HSR, ZZZ, HI3, ToT), per-account
+   toggles, optional per-account "enabled games" filter so an account only checks the games
+   it actually plays (avoids daily `-10002` "no character" skipped rows for unplayed games).
 4. Manual `run-once` / "Claim now", stats, source/account management.
 5. Local Web UI on 127.0.0.1 only, no server part.
 
 ## Key features
 - Multi-source scraping (25 presets: wikis, hoyo-codes, ennead, guides), per-game filter.
-- Auto-redeem with encrypted cookies, 8s gap, retry 429/5xx.
+- Auto-redeem with encrypted cookies, configurable gap (default 8s), retry 429/5xx.
 - Daily check-ins: `info → sign → home`, idempotent log, catch-up on startup, progress API.
+- Per-source "active" health status: a source only shows "active" after a real successful
+  fetch (`sources.last_success`); a fresh failure drops it out of "active" immediately.
+- Auto cookie refresh: when a check-in fails on expired cookies, the scheduler optionally
+  re-captures cookies headless from the saved browser profile (opt-in, per-account cooldown),
+  so monitoring keeps working without a manual re-login while the session is still valid.
+- Notifications: optional Telegram bot + local Windows toasts for new codes / successful
+  redemptions; in-app GitHub Releases update banner (manual, read-only, disableable via
+  `update_check_enabled = false` in config).
 - Stats (total/success/failed/by source/by game), logs, Prometheus /metrics.
-- CLI + Web UI (6 languages), tray, autostart, graceful shutdown, rotating logs with secret filter.
+- CLI + Web UI (6 languages, check-in pages fully translated in all six), tray, autostart,
+  graceful shutdown, rotating logs with secret filter.
 
 ## Constraints
 Local only, single user, offline-capable core, no admin rights, Python 3.11+, Windows 10/11.
@@ -44,12 +55,15 @@ fallback Wiki → GitHub → hoyo-codes → ennead.
 Start <3s, cycle <30s, RAM <200MB, idle CPU <1%, shutdown <10s.
 
 ## Scope
-In: monitoring, redeem, check-ins, CLI+Web UI, stats, encryption, tray, NSIS installer.
-Out: multi-user, cloud, mobile, Discord bot, auto-update, native GUI, plugins, ToT check-in
-(no verified OS act_id yet).
+In: monitoring, redeem, check-ins, CLI+Web UI, stats, encryption, tray, NSIS installer,
+Telegram/toast notifications, auto cookie refresh, in-app update banner.
+Out: multi-user, cloud, mobile, Discord bot, self-applying auto-update, native GUI.
 
 ## Assumptions (verified live)
 - A1: Hoyolab `webExchangeCdkey` stable, ~6-8s gap. ✓
-- A2: user refreshes cookies manually (UI warns with no-cookies badge). ✓
+- A2: user refreshes cookies manually (UI warns with no-cookies badge); optional headless
+  auto-refresh covers the still-valid-session case without manual re-login. ✓
 - A3: check-in `/info.today` is `YYYY-MM-DD`, `-5003` means already claimed. ✓
 - A4: Playwright ~170MB auto-download, browser sources off by default. ✓
+- A5: ToT (Tears of Themis) check-in OS `act_id` verified live against HoYoLAB (no longer
+  an open "no verified act_id" gap). ✓

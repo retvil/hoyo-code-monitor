@@ -759,6 +759,42 @@ class Storage:
                 (name,),
             )
 
+    def mark_source_success(self, name: str, at: str | None = None) -> None:
+        """Record the current UTC time as the source's last successful fetch.
+
+        Symmetric counterpart to :meth:`increment_source_error`: the error
+        counter tracks *how many* consecutive failures, while ``last_success``
+        tracks *when* the source last succeeded. ``web_ui``/``web_views`` read
+        this to drive the source "active" status (a source with a recent
+        ``last_success`` shows "active" instead of "idle"/"warning").
+
+        Args:
+            name: The source's unique name.
+            at: ISO-8601 timestamp to store. Defaults to the current UTC time
+                if omitted (matches the tz-aware-UTC convention used for the
+                ``attempted_at`` write side elsewhere in this module).
+        """
+        stamp = at or datetime.now(UTC).isoformat()
+        with self._connection() as conn:
+            conn.execute(
+                "UPDATE sources SET last_success = ? WHERE name = ?",
+                (stamp, name),
+            )
+
+    def clear_source_success(self, name: str) -> None:
+        """Reset a source's ``last_success`` back to NULL (never succeeded).
+
+        The failure-path counterpart to :meth:`mark_source_success`: when a
+        fetch just failed we want the dashboard's "active" status to drop
+        immediately rather than keep showing a stale success timestamp from
+        before the failure.
+        """
+        with self._connection() as conn:
+            conn.execute(
+                "UPDATE sources SET last_success = NULL WHERE name = ?",
+                (name,),
+            )
+
     def delete_source(self, name: str) -> bool:
         """Delete a source by name.
 
