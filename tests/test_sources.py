@@ -458,6 +458,63 @@ class TestSourceFetcher:
         assert storage.get_source("bad")["last_success"] is None
 
     @pytest.mark.asyncio
+    async def test_fetch_all_enabled_success_clears_stale_error_count(
+        self, storage: Storage
+    ) -> None:
+        """A recovered source must not keep a stale, accumulated error count.
+
+        Simulate a source that failed a few times (high ``error_count``), then
+        succeeds on a later call — the success path must call
+        ``Storage.clear_source_error`` so the counter resets to 0 instead of
+        dragging the dashboard status down to "error" forever.
+        """
+        storage.add_source("flaky", "https://flaky.example", "css", ".code", rate_limit_seconds=0)
+
+        # Simulate accumulated failures from earlier, now-recovered cycles.
+        for _ in range(4):
+            storage.increment_source_error("flaky")
+        assert storage.get_source("flaky")["error_count"] == 4
+
+        fetcher = SourceFetcher(storage, session=MagicMock())
+
+        async def fake_fetch(_source: SourceConfig) -> list[str]:
+            return ["GOODCODE"]
+
+        fetcher.fetch_source = fake_fetch
+        result = await fetcher.fetch_all_enabled()
+
+        assert result == {"flaky": ["GOODCODE"]}
+        source = storage.get_source("flaky")
+        assert source is not None
+        # The recovered source must have its stale high error count reset to 0,
+        # and a fresh last_success recorded by the same success path.
+        assert source["error_count"] == 0
+        assert source["last_success"] is not None
+
+    @pytest.mark.asyncio
+    async def test_fetch_all_enabled_failure_does_not_clear_error_count(
+        self, storage: Storage
+    ) -> None:
+        """The failure path must not accidentally zero out a real error count."""
+        storage.add_source("bad", "https://bad.example", "css", ".code", rate_limit_seconds=0)
+        storage.increment_source_error("bad")  # simulate one prior failure
+        assert storage.get_source("bad")["error_count"] == 1
+
+        fetcher = SourceFetcher(storage, session=MagicMock())
+
+        async def failing_fetch(_source: SourceConfig) -> list[str]:
+            raise RuntimeError("boom")
+
+        fetcher.fetch_source = failing_fetch
+        result = await fetcher.fetch_all_enabled()
+
+        assert result == {"bad": []}
+        source = storage.get_source("bad")
+        assert source is not None
+        # Each failure increments the counter; a failure must never clear it.
+        assert source["error_count"] == 2
+
+    @pytest.mark.asyncio
     async def test_zero_retries_still_attempts_and_logs_failure(
         self, storage: Storage, source_config: SourceConfig
     ) -> None:

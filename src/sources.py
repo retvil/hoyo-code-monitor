@@ -556,6 +556,11 @@ class SourceFetcher:
             else:
                 try:
                     self.storage.mark_source_success(source.name)
+                    # A recovered source must not keep a stale, accumulated
+                    # error count dragging its dashboard status down to
+                    # "error"/"degraded" forever — reset it now that it's
+                    # working again.
+                    self.storage.clear_source_error(source.name)
                 except Exception:
                     logger.debug("Could not record last_success for %s", source.name)
                 return name, codes

@@ -758,6 +758,21 @@ class Storage:
                 (name,),
             )
 
+    def clear_source_error(self, name: str) -> None:
+        """Reset a source's ``error_count`` back to 0.
+
+        The success-path counterpart to :meth:`increment_source_error`: when a
+        fetch just succeeded we want a previously-accumulated error count (from
+        earlier, now-recovered failures) to stop dragging the dashboard's
+        source-health status down to "error"/"degraded" indefinitely. Call this
+        immediately after :meth:`mark_source_success` in the success path.
+        """
+        with self._connection() as conn:
+            conn.execute(
+                "UPDATE sources SET error_count = 0 WHERE name = ?",
+                (name,),
+            )
+
     def mark_source_success(self, name: str, at: str | None = None) -> None:
         """Record the current UTC time as the source's last successful fetch.
 

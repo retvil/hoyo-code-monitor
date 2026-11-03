@@ -234,12 +234,30 @@ def source_status(source_row: dict[str, Any]) -> str:
     """Return a single status word for a source row (used by /api/sources/status and source_health).
 
     Vocabulary: active | idle | warning | error.
+
+    A source that has a recorded ``last_success`` wins over a still-accumulated
+    ``error_count``: error counts from earlier, now-recovered failures are
+    cleared the moment the source succeeds again (see
+    ``Storage.mark_source_success`` + ``clear_source_error`` in
+    ``src/sources.py``), so a high leftover number should not keep pinning the
+    status to "error" indefinitely once the source is working again.
+
+    A source that has never succeeded (``last_success`` is NULL, so it has
+    never been checked recently either) is treated as "idle", not "error",
+    unless it has accumulated a lot of *consecutive* failures since its last
+    success — that's the only case where a never-succeeded source genuinely
+    looks broken rather than just forgotten/not-yet-tried.
     """
     if source_row.get("enabled") and source_row.get("last_success"):
         return "active"
-    if source_row.get("error_count", 0) > 3:
+    error_count = source_row.get("error_count", 0)
+    if source_row.get("last_success") is None and error_count > 3:
+        # Never succeeded, and a lot of consecutive failures piled up — this
+        # source looks genuinely broken, not just stale.
         return "error"
-    if is_source_stale(source_row.get("last_checked")):
+    if source_row.get("last_success") is not None and is_source_stale(source_row["last_success"]):
+        # Succeeded at some point, but hasn't been seen succeeding in a long
+        # time — a soft warning, not a hard error.
         return "warning"
     return "idle"
 

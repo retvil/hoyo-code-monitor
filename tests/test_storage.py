@@ -331,6 +331,20 @@ class TestSourcesCRUD:
         """Test incrementing a missing source does not raise."""
         storage.increment_source_error("nonexistent")
 
+    def test_clear_source_error_resets_count_to_zero(self, storage: Storage) -> None:
+        """``clear_source_error`` resets an accumulated ``error_count`` back to 0."""
+        storage.add_source("wiki", "https://example.com", "css", ".code")
+        for _ in range(5):
+            storage.increment_source_error("wiki")
+        assert storage.get_source("wiki")["error_count"] == 5
+
+        storage.clear_source_error("wiki")
+        assert storage.get_source("wiki")["error_count"] == 0
+
+    def test_clear_source_error_unknown_source_is_noop(self, storage: Storage) -> None:
+        """Clearing a missing source must not raise, mirroring increment_source_error."""
+        storage.clear_source_error("nonexistent")
+
     def test_increment_source_error_does_not_touch_check_count(
         self, storage: Storage
     ) -> None:
