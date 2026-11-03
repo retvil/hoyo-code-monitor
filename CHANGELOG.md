@@ -1,5 +1,44 @@
 # Changelog
 
+## [1.5.1] - 2026-11-03
+
+### Fixed
+- **Recover source "error" status after a transient failure**: a source's
+  `error_count` only ever went up (incremented on each failure) and was never
+  reset, so a source that recovered from a transient outage but had earlier
+  piled up >3 failures kept showing `error`/`degraded` in the dashboard and
+  `/health` indefinitely. `Storage.clear_source_error(name)` now resets the
+  counter to 0 on the fetch success path (right after `mark_source_success`),
+  so a recovered source drops back to `active`/`idle` instead of staying
+  pinned to `error` from stale, now-moot failures.
+- **`/health` no longer counts "forgotten" sources as broken**: `source_status`
+  was keyed off `last_checked` (a column that is never actually populated),
+  making its staleness check effectively dead. It now keys off `last_success`
+  and only classifies a source as `error` when it has *never* succeeded and
+  has a genuinely high consecutive-failure count; a source that simply hasn't
+  been checked recently but last succeeded is now `idle`, not `error`.
+
+### Changed
+- **Leaner installer bundle**: dev/analysis tooling that was accidentally
+  shipped in the PyInstaller onedir bundle (`IPython`, `mypy`, `sqlalchemy`,
+  `werkzeug`, `flask`, `black`, `prompt_toolkit`, `parso`, `wcwidth`,
+  `ast_serialize`, `pyreadline3`, `blib2to3`, `yapf_third_party`, `librt`,
+  `patchright`, `greenlet`, `jedi`, `ipykernel`) is now excluded — these are
+  only present in local dev/build environments and are never imported by the
+  app; excluding them drops ~130 MB of dead weight from the installed app
+  without changing runtime behavior.
+- Removed project-local agent skills (`.agents/`) and `skills-lock.json`
+  from version control; these are developer tooling, not part of the shipped
+  application.
+
+### Tests
+- 9 new tests lock in the `clear_source_error` reset-on-success behavior and
+  the new `source_status` decision tree (`tests/test_storage.py`,
+  `tests/test_sources.py`, `tests/test_web_views.py`); two pre-existing
+  `TestSourceHealth` assertions that assumed the old `last_checked`-based
+  behavior were updated to match. Full suite: 475 passed, 2 skipped;
+  `mypy src`: 0 errors.
+
 ## [1.5.0] - 2026-10-29
 
 ### Added
