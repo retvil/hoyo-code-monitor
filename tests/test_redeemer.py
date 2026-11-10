@@ -197,9 +197,7 @@ class TestRedeemerFormData:
 class TestRedeemerParseResponse:
     """Tests for response parsing."""
 
-    def test_parse_success_response(
-        self, redeemer: Redeemer, mock_success_response: dict
-    ) -> None:
+    def test_parse_success_response(self, redeemer: Redeemer, mock_success_response: dict) -> None:
         """Test parsing successful response."""
         result = redeemer._parse_response(mock_success_response)
         assert result.success is True
@@ -207,9 +205,7 @@ class TestRedeemerParseResponse:
         assert result.message == "OK"
         assert result.raw_response == mock_success_response
 
-    def test_parse_failure_response(
-        self, redeemer: Redeemer, mock_failure_response: dict
-    ) -> None:
+    def test_parse_failure_response(self, redeemer: Redeemer, mock_failure_response: dict) -> None:
         """Test parsing failed response."""
         result = redeemer._parse_response(mock_failure_response)
         assert result.success is False
@@ -355,11 +351,9 @@ class TestRedeemerRedeemCode:
             )
 
     @pytest.mark.asyncio
-    async def test_redeem_code_http_error(
-        self, redeemer: Redeemer, valid_cookies: dict
-    ) -> None:
+    async def test_redeem_code_http_error(self, redeemer: Redeemer, valid_cookies: dict) -> None:
         """Test handling of HTTP error response."""
-        import aiohttp  # noqa: PLC0415 -- test-local import kept near its use
+        import aiohttp
 
         mock_response = AsyncMock()
         mock_response.raise_for_status = MagicMock(
@@ -387,16 +381,12 @@ class TestRedeemerRedeemCode:
         assert "HTTP 403" in result.message
 
     @pytest.mark.asyncio
-    async def test_redeem_code_network_error(
-        self, redeemer: Redeemer, valid_cookies: dict
-    ) -> None:
+    async def test_redeem_code_network_error(self, redeemer: Redeemer, valid_cookies: dict) -> None:
         """Test handling of network error."""
-        import aiohttp  # noqa: PLC0415 -- test-local import kept near its use
+        import aiohttp
 
         mock_session = AsyncMock()
-        mock_session.get = MagicMock(
-            side_effect=aiohttp.ClientError("Connection refused")
-        )
+        mock_session.get = MagicMock(side_effect=aiohttp.ClientError("Connection refused"))
         mock_session.closed = False
 
         with patch.object(redeemer, "_get_session", return_value=mock_session):
@@ -491,10 +481,18 @@ class TestRedeemerLogging:
         mock_response.raise_for_status = MagicMock()
 
         mock_session = AsyncMock()
-        mock_session.get = AsyncMock(return_value=mock_async_context_manager(mock_response))
+        # ``session.get(url)`` must return the async context manager directly
+        # (synchronously) so that ``async with session.get(...)`` works. A plain
+        # MagicMock is correct here; an AsyncMock would yield a coroutine, and
+        # ``async with coroutine`` is not a valid context manager, leaving the
+        # coroutine unawaited (the source of the "never awaited" warning).
+        mock_session.get = MagicMock(return_value=mock_async_context_manager(mock_response))
         mock_session.closed = False
 
-        with patch.object(redeemer, "_get_session", return_value=mock_session), caplog.at_level("INFO"):
+        with (
+            patch.object(redeemer, "_get_session", return_value=mock_session),
+            caplog.at_level("INFO"),
+        ):
             await redeemer.redeem_code(
                 code="GENSHIN123",
                 cookies=valid_cookies,
@@ -518,7 +516,7 @@ class TestRedeemerConcurrentGames:
         redeemer: Redeemer,
         valid_cookies: dict,
     ) -> None:
-        from src.constants import GAME_CONF  # noqa: PLC0415 -- test-local import kept near its use
+        from src.constants import GAME_CONF
 
         called_urls: list[str] = []
 

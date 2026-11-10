@@ -173,8 +173,9 @@ class TestTokenDelivery:
 class TestRotation:
     """The token must expire, so an observed one cannot be replayed forever."""
 
-    def test_token_differs_across_days(self, client: TestClient, monkeypatch) -> None:
-        from src import web_ui  # noqa: PLC0415 -- test-local import kept near its use
+    @pytest.mark.usefixtures("client")
+    def test_token_differs_across_days(self, monkeypatch) -> None:
+        from src import web_ui
 
         monkeypatch.setattr(web_ui, "_csrf_day", lambda: "2026-01-01")
         first = web_ui._csrf_token()
@@ -183,7 +184,7 @@ class TestRotation:
 
     def test_stale_token_rejected_after_rotation(self, client: TestClient, monkeypatch) -> None:
         """A token leaked yesterday must not work today."""
-        from src import web_ui  # noqa: PLC0415 -- test-local import kept near its use
+        from src import web_ui
 
         monkeypatch.setattr(web_ui, "_csrf_day", lambda: "2026-01-01")
         stale = client.get("/api/csrf-token").json()["csrf_token"]
@@ -199,7 +200,7 @@ class TestRotation:
 
     def test_fresh_token_accepted_after_rotation(self, client: TestClient, monkeypatch) -> None:
         """Rotation must not lock the legitimate client out."""
-        from src import web_ui  # noqa: PLC0415 -- test-local import kept near its use
+        from src import web_ui
 
         monkeypatch.setattr(web_ui, "_csrf_day", lambda: "2026-01-01")
         client.get("/api/csrf-token")
@@ -215,18 +216,17 @@ class TestRotation:
 
     def test_token_stable_within_a_day(self, client: TestClient, monkeypatch) -> None:
         """Rotation is per-day, not per-request: one render must not break the next."""
-        from src import web_ui  # noqa: PLC0415 -- test-local import kept near its use
+        from src import web_ui
 
         monkeypatch.setattr(web_ui, "_csrf_day", lambda: "2026-01-01")
         first = client.get("/api/csrf-token").json()["csrf_token"]
         second = client.get("/api/csrf-token").json()["csrf_token"]
         assert first == second
 
-    def test_derivation_does_not_depend_on_seed_leakage(
-        self, client: TestClient, monkeypatch
-    ) -> None:
+    @pytest.mark.usefixtures("client")
+    def test_derivation_does_not_depend_on_seed_leakage(self, monkeypatch) -> None:
         """Token must be a one-way derivation, not the seed itself."""
-        from src import web_ui  # noqa: PLC0415 -- test-local import kept near its use
+        from src import web_ui
 
         monkeypatch.setattr(web_ui, "_csrf_day", lambda: "2026-01-01")
         assert web_ui._csrf_token() != web_ui._CSRF_SEED

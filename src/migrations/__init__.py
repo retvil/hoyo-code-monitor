@@ -563,4 +563,4 @@ if __name__ == "__main__":
 
     db_path = sys.argv[1] if len(sys.argv) > 1 else "data/monitor.db"
     run_migrations(db_path)
-    print(f"Migrations applied to {db_path}")
+    print(f"Migrations applied to {db_path}")  # noqa: T201 -- CLI one-shot print, not a library function

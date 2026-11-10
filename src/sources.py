@@ -101,8 +101,8 @@ class JSONExtractor:
     Values of exact `code`-like keys are taken verbatim (case preserved).
     """
 
-    def extract(self, content: str, selector: str) -> list[str]:  # noqa: C901 -- dict/list/str recursion covers the JSON shapes
-        import json  # noqa: PLC0415 -- stdlib import kept lazy to mirror the module's import-light design
+    def extract(self, content: str, selector: str) -> list[str]:
+        import json
 
         data = json.loads(content)
         target: Any = data
@@ -193,21 +193,21 @@ class SourceConfig:
         )
 
         if self.game not in GAMES:
-            raise SourceValidationError(f"Unknown game: {self.game}")  # noqa: TRY003 -- validation message needs interpolation
+            raise SourceValidationError(f"Unknown game: {self.game}")
         if self.selector_type not in EXTRACTORS:
-            raise SourceValidationError(f"Unknown selector_type: {self.selector_type}")  # noqa: TRY003 -- validation message needs interpolation
+            raise SourceValidationError(f"Unknown selector_type: {self.selector_type}")
         if not self.url:
-            raise SourceValidationError("url is required")  # noqa: TRY003 -- validation message needs interpolation
+            raise SourceValidationError("url is required")
         if not self.selector and self.selector_type != "json":
-            raise SourceValidationError("selector is required")  # noqa: TRY003 -- validation message needs interpolation
+            raise SourceValidationError("selector is required")
         if self.timeout_seconds <= 0:
-            raise SourceValidationError("timeout_seconds must be positive")  # noqa: TRY003 -- validation message needs interpolation
+            raise SourceValidationError("timeout_seconds must be positive")
         if self.rate_limit_seconds < 0:
-            raise SourceValidationError("rate_limit_seconds must be non-negative")  # noqa: TRY003 -- validation message needs interpolation
+            raise SourceValidationError("rate_limit_seconds must be non-negative")
         if self.max_retries < 0:
-            raise SourceValidationError("max_retries must be non-negative")  # noqa: TRY003 -- validation message needs interpolation
+            raise SourceValidationError("max_retries must be non-negative")
         if self.retry_base_delay <= 0:
-            raise SourceValidationError("retry_base_delay must be positive")  # noqa: TRY003 -- validation message needs interpolation
+            raise SourceValidationError("retry_base_delay must be positive")
 
     @classmethod
     def from_row(cls, row: dict[str, Any]) -> Self:
@@ -368,7 +368,7 @@ class SourceFetcher:
     async def _fetch_with_aiohttp(self, source: SourceConfig) -> list[str]:
         """Fetch using aiohttp with exponential backoff retry."""
         if not self._session:
-            raise RuntimeError("Session not initialized. Use async context manager.")  # noqa: TRY003 -- validation message needs interpolation
+            raise RuntimeError("Session not initialized. Use async context manager.")
 
         headers = {"User-Agent": self.user_agent}
         headers.update(source.headers)
@@ -500,7 +500,7 @@ class SourceFetcher:
             for host, interval in intervals.items()
         }
 
-    async def fetch_all_enabled(self) -> dict[str, list[str]]:  # noqa: C901 -- gate-building + per-source error paths; extract would obscure the flow
+    async def fetch_all_enabled(self) -> dict[str, list[str]]:
         """Fetch codes from every enabled source, overlapping unrelated hosts.
 
         Requests to *different* hosts run concurrently. Requests sharing a host
@@ -976,9 +976,9 @@ if __name__ == "__main__":
             async with SourceFetcher(storage) as fetcher:
                 results = await fetcher.fetch_all_enabled()
                 for name, codes in results.items():
-                    print(f"{name}: {len(codes)} codes")
+                    print(f"{name}: {len(codes)} codes")  # noqa: T201 -- one-shot seed/diag CLI output
                     for code in codes[:3]:
-                        print(f"  {code}")
+                        print(f"  {code}")  # noqa: T201 -- one-shot seed/diag CLI output
         finally:
             Path(db_path).unlink(missing_ok=True)
 

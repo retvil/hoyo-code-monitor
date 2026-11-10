@@ -57,9 +57,7 @@ def test_success_path_builds_notification(monkeypatch) -> None:
 
 def test_notify_toast_runs_in_thread_and_returns_flag(monkeypatch) -> None:
     seen: list[tuple[str, str]] = []
-    monkeypatch.setattr(
-        system_notify, "show_toast", lambda t, m: seen.append((t, m)) or True
-    )
+    monkeypatch.setattr(system_notify, "show_toast", lambda t, m: seen.append((t, m)) or True)
     assert asyncio.run(notify_toast("t", "m")) is True
     assert seen == [("t", "m")]
 
@@ -78,7 +76,7 @@ def test_new_codes_toast_batches_and_truncates(monkeypatch) -> None:
     assert sent[0] == ("New codes: 3", "A1, B2, C3")
     assert sent[1][0] == "New codes: 9"
     assert sent[1][1] == "C0, C1, C2, C3, C4 (+4 more)"
-    assert MAX_CODES_PER_TOAST == 5  # noqa: PLR2004 -- pins the batching constant
+    assert MAX_CODES_PER_TOAST == 5
 
 
 def test_new_codes_toast_empty_returns_false() -> None:

@@ -109,7 +109,12 @@ class Redeemer:
         """Async context manager entry."""
         return self
 
-    async def __aexit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None) -> None:
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         """Async context manager exit - closes session."""
         await self.close()
 
@@ -144,7 +149,7 @@ class Redeemer:
             "x-rpc-client_type": "4",
         }
 
-    def _build_form_data(  # noqa: PLR0913 -- 6 form fields mirror the API's query params
+    def _build_form_data(
         self,
         code: str,
         uid: str,
@@ -175,7 +180,7 @@ class Redeemer:
             "sLangKey": s_lang_key,
         }
 
-    def _parse_response(self, data: dict[str, Any]) -> RedemptionResult:  # noqa: C901 -- response shape varies (dict/list/absent); keep the classification inline
+    def _parse_response(self, data: dict[str, Any]) -> RedemptionResult:
         """Parse Hoyolab API response into RedemptionResult.
 
         Hoyolab API response format:
@@ -234,7 +239,7 @@ class Redeemer:
             raw_response=data,
         )
 
-    async def redeem_code(  # noqa: PLR0913 -- mirrors the Hoyolab API's own query surface (game selects the endpoint)
+    async def redeem_code(
         self,
         code: str,
         cookies: dict[str, str],
@@ -274,7 +279,7 @@ class Redeemer:
         required_cookies = ["ltuid", "ltoken"]
         missing = [c for c in required_cookies if not cookies.get(c)]
         if missing:
-            raise RedeemerError(f"Missing required cookies: {missing}")  # noqa: TRY003 -- validation message needs interpolation
+            raise RedeemerError(f"Missing required cookies: {missing}")
 
         conf = GAME_CONF.get(game, GAME_CONF["genshin"])
         resolved_biz = game_biz or conf["game_biz"]
@@ -287,7 +292,7 @@ class Redeemer:
             code, cookies, uid, region, resolved_biz, lang, s_lang_key, endpoint
         )
 
-    async def _redeem_get(  # noqa: PLR0913 -- internal helper, params mirror the redemption request fields
+    async def _redeem_get(
         self,
         code: str,
         cookies: dict[str, str],
@@ -370,7 +375,7 @@ class Redeemer:
                 raw_response={"retcode": -1, "message": str(e), "data": {}},
             )
 
-    async def _redeem_risk(  # noqa: PLR0913 -- internal helper, params mirror the redemption request fields
+    async def _redeem_risk(
         self,
         code: str,
         cookies: dict[str, str],
@@ -378,7 +383,7 @@ class Redeemer:
         region: str,
         conf: dict[str, str],
         lang: str,
-        s_lang_key: str,  # noqa: ARG002 -- accepted for signature symmetry with _redeem_get; risk payload has no sLangKey field
+        _s_lang_key: str,
         endpoint: str | None = None,
     ) -> RedemptionResult:
         """Redeem via POST webExchangeCdkeyRisk (ZZZ)."""
@@ -397,7 +402,9 @@ class Redeemer:
         logger.info("Attempting to redeem ZZZ code: %s", code[:4] + "****")
 
         try:
-            async with session.post(url, headers=headers, json=payload, timeout=self.timeout) as response:
+            async with session.post(
+                url, headers=headers, json=payload, timeout=self.timeout
+            ) as response:
                 response.raise_for_status()
                 result = self._parse_response(await response.json())
                 if result.success:

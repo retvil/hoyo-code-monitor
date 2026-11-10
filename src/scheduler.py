@@ -21,6 +21,8 @@ import aiohttp
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+import contextlib
+
 from src.checkin import (
     COOKIE_EXPIRED_MARKER,
     GAME_CHECKIN_CONF,
@@ -326,9 +328,7 @@ class Scheduler:
             return
         account_name = acc["name"]
         if not self._cookie_refresh_due(account_name):
-            logger.info(
-                "Cookie auto-refresh for %s skipped (cooldown)", account_name
-            )
+            logger.info("Cookie auto-refresh for %s skipped (cooldown)", account_name)
             return
         logger.info("Auto-refreshing cookies for %s (headless)", account_name)
         try:
@@ -340,15 +340,12 @@ class Scheduler:
             return
         if not fresh.get("ltoken"):
             logger.info(
-                "Auto cookie refresh for %s: no live session in profile; "
-                "run Auto-login to restore",
+                "Auto cookie refresh for %s: no live session in profile; run Auto-login to restore",
                 account_name,
             )
             return
         self.storage.store_account_cookies(account_name, fresh)
-        self.storage.set_config(
-            f"last_cookie_refresh_{account_name}", str(int(time.time()))
-        )
+        self.storage.set_config(f"last_cookie_refresh_{account_name}", str(int(time.time())))
         logger.info(
             "Auto cookie refresh succeeded for %s; next check-in run uses the fresh cookies",
             account_name,
@@ -383,7 +380,8 @@ class Scheduler:
             return summary
 
         accounts = [
-            a for a in self.storage.list_accounts()
+            a
+            for a in self.storage.list_accounts()
             if self.storage.is_account_checkin_enabled(a["name"])
         ]
         if not accounts:
@@ -477,8 +475,7 @@ class Scheduler:
             if row.get("claimed_date") == today
         ]
         if today_rows and all(
-            row.get("status") in (STATUS_SUCCESS, STATUS_ALREADY_CLAIMED)
-            for row in today_rows
+            row.get("status") in (STATUS_SUCCESS, STATUS_ALREADY_CLAIMED) for row in today_rows
         ):
             self._last_checkin_date = today
             return None
@@ -528,7 +525,7 @@ class Scheduler:
 
         return can_redeem, redeem_accounts
 
-    async def _run_check_cycle(self) -> dict[str, Any]:  # noqa: C901, PLR0912, PLR0915 -- the fetch/store/redeem pipeline; sub-seams already extracted
+    async def _run_check_cycle(self) -> dict[str, Any]:
         """Run a single check cycle: scrape sources, store codes, attempt redemption.
 
         Returns:
@@ -644,20 +641,18 @@ class Scheduler:
                                     )
                                     if claimed:
                                         codes_redeemed += 1
-                                        try:
+                                        with contextlib.suppress(Exception):
                                             await notify_redeemed(
                                                 self.storage,
                                                 code,
                                                 acc["name"],
                                                 res.reward or "claimed",
                                             )
-                                        except Exception:
-                                            pass
                                         # Local toast: no config, no network; best-effort.
-                                        try:
-                                            await notify_redeemed_toast(code, acc["name"], res.reward or "claimed")
-                                        except Exception:
-                                            pass
+                                        with contextlib.suppress(Exception):
+                                            await notify_redeemed_toast(
+                                                code, acc["name"], res.reward or "claimed"
+                                            )
                                 except Exception as e:
                                     logger.exception(
                                         "Error redeeming code %s for %s",
@@ -679,15 +674,11 @@ class Scheduler:
                     errors.append(f"Storage error for {code[:4]}****: {e}")
 
         if new_codes:
-            try:
+            with contextlib.suppress(Exception):
                 await notify_new_codes(self.storage, new_codes)
-            except Exception:
-                pass
             # Local toast: no config, no network; best-effort.
-            try:
+            with contextlib.suppress(Exception):
                 await notify_new_codes_toast(new_codes)
-            except Exception:
-                pass
 
         return {
             "success": len(errors) == 0,
@@ -748,11 +739,7 @@ class Scheduler:
                             -2018,
                         )
                         existing = self.storage.get_code(code, game=acc_game)
-                        new_reward = (
-                            res.reward
-                            if res.success
-                            else (existing or {}).get("reward")
-                        )
+                        new_reward = res.reward if res.success else (existing or {}).get("reward")
                         self.storage.update_code_redemption(
                             code=code,
                             redeemed=claimed,
@@ -768,29 +755,25 @@ class Scheduler:
                         )
                         if claimed:
                             codes_redeemed += 1
-                            try:
+                            with contextlib.suppress(Exception):
                                 await notify_redeemed(
                                     self.storage,
                                     code,
                                     acc["name"],
                                     res.reward or "claimed",
                                 )
-                            except Exception:
-                                pass
                             # Local toast: no config, no network; best-effort.
-                            try:
-                                await notify_redeemed_toast(code, acc["name"], res.reward or "claimed")
-                            except Exception:
-                                pass
+                            with contextlib.suppress(Exception):
+                                await notify_redeemed_toast(
+                                    code, acc["name"], res.reward or "claimed"
+                                )
                     except Exception as e:
                         logger.exception(
                             "Error redeeming code %s for %s",
                             code[:4] + "****",
                             acc["name"],
                         )
-                        errors.append(
-                            f"Redemption error for {code[:4]}**** ({acc['name']}): {e}"
-                        )
+                        errors.append(f"Redemption error for {code[:4]}**** ({acc['name']}): {e}")
                     await asyncio.sleep(gap)
             except Exception as e:
                 logger.exception("Error redeeming code %s", code[:4] + "****")
@@ -906,7 +889,7 @@ class Scheduler:
             if not self.config.cookies.get("ltoken"):
                 missing.append("ltoken cookie")
             if missing:
-                raise ConfigError(  # noqa: TRY003 -- validation message needs interpolation
+                raise ConfigError(
                     f"Redemption enabled but missing required configuration: {', '.join(missing)}. "
                     f"Run 'genshin-code-monitor config set redemption_enabled false' to disable, "
                     f"or configure the missing values."
@@ -1036,3 +1019,33 @@ def create_scheduler_from_storage(db_path: str | None = None) -> Scheduler:
         config=config,
         redeemer=redeemer,
     )
+
+
+def main() -> None:
+    """Console entry point: run the scheduler until Ctrl+C.
+
+    Creates the default scheduler from storage, installs SIGINT/SIGTERM
+    handlers for graceful shutdown, and blocks the calling thread until
+    a stop signal arrives.
+    """
+    import signal
+
+    scheduler = create_scheduler_from_storage()
+
+    def _stop(_signum: object, _frame: object) -> None:
+        scheduler.stop()
+
+    signal.signal(signal.SIGINT, _stop)
+    signal.signal(signal.SIGTERM, _stop)
+
+    scheduler.start()
+    logger.info("Scheduler running; press Ctrl+C to stop")
+    try:
+        while scheduler.is_running():
+            time.sleep(0.5)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        if scheduler.is_running():
+            scheduler.stop()
+        logger.info("Scheduler stopped")

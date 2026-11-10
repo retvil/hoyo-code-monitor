@@ -20,22 +20,19 @@ def runner() -> CliRunner:
 @pytest.fixture
 def mock_storage() -> MagicMock:
     """Create a mock Storage instance."""
-    storage = MagicMock(spec=Storage)
-    return storage
+    return MagicMock(spec=Storage)
 
 
 @pytest.fixture
 def mock_scheduler() -> MagicMock:
     """Create a mock Scheduler instance."""
-    scheduler = MagicMock(spec=Scheduler)
-    return scheduler
+    return MagicMock(spec=Scheduler)
 
 
 @pytest.fixture
 def mock_config_manager() -> MagicMock:
     """Create a mock ConfigManager instance."""
-    config = MagicMock(spec=ConfigManager)
-    return config
+    return MagicMock(spec=ConfigManager)
 
 
 class TestStartCommand:
@@ -55,7 +52,9 @@ class TestStartCommand:
         mock_scheduler.start.assert_called_once()
 
     @patch("src.cli.create_scheduler_from_storage")
-    def test_start_already_running(self, mock_create_scheduler: MagicMock, runner: CliRunner) -> None:
+    def test_start_already_running(
+        self, mock_create_scheduler: MagicMock, runner: CliRunner
+    ) -> None:
         """Test start command when scheduler is already running."""
         mock_scheduler = MagicMock()
         mock_scheduler.start.return_value = False
@@ -254,7 +253,9 @@ class TestRunOnceCommand:
         mock_storage = MagicMock()
         mock_storage.get_code.return_value = None
         mock_storage.add_code.return_value = 1
-        mock_storage.list_accounts.return_value = [{"name": "a", "uid": "1", "region": "os_usa", "id": 1}]
+        mock_storage.list_accounts.return_value = [
+            {"name": "a", "uid": "1", "region": "os_usa", "id": 1}
+        ]
         mock_storage.is_account_redeem_enabled.return_value = True
         mock_storage_class.return_value = mock_storage
 
@@ -369,8 +370,20 @@ class TestSourcesCommand:
         """Test sources list command."""
         mock_storage = MagicMock()
         mock_storage.list_sources.return_value = [
-            {"name": "wiki", "url": "https://example.com", "selector_type": "css", "selector": "table", "enabled": True},
-            {"name": "reddit", "url": "https://reddit.com", "selector_type": "json", "selector": "data", "enabled": False},
+            {
+                "name": "wiki",
+                "url": "https://example.com",
+                "selector_type": "css",
+                "selector": "table",
+                "enabled": True,
+            },
+            {
+                "name": "reddit",
+                "url": "https://reddit.com",
+                "selector_type": "json",
+                "selector": "data",
+                "enabled": False,
+            },
         ]
         mock_storage_class.return_value = mock_storage
 
@@ -402,7 +415,19 @@ class TestSourcesCommand:
         mock_storage.add_source.return_value = True
         mock_storage_class.return_value = mock_storage
 
-        result = runner.invoke(cli, ["sources", "add", "test", "https://test.com", "--selector-type", "css", "--selector", "table"])
+        result = runner.invoke(
+            cli,
+            [
+                "sources",
+                "add",
+                "test",
+                "https://test.com",
+                "--selector-type",
+                "css",
+                "--selector",
+                "table",
+            ],
+        )
 
         assert result.exit_code == 0
         assert "Added source 'test'" in result.output

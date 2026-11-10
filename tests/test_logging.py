@@ -56,8 +56,13 @@ class TestSensitiveDataFilter:
     def test_masks_ltuid_cookie(self, filter_instance: SensitiveDataFilter) -> None:
         """Test that ltuid cookie value is masked."""
         record = logging.LogRecord(
-            name="test", level=logging.INFO, pathname="", lineno=0,
-            msg="ltuid=12345; ltoken=abcdef", args=(), exc_info=None
+            name="test",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="ltuid=12345; ltoken=abcdef",
+            args=(),
+            exc_info=None,
         )
         filter_instance.filter(record)
         assert "ltuid=***" in record.msg
@@ -68,8 +73,13 @@ class TestSensitiveDataFilter:
     def test_masks_cookie_token_v2(self, filter_instance: SensitiveDataFilter) -> None:
         """Test that cookie_token_v2 is masked."""
         record = logging.LogRecord(
-            name="test", level=logging.INFO, pathname="", lineno=0,
-            msg="cookie_token_v2=xyz789", args=(), exc_info=None
+            name="test",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="cookie_token_v2=xyz789",
+            args=(),
+            exc_info=None,
         )
         filter_instance.filter(record)
         assert "cookie_token_v2=***" in record.msg
@@ -78,8 +88,13 @@ class TestSensitiveDataFilter:
     def test_masks_bearer_token(self, filter_instance: SensitiveDataFilter) -> None:
         """Test that Bearer tokens are masked."""
         record = logging.LogRecord(
-            name="test", level=logging.INFO, pathname="", lineno=0,
-            msg="Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9", args=(), exc_info=None
+            name="test",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9",
+            args=(),
+            exc_info=None,
         )
         filter_instance.filter(record)
         assert "Bearer ***" in record.msg
@@ -88,8 +103,13 @@ class TestSensitiveDataFilter:
     def test_masks_authorization_header(self, filter_instance: SensitiveDataFilter) -> None:
         """Test that Authorization header is masked."""
         record = logging.LogRecord(
-            name="test", level=logging.INFO, pathname="", lineno=0,
-            msg="Authorization: Basic dXNlcjpwYXNz", args=(), exc_info=None
+            name="test",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="Authorization: Basic dXNlcjpwYXNz",
+            args=(),
+            exc_info=None,
         )
         filter_instance.filter(record)
         assert "Authorization: ***" in record.msg
@@ -98,8 +118,13 @@ class TestSensitiveDataFilter:
     def test_masks_cookie_header(self, filter_instance: SensitiveDataFilter) -> None:
         """Test that Cookie header is masked."""
         record = logging.LogRecord(
-            name="test", level=logging.INFO, pathname="", lineno=0,
-            msg="Cookie: session=abc123; user=john", args=(), exc_info=None
+            name="test",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="Cookie: session=abc123; user=john",
+            args=(),
+            exc_info=None,
         )
         filter_instance.filter(record)
         assert "Cookie: ***" in record.msg
@@ -108,8 +133,13 @@ class TestSensitiveDataFilter:
     def test_masks_generic_token_patterns(self, filter_instance: SensitiveDataFilter) -> None:
         """Test that generic token/password patterns are masked."""
         record = logging.LogRecord(
-            name="test", level=logging.INFO, pathname="", lineno=0,
-            msg="api_key=secret123 password=pass456 token=xyz789", args=(), exc_info=None
+            name="test",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="api_key=secret123 password=pass456 token=xyz789",
+            args=(),
+            exc_info=None,
         )
         filter_instance.filter(record)
         assert "api_key=***" in record.msg
@@ -122,8 +152,13 @@ class TestSensitiveDataFilter:
     def test_masks_args(self, filter_instance: SensitiveDataFilter) -> None:
         """Test that sensitive data in log args is masked."""
         record = logging.LogRecord(
-            name="test", level=logging.INFO, pathname="", lineno=0,
-            msg="User cookie: %s", args=("ltuid=12345; ltoken=abcdef",), exc_info=None
+            name="test",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="User cookie: %s",
+            args=("ltuid=12345; ltoken=abcdef",),
+            exc_info=None,
         )
         filter_instance.filter(record)
         assert "ltuid=***" in record.args[0]
@@ -132,8 +167,13 @@ class TestSensitiveDataFilter:
     def test_non_string_args_unchanged(self, filter_instance: SensitiveDataFilter) -> None:
         """Test that non-string args are not modified."""
         record = logging.LogRecord(
-            name="test", level=logging.INFO, pathname="", lineno=0,
-            msg="Count: %d, Name: %s", args=(42, "test"), exc_info=None
+            name="test",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="Count: %d, Name: %s",
+            args=(42, "test"),
+            exc_info=None,
         )
         filter_instance.filter(record)
         assert record.args[0] == 42
@@ -142,8 +182,13 @@ class TestSensitiveDataFilter:
     def test_returns_true(self, filter_instance: SensitiveDataFilter) -> None:
         """Test that filter returns True to allow the record."""
         record = logging.LogRecord(
-            name="test", level=logging.INFO, pathname="", lineno=0,
-            msg="Normal message", args=(), exc_info=None
+            name="test",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="Normal message",
+            args=(),
+            exc_info=None,
         )
         assert filter_instance.filter(record) is True
 
@@ -209,8 +254,13 @@ class TestRotatingFileHandler:
 
             # Should not raise exception
             record = logging.LogRecord(
-                name="test", level=logging.INFO, pathname="", lineno=0,
-                msg="Test message", args=(), exc_info=None
+                name="test",
+                level=logging.INFO,
+                pathname="",
+                lineno=0,
+                msg="Test message",
+                args=(),
+                exc_info=None,
             )
             # The safe_emit wrapper should catch the OSError
             try:
@@ -326,7 +376,9 @@ class TestSetupLogging:
                 # We check that our dummy handler was removed
                 assert dummy_handler not in root.handlers
                 # And that we have at least one RotatingFileHandler
-                assert any(isinstance(h, logging.handlers.RotatingFileHandler) for h in root.handlers)
+                assert any(
+                    isinstance(h, logging.handlers.RotatingFileHandler) for h in root.handlers
+                )
             finally:
                 self._cleanup_logger()
 

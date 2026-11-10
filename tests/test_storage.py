@@ -47,9 +47,7 @@ class TestStorageInitialization:
     def test_init_creates_tables(self, storage: Storage) -> None:
         """Test that all three tables are created on initialization."""
         with storage._connection() as conn:
-            tables = conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            ).fetchall()
+            tables = conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
             table_names = {row["name"] for row in tables}
             assert "codes" in table_names
             assert "sources" in table_names
@@ -93,9 +91,7 @@ class TestCodesCRUD:
         assert row is not None
         # Naive local isoformat ends in a plain HH:MM:SS[.ffffff]; a tz-aware
         # UTC one always carries an offset suffix ("+00:00" / "Z").
-        assert row["attempted_at"].endswith("+00:00") or row[
-            "attempted_at"
-        ].endswith("Z")
+        assert row["attempted_at"].endswith("+00:00") or row["attempted_at"].endswith("Z")
 
     def test_add_redemption_log_default_timestamp_is_utc(self, storage: Storage) -> None:
         """Same UTC-aware default for the redemption_log write path."""
@@ -107,9 +103,7 @@ class TestCodesCRUD:
                 ("UTCCODE2",),
             ).fetchone()
         assert row is not None
-        assert row["attempted_at"].endswith("+00:00") or row[
-            "attempted_at"
-        ].endswith("Z")
+        assert row["attempted_at"].endswith("+00:00") or row["attempted_at"].endswith("Z")
 
     def test_add_code_duplicate_same_source_raises(self, storage: Storage) -> None:
         """Test that adding duplicate code from same source raises IntegrityError."""
@@ -178,9 +172,7 @@ class TestCodesCRUD:
     def test_update_code_redemption_success(self, storage: Storage) -> None:
         """Test updating code redemption status to success."""
         storage.add_code("GENSHIN123", "wiki")
-        result = storage.update_code_redemption(
-            "GENSHIN123", True, "100 Primogems"
-        )
+        result = storage.update_code_redemption("GENSHIN123", True, "100 Primogems")
         assert result is True
 
         code = storage.get_code("GENSHIN123")
@@ -240,9 +232,7 @@ class TestSourcesCRUD:
 
     def test_add_source_happy_path(self, storage: Storage) -> None:
         """Test adding a source successfully."""
-        source_id = storage.add_source(
-            "wiki", "https://example.com", "css", ".code-class"
-        )
+        source_id = storage.add_source("wiki", "https://example.com", "css", ".code-class")
         assert source_id == 1
 
         source = storage.get_source("wiki")
@@ -345,9 +335,7 @@ class TestSourcesCRUD:
         """Clearing a missing source must not raise, mirroring increment_source_error."""
         storage.clear_source_error("nonexistent")
 
-    def test_increment_source_error_does_not_touch_check_count(
-        self, storage: Storage
-    ) -> None:
+    def test_increment_source_error_does_not_touch_check_count(self, storage: Storage) -> None:
         """Test that error counting is independent of check/success counts."""
         storage.add_source("wiki", "https://example.com", "css", ".code")
         storage.increment_source_error("wiki")
@@ -431,13 +419,12 @@ class TestAccountGames:
         storage.add_account("acc2", "789012", "os_usa")
         assert storage.get_account_games("acc2") is None
 
-    def test_update_account_games_list_accounts_exposes_column(
-        self, storage: Storage
-    ) -> None:
+    def test_update_account_games_list_accounts_exposes_column(self, storage: Storage) -> None:
         """list_accounts rows carry the games column (SELECT * shape)."""
         storage.add_account("acc", "123456", "os_euro")
         rows = storage.list_accounts()
-        assert rows and "games" in rows[0]
+        assert rows
+        assert "games" in rows[0]
         assert rows[0]["games"] is None
         storage.update_account_games("acc", ["genshin"])
         rows = storage.list_accounts()
@@ -492,13 +479,15 @@ class TestContextManager:
         the whole block (isolation_level=None), so any write made before an
         exception inside the block must not survive the block.
         """
-        with pytest.raises(ValueError, match="Test exception"):
+        # SIM117/PT012: outer pytest.raises must stay outer so the exception
+        # reaches storage._connection()'s __exit__ and triggers rollback.
+        with pytest.raises(ValueError, match="Test exception"):  # noqa: SIM117,PT012
             with storage._connection() as conn:
                 conn.execute(
                     "INSERT INTO codes (code, attempted_at, game) VALUES (?, ?, ?)",
                     ("ROLBACK", "2026-01-01T00:00:00", "genshin"),
                 )
-                raise ValueError("Test exception")  # noqa: TRY003 -- test raises its own message
+                raise ValueError("Test exception")
 
         assert storage.get_code("ROLBACK", game="genshin") is None
 

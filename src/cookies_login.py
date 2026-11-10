@@ -23,9 +23,7 @@ LOGIN_URL = "https://www.hoyolab.com/"
 # Skip junk/consent cookies, keep everything else (auth needs full set:
 # ltuid_v2, ltoken_v2, cookie_token_v2, account_id_v2, account_mid_v2, ...)
 SKIP_PREFIXES = ("_ga", "_gid", "_gat", "_hj", "intercom-", "cf_", "__cf")
-SKIP_EXACT: frozenset[str] = frozenset(
-    {"mi18nLang", "DEVICEFP", "_MHYUUID", "Hm_lvt_", "Hm_lpvt_"}
-)
+SKIP_EXACT: frozenset[str] = frozenset({"mi18nLang", "DEVICEFP", "_MHYUUID", "Hm_lvt_", "Hm_lpvt_"})
 POLL_SECONDS = 2.0
 
 
@@ -79,13 +77,13 @@ def ensure_chromium() -> None:
     if chromium_executable():
         return
     try:
-        from playwright._impl._driver import (  # noqa: PLC0415 -- heavy optional import, lazy
+        from playwright._impl._driver import (
             compute_driver_executable,
             get_driver_env,
         )
 
     except ImportError as e:
-        raise RuntimeError("Playwright is not installed (pip install playwright)") from e  # noqa: TRY003 -- actionable install hint
+        raise RuntimeError("Playwright is not installed (pip install playwright)") from e
     target = browsers_dir()
     logger.info("Chromium not found, downloading to %s (~170MB, one-time)", target)
     env = dict(get_driver_env())
@@ -98,12 +96,13 @@ def ensure_chromium() -> None:
             capture_output=True,
             text=True,
             timeout=900,
+            check=False,
         )
     except Exception as e:
-        raise RuntimeError(f"Chromium download failed to start: {e}") from e  # noqa: TRY003 -- startup detail needed
+        raise RuntimeError(f"Chromium download failed to start: {e}") from e
     if proc.returncode != 0 or not chromium_executable():
         tail = (proc.stderr or proc.stdout or "")[-500:]
-        raise RuntimeError(f"Chromium download failed: {tail}") from None  # noqa: TRY003 -- download detail needed
+        raise RuntimeError(f"Chromium download failed: {tail}") from None
     logger.info("Chromium downloaded")
 
 
@@ -125,9 +124,7 @@ def _cookie_skip_filters() -> tuple[tuple[str, ...], frozenset[str]]:
     cookie_conf = raw.get("cookies") or {}
     prefixes = cookie_conf.get("skip_cookie_prefixes")
     exact = cookie_conf.get("skip_cookies")
-    exact_frozen: frozenset[str] = (
-        frozenset(exact) if exact else frozenset(SKIP_EXACT)
-    )
+    exact_frozen: frozenset[str] = frozenset(exact) if exact else frozenset(SKIP_EXACT)
     return (
         tuple(prefixes) if prefixes else SKIP_PREFIXES,
         exact_frozen,
@@ -184,7 +181,7 @@ async def capture_cookies(
         )
 
     except ImportError as e:
-        raise RuntimeError("Playwright is not installed (pip install playwright)") from e  # noqa: TRY003 -- actionable install hint
+        raise RuntimeError("Playwright is not installed (pip install playwright)") from e
 
     deadline = time.time() + timeout_seconds
     # Blocking download (~170MB first run) must not stall the event loop
@@ -218,7 +215,7 @@ async def capture_cookies(
                     logger.info("Auth cookies captured (%d keys)", len(found))
                     return found
                 await asyncio.sleep(POLL_SECONDS)
-            raise TimeoutError(f"No login within {timeout_seconds}s")  # noqa: TRY003 -- timeout detail needed
+            raise TimeoutError(f"No login within {timeout_seconds}s")
         finally:
             await context.close()
 

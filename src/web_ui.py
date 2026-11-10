@@ -71,7 +71,7 @@ scheduler: Scheduler | None = None
 
 def _get_scheduler() -> Any:
     """Read the live scheduler (the module attribute, kept in sync by external sets)."""
-    return scheduler  # noqa: F821 -- assigned at module scope above, rebased via _set_scheduler
+    return scheduler
 
 
 def _set_scheduler(value: Any) -> None:
@@ -168,7 +168,7 @@ async def _prime_update_cache() -> None:
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:  # noqa: ARG001 -- FastAPI lifespan contract requires the app param
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     # Startup
 
     # Seed sources first so the UI is never empty before the first cycle.
@@ -210,7 +210,9 @@ app = FastAPI(
 
 
 @app.middleware("http")
-async def request_id_middleware(request: Request, call_next: Callable[[Request], Coroutine[Any, Any, Response]]) -> Response:
+async def request_id_middleware(
+    request: Request, call_next: Callable[[Request], Coroutine[Any, Any, Response]]
+) -> Response:
     """Attach a unique request ID for traceability."""
     request_id = secrets.token_urlsafe(16)
     request.state.request_id = request_id
@@ -220,7 +222,9 @@ async def request_id_middleware(request: Request, call_next: Callable[[Request],
 
 
 @app.middleware("http")
-async def csrf_middleware(request: Request, call_next: Callable[[Request], Coroutine[Any, Any, Response]]) -> Response:
+async def csrf_middleware(
+    request: Request, call_next: Callable[[Request], Coroutine[Any, Any, Response]]
+) -> Response:
     """Enforce CSRF protection on state-changing requests.
 
     HTTPException raised inside user middleware escapes Starlette's inner
@@ -232,8 +236,7 @@ async def csrf_middleware(request: Request, call_next: Callable[[Request], Corou
             _verify_csrf(request)
         except HTTPException as exc:
             return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
-    response = await call_next(request)
-    return response
+    return await call_next(request)
 
 
 @app.get("/api/update", response_class=JSONResponse)
@@ -304,7 +307,7 @@ async def set_language(language: str = Form(...)) -> dict[str, Any]:
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request, game: str = "") -> HTMLResponse:
     """Main dashboard (variant C: game summary cards + filter)."""
-    from src.constants import (  # noqa: PLC0415 -- circular import: constants consumed across app; break the cycle here
+    from src.constants import (
         GAME_CONF,
         GAMES,
     )
@@ -394,7 +397,7 @@ async def sources_page(request: Request) -> HTMLResponse:
 
 
 @app.post("/sources")
-async def create_source(  # noqa: PLR0913 -- form-data route: 13 fields mirror storage.add_source
+async def create_source(
     name: str = Form(...),
     url: str = Form(...),
     selector_type: str = Form("css"),
@@ -408,7 +411,7 @@ async def create_source(  # noqa: PLR0913 -- form-data route: 13 fields mirror s
     browser_wait_seconds: int = Form(5),
     max_retries: int = Form(3),
     retry_base_delay: float = Form(1.0),
-    game: str = Form("genshin"),  # noqa: ARG001 -- accepted for form symmetry with the game-aware UI; passed through to storage.add_source
+    game: str = Form("genshin"),
 ) -> dict[str, Any]:
     """Create a new source (accepts form-data from HTMX modal)."""
     storage = Storage()
@@ -494,7 +497,11 @@ async def test_source(name: str, request: Request) -> dict[str, Any]:
             detail=f"Rate limited, try in {_RATE_LIMIT_SECONDS - (now - last):.1f}s",
         )
     # Prune stale entries in place (TTL cleanup to prevent memory leak on long runs)
-    for k in [key for key in _test_rate_limit if now - _test_rate_limit[key] >= _TEST_RATE_LIMIT_TTL_SECONDS]:
+    for k in [
+        key
+        for key in _test_rate_limit
+        if now - _test_rate_limit[key] >= _TEST_RATE_LIMIT_TTL_SECONDS
+    ]:
         del _test_rate_limit[k]
     _test_rate_limit[key] = now
 
@@ -537,7 +544,7 @@ async def accounts_page(request: Request) -> HTMLResponse:
 
 
 @app.post("/accounts")
-async def create_account(  # noqa: PLR0913 -- form-data route: 7 fields mirror storage.add_account
+async def create_account(
     name: str = Form(...),
     uid: str = Form(...),
     region: str = Form(...),
@@ -672,7 +679,7 @@ async def config_page(request: Request) -> HTMLResponse:
 
 
 @app.post("/config")
-async def update_config(  # noqa: PLR0913 -- form-data route: 8 config fields mirror ConfigManager keys
+async def update_config(
     poll_interval_seconds: int = Form(900),
     source_timeout_seconds: int = Form(30),
     redemption_min_gap_seconds: int = Form(8),
@@ -767,7 +774,7 @@ async def author_qr(kind: str = "bitcoin") -> Response:
     if not address:
         raise HTTPException(status_code=404, detail="Address not set")
     try:
-        import qrcode  # noqa: PLC0415 -- optional dependency; keep QR generation off module import time
+        import qrcode
     except ImportError as e:
         raise HTTPException(status_code=503, detail="qrcode lib not installed") from e
 
@@ -861,15 +868,17 @@ async def api_sources_status() -> list[dict[str, Any]]:
     # Format for frontend consumption
     statuses = []
     for source in sources:
-        statuses.append({
-            "name": source["name"],
-            "enabled": bool(source["enabled"]),
-            "game": source.get("game", "unknown"),
-            "last_checked": source.get("last_checked"),
-            "last_success": source.get("last_success"),
-            "error_count": source.get("error_count", 0),
-            "status": source_status(source),
-        })
+        statuses.append(
+            {
+                "name": source["name"],
+                "enabled": bool(source["enabled"]),
+                "game": source.get("game", "unknown"),
+                "last_checked": source.get("last_checked"),
+                "last_success": source.get("last_success"),
+                "error_count": source.get("error_count", 0),
+                "status": source_status(source),
+            }
+        )
 
     return statuses
 
@@ -901,9 +910,7 @@ async def health_check() -> dict[str, Any]:
             # 5s budget is applied per request, so the shared session (and its
             # connection pool) survives the probe. See src/http_session.py.
             timeout = aiohttp.ClientTimeout(total=5)
-            async with get_session().head(
-                "https://api.telegram.org", timeout=timeout
-            ) as resp:
+            async with get_session().head("https://api.telegram.org", timeout=timeout) as resp:
                 payload["connectivity"] = "ok" if resp.status < 500 else "degraded"
         except Exception as exc:
             payload["connectivity"] = "error"
@@ -1060,8 +1067,8 @@ def _account_games_checkboxes_html(
         f"<div id='games-{name}'>"
         f"<form hx-post='/accounts/{name}/games' hx-target='#games-{name}' hx-swap='outerHTML'>"
         f"<button type='button' class='btn' style='padding: 2px 8px; font-size: 0.75rem;'>Games:</button> "
-        + "".join(boxes) +
-        "<button type='submit' class='btn btn-primary' "
+        + "".join(boxes)
+        + "<button type='submit' class='btn btn-primary' "
         "style='padding: 2px 8px; font-size: 0.75rem;'>Save</button>"
         "</form></div>"
     )
@@ -1133,14 +1140,10 @@ async def update_checkin_settings(
 
 
 @app.get("/partials/checkin-logs")
-async def partial_checkin_logs(
-    request: Request, game: str = "", status: str = ""
-) -> HTMLResponse:
+async def partial_checkin_logs(request: Request, game: str = "", status: str = "") -> HTMLResponse:
     """HTMX partial for check-in history with filters."""
     storage = Storage()
-    logs = checkin_logs_with_names(
-        storage, limit=50, game=game or None, status=status or None
-    )
+    logs = checkin_logs_with_names(storage, limit=50, game=game or None, status=status or None)
     return templates.TemplateResponse(
         request,
         "partials/checkin_logs.html",
@@ -1223,9 +1226,13 @@ async def redeem_single_code(code: str) -> dict[str, Any]:
 
                 _ag = acc.get("game") or "genshin"
                 res = await redeemer.redeem_code(
-                    code=row["code"], cookies=cookies, uid=acc["uid"], region=acc["region"],
+                    code=row["code"],
+                    cookies=cookies,
+                    uid=acc["uid"],
+                    region=acc["region"],
                     game_biz=acc.get("game_biz") or _GC.get(_ag, _GC["genshin"])["game_biz"],
-                    lang=acc.get("lang", "en-us"), s_lang_key=acc.get("s_lang_key", "en-us"),
+                    lang=acc.get("lang", "en-us"),
+                    s_lang_key=acc.get("s_lang_key", "en-us"),
                     game=_ag,
                 )
                 claimed = res.success or res.raw_response.get("retcode") in (-2017, -2018)
@@ -1487,7 +1494,7 @@ PAGE_SIZE = 20
 
 
 @app.get("/partials/recent-codes")
-async def partial_recent_codes(  # noqa: PLR0913 -- HTMX partial: 5 filter params mirror the codes-table query surface
+async def partial_recent_codes(
     request: Request,
     page: int = 1,
     source: str = "",
@@ -1550,7 +1557,12 @@ async def partial_recent_logs(request: Request) -> HTMLResponse:
     )
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """Console entry point: run the web UI via uvicorn."""
     import uvicorn
 
     uvicorn.run(app, host="127.0.0.1", port=8000, log_config=None)
+
+
+if __name__ == "__main__":
+    main()

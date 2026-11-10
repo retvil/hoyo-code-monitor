@@ -24,7 +24,8 @@ class TestSchedulerInitialization:
         assert scheduler.redeemer is not None
 
     def test_init_with_custom_config(self, storage: Storage) -> None:
-        from src.config import Settings  # noqa: PLC0415 -- test-local import kept near its use
+        from src.config import Settings
+
         custom_config = Settings(poll_interval_seconds=600)
         scheduler = Scheduler(storage=storage, config=custom_config)
         assert scheduler.config.poll_interval_seconds == 600
@@ -78,7 +79,9 @@ class TestSchedulerRunOnce:
         # Mock the SourceFetcher
         with patch("src.scheduler.SourceFetcher") as mock_fetcher_class:
             mock_fetcher = AsyncMock()
-            mock_fetcher.fetch_all_enabled = AsyncMock(return_value={"test": ["GENSHIN123", "STARRAIL456"]})
+            mock_fetcher.fetch_all_enabled = AsyncMock(
+                return_value={"test": ["GENSHIN123", "STARRAIL456"]}
+            )
             mock_fetcher.__aenter__ = AsyncMock(return_value=mock_fetcher)
             mock_fetcher.__aexit__ = AsyncMock(return_value=None)
             mock_fetcher_class.return_value = mock_fetcher
@@ -145,16 +148,19 @@ class TestSchedulerRedemption:
         from src.config import (
             load_config_from_storage,
         )
+
         config = load_config_from_storage(storage)
         scheduler = Scheduler(storage=storage, config=config)
 
         mock_redeemer = AsyncMock()
-        mock_redeemer.redeem_code = AsyncMock(return_value=RedemptionResult(
-            success=True,
-            reward="Primogems x100",
-            message="OK",
-            raw_response={"retcode": 0, "message": "OK", "data": {"award": "Primogems x100"}},
-        ))
+        mock_redeemer.redeem_code = AsyncMock(
+            return_value=RedemptionResult(
+                success=True,
+                reward="Primogems x100",
+                message="OK",
+                raw_response={"retcode": 0, "message": "OK", "data": {"award": "Primogems x100"}},
+            )
+        )
         scheduler.redeemer = mock_redeemer
 
         with patch("src.scheduler.SourceFetcher") as mock_fetcher_class:
@@ -185,16 +191,19 @@ class TestSchedulerRedemption:
         from src.config import (
             load_config_from_storage,
         )
+
         config = load_config_from_storage(storage)
         scheduler = Scheduler(storage=storage, config=config)
 
         mock_redeemer = AsyncMock()
-        mock_redeemer.redeem_code = AsyncMock(return_value=RedemptionResult(
-            success=False,
-            reward=None,
-            message="Invalid code",
-            raw_response={"retcode": -1, "message": "Invalid code"},
-        ))
+        mock_redeemer.redeem_code = AsyncMock(
+            return_value=RedemptionResult(
+                success=False,
+                reward=None,
+                message="Invalid code",
+                raw_response={"retcode": -1, "message": "Invalid code"},
+            )
+        )
         scheduler.redeemer = mock_redeemer
 
         with patch("src.scheduler.SourceFetcher") as mock_fetcher_class:
@@ -217,9 +226,7 @@ class TestSchedulerRedemption:
         assert logs[0]["error_message"] == "Invalid code"
 
     @pytest.mark.asyncio
-    async def test_already_claimed_does_not_clobber_stored_reward(
-        self, storage: Storage
-    ) -> None:
+    async def test_already_claimed_does_not_clobber_stored_reward(self, storage: Storage) -> None:
         storage.add_source("test", "https://example.com", "css", ".code")
         storage.add_account("test_account", "12345", "os_usa")
         storage.add_account("test_account2", "67890", "os_usa")
@@ -227,13 +234,12 @@ class TestSchedulerRedemption:
         storage.set_config("region", "os_usa")
         storage.set_config("redemption_enabled", "true")
         storage.store_account_cookies("test_account", {"ltuid": "12345", "ltoken": "abcdef"})
-        storage.store_account_cookies(
-            "test_account2", {"ltuid": "67890", "ltoken": "ghijkl"}
-        )
+        storage.store_account_cookies("test_account2", {"ltuid": "67890", "ltoken": "ghijkl"})
 
         from src.config import (
             load_config_from_storage,
         )
+
         config = load_config_from_storage(storage)
         scheduler = Scheduler(storage=storage, config=config)
 
@@ -279,6 +285,7 @@ class TestSchedulerRedemption:
         from src.config import (
             load_config_from_storage,
         )
+
         config = load_config_from_storage(storage)
         scheduler = Scheduler(storage=storage, config=config)
 

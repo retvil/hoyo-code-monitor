@@ -43,7 +43,7 @@ class Storage:
         self._fernet = self._get_or_create_fernet()
         run_migrations(str(self.db_path), CURRENT_VERSION)
 
-    def _get_or_create_fernet(self) -> Fernet:  # noqa: C901 -- 4 ordered key-lookup fallbacks; splitting would obscure the sequence
+    def _get_or_create_fernet(self) -> Fernet:
         """Get or create Fernet instance for cookie encryption.
 
         Tries in order:
@@ -65,7 +65,7 @@ class Storage:
 
         # Try keyring (optional dependency, kept lazy so missing it never blocks storage)
         try:
-            import keyring  # noqa: PLC0415 -- optional dependency, lazy import
+            import keyring
 
             key = keyring.get_password("genshin-code-monitor", "encryption-key")
             if key:
@@ -86,7 +86,7 @@ class Storage:
         # 4. Generate new key and persist
         key = Fernet.generate_key().decode()
         try:
-            import keyring  # noqa: PLC0415 -- optional dependency, lazy import
+            import keyring
 
             keyring.set_password("genshin-code-monitor", "encryption-key", key)
             logger.info("Generated new encryption key and stored in keyring")
@@ -96,10 +96,8 @@ class Storage:
             key_path = self.db_path.parent / ".key"
             key_path.parent.mkdir(parents=True, exist_ok=True)
             key_path.write_text(key, encoding="utf-8")
-            try:
-                os.chmod(key_path, 0o600)
-            except Exception:
-                pass
+            with contextlib.suppress(Exception):
+                key_path.chmod(0o600)
             logger.info("Stored encryption key at %s", key_path)
         except Exception as e:
             logger.warning("Could not persist encryption key: %s; using ephemeral key", e)
@@ -129,20 +127,16 @@ class Storage:
             yield conn
             conn.commit()
         except Exception:
-            try:
+            with contextlib.suppress(Exception):
                 conn.rollback()
-            except Exception:
-                pass
             raise
         finally:
-            try:
+            with contextlib.suppress(Exception):
                 conn.close()
-            except Exception:
-                pass
 
     # --- Codes CRUD ---
 
-    def add_code(  # noqa: PLR0913 -- 5 params mirror the codes-table write surface (code, source, 3 optional timestamps)
+    def add_code(
         self,
         code: str,
         source: str,
@@ -189,7 +183,7 @@ class Storage:
                     (code_id, source),
                 ).fetchone()
                 if existing_source:
-                    raise sqlite3.IntegrityError(  # noqa: TRY003 -- validation message needs interpolation
+                    raise sqlite3.IntegrityError(
                         f"Code '{code}' already exists from source '{source}'"
                     )
                 # Add new source association
@@ -360,7 +354,7 @@ class Storage:
                 )
             return cursor.rowcount > 0
 
-    def list_codes(  # noqa: PLR0913 -- 7 filter params mirror the codes-table query surface
+    def list_codes(
         self,
         limit: int = 100,
         offset: int = 0,
@@ -572,7 +566,7 @@ class Storage:
 
     # --- Sources CRUD ---
 
-    def add_source(  # noqa: PLR0913 -- 13 params mirror the sources-table write surface
+    def add_source(
         self,
         name: str,
         url: str,
@@ -670,7 +664,7 @@ class Storage:
         data["requires_browser"] = bool(data.get("requires_browser", 0))
         return data
 
-    def update_source(  # noqa: PLR0913, C901, PLR0912 -- 12 optional-field kwargs mirror the sources-table write surface
+    def update_source(
         self,
         name: str,
         url: str | None = None,
@@ -824,7 +818,7 @@ class Storage:
 
     # --- Accounts CRUD ---
 
-    def add_account(  # noqa: PLR0913 -- 6 params mirror the accounts-table write surface
+    def add_account(
         self,
         name: str,
         uid: str,
@@ -877,7 +871,7 @@ class Storage:
                 rows = conn.execute("SELECT * FROM accounts ORDER BY name").fetchall()
             return [dict(row) for row in rows]
 
-    def update_account(  # noqa: PLR0913 -- 5 optional-field kwargs mirror the accounts-table write surface
+    def update_account(
         self,
         name: str,
         uid: str | None = None,
@@ -941,9 +935,7 @@ class Storage:
     def get_account_games(self, name: str) -> list[str] | None:
         """Read the per-account games filter (None = all games)."""
         with self._connection() as conn:
-            row = conn.execute(
-                "SELECT games FROM accounts WHERE name = ?", (name,)
-            ).fetchone()
+            row = conn.execute("SELECT games FROM accounts WHERE name = ?", (name,)).fetchone()
         if row is None:
             return None
         raw = row["games"]
@@ -965,7 +957,7 @@ class Storage:
 
     # --- Redemption Log CRUD ---
 
-    def add_redemption_log(  # noqa: PLR0913 -- 6 params mirror the redemption_log-table write surface
+    def add_redemption_log(
         self,
         code: str,
         account_id: int,
@@ -1246,7 +1238,7 @@ class Storage:
             rows = conn.execute(query, params).fetchall()
             return [dict(row) for row in rows]
 
-    def upsert_checkin_log(  # noqa: PLR0913 -- 6 params mirror the checkin_log-table write surface
+    def upsert_checkin_log(
         self,
         account_id: int,
         game: str,
@@ -1352,19 +1344,3 @@ class Storage:
         device_id = uuid.uuid4().hex
         self.set_config(key, device_id)
         return device_id
-
-
-if __name__ == "__main__":
-    # Quick test
-    import os
-    import tempfile
-
-    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
-        db_path = f.name
-
-    try:
-        storage = Storage(db_path)
-        print("Storage initialized successfully")
-        print("Tables:", storage.list_config())
-    finally:
-        Path(db_path).unlink(missing_ok=True)

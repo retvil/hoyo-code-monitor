@@ -160,7 +160,7 @@ class ConfigManager:
             if not self._loaded:
                 self.load()
             if key not in self.DEFAULTS.to_dict():
-                raise ConfigError(f"Unknown configuration key: {key}")  # noqa: TRY003 -- validation message needs interpolation
+                raise ConfigError(f"Unknown configuration key: {key}")
             self._validate_value(key, value)
             if key == "log_level":
                 value = value.upper()
@@ -249,9 +249,7 @@ class ConfigManager:
             return
         check, message = entry
         if not check(value):
-            raise ConfigError(  # noqa: TRY003 -- validation message needs interpolation
-                f"{message}, got: {value}"
-            )
+            raise ConfigError(f"{message}, got: {value}")
 
     def reset_to_defaults(self) -> None:
         with self._lock:

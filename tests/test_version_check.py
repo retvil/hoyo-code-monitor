@@ -95,9 +95,7 @@ class TestCheckForUpdate:
     @pytest.mark.asyncio
     async def test_prerelease_hidden_for_stable_build(self, monkeypatch) -> None:
         response = MagicMock(status=200)
-        response.json = AsyncMock(
-            return_value={"tag_name": "v1.3.0-beta.1", "prerelease": True}
-        )
+        response.json = AsyncMock(return_value={"tag_name": "v1.3.0-beta.1", "prerelease": True})
         response.__aenter__ = AsyncMock(return_value=response)
         response.__aexit__ = AsyncMock(return_value=None)
         session = MagicMock(get=MagicMock(return_value=response))

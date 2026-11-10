@@ -116,7 +116,9 @@ async def test_run_daily_checkins_missing_cookies(storage: Storage) -> None:
 async def test_run_daily_checkins_updates_status(storage: Storage, account_id: int) -> None:
     """Scheduler status exposes last/next check-in info for the UI."""
     assert account_id > 0
-    scheduler = make_scheduler(storage, FakeTransport(sign=[make_sign() for _ in GAME_CHECKIN_CONF]))
+    scheduler = make_scheduler(
+        storage, FakeTransport(sign=[make_sign() for _ in GAME_CHECKIN_CONF])
+    )
     await scheduler.run_daily_checkins("2026-09-24")
 
     status = scheduler.status
@@ -152,9 +154,7 @@ async def test_success_row_today_is_skipped(storage: Storage, account_id: int) -
     """A success entry for today is never re-claimed."""
     assert account_id > 0
     for game in GAME_CHECKIN_CONF:
-        storage.add_checkin_log(
-            account_id, CheckinResult(game, "2026-09-24", "already_claimed")
-        )
+        storage.add_checkin_log(account_id, CheckinResult(game, "2026-09-24", "already_claimed"))
     transport = FakeTransport(sign=[make_sign() for _ in GAME_CHECKIN_CONF])
     scheduler = make_scheduler(storage, transport)
     result = await scheduler.run_daily_checkins("2026-09-24")
@@ -164,9 +164,7 @@ async def test_success_row_today_is_skipped(storage: Storage, account_id: int) -
 
 
 @pytest.mark.asyncio
-async def test_run_daily_checkins_sign_failure_logged(
-    storage: Storage, account_id: int
-) -> None:
+async def test_run_daily_checkins_sign_failure_logged(storage: Storage, account_id: int) -> None:
     """API-level sign failure is stored with the provider message."""
     assert account_id > 0
     transport = FakeTransport(sign=[make_sign(10001, "Not logged in")] * len(GAME_CHECKIN_CONF))
@@ -178,9 +176,7 @@ async def test_run_daily_checkins_sign_failure_logged(
 
 
 @pytest.mark.asyncio
-async def test_cookie_expired_triggers_auto_refresh(
-    storage: Storage, account_id: int
-) -> None:
+async def test_cookie_expired_triggers_auto_refresh(storage: Storage, account_id: int) -> None:
     """Expired-cookie failures re-capture and re-store account cookies when auto-refresh is on."""
     assert account_id > 0
     storage.set_config("cookie_auto_refresh", "true")
@@ -204,9 +200,7 @@ async def test_cookie_expired_triggers_auto_refresh(
 
 
 @pytest.mark.asyncio
-async def test_cookie_refresh_disabled_does_nothing(
-    storage: Storage, account_id: int
-) -> None:
+async def test_cookie_refresh_disabled_does_nothing(storage: Storage, account_id: int) -> None:
     """With auto-refresh off, expired failures are logged without any capture."""
     assert account_id > 0
     storage.set_config("cookie_auto_refresh", "false")
@@ -223,9 +217,7 @@ async def test_cookie_refresh_disabled_does_nothing(
 
 
 @pytest.mark.asyncio
-async def test_cookie_refresh_respects_cooldown(
-    storage: Storage, account_id: int
-) -> None:
+async def test_cookie_refresh_respects_cooldown(storage: Storage, account_id: int) -> None:
     """A recent refresh timestamp blocks a second capture within the cooldown window."""
     assert account_id > 0
     storage.set_config("cookie_auto_refresh", "true")
@@ -319,7 +311,11 @@ class TestMaybeRunDailyCheckins:
         scheduler._loop = None
         with patch("src.scheduler.datetime") as mock_dt:
             mock_dt.now.return_value = datetime(2026, 9, 24, 10, 0, 0)
-            mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)  # noqa: PLW0108
+
+            def _dt(*args, **kwargs):
+                return datetime(*args, **kwargs)
+
+            mock_dt.side_effect = _dt
             scheduler._maybe_run_daily_checkins()
         assert storage.get_checkin_logs() == []
 
@@ -351,15 +347,15 @@ class TestCatchUpMissedCheckins:
         assert storage.get_checkin_logs() == []
 
     @pytest.mark.asyncio
-    async def test_catch_up_skips_when_already_logged(self, storage: Storage, account_id: int) -> None:
+    async def test_catch_up_skips_when_already_logged(
+        self, storage: Storage, account_id: int
+    ) -> None:
         """If log for today exists, catch-up skips."""
         assert account_id > 0
         storage.set_config("checkin_time", "01:00")
         storage.set_config("checkin_jitter_minutes", "0")
         today = date.today().isoformat()
-        storage.add_checkin_log(
-            account_id, CheckinResult("genshin", today, "success")
-        )
+        storage.add_checkin_log(account_id, CheckinResult("genshin", today, "success"))
         scheduler = make_scheduler(storage, FakeTransport())
         result = await scheduler.catch_up_missed_checkins()
         assert result is None
@@ -401,14 +397,14 @@ class TestStopCancelsCheckinPass:
         assert scheduler.stop.__defaults__[0] >= STOP_TIMEOUT_FLOOR
 
     @pytest.mark.asyncio
-    async def test_stop_event_returns_pass_early(
-        self, storage: Storage, account_id: int
-    ) -> None:
+    async def test_stop_event_returns_pass_early(self, storage: Storage, account_id: int) -> None:
         """A set _stop_event aborts the pass on the next inter-slot poll."""
         assert account_id > 0
         config = SimpleNamespace(redemption_min_gap_seconds=2)
-        runner = CheckinRunner(transport=FakeTransport(sign=[make_sign()] * len(GAME_CHECKIN_CONF)),
-                               retry_base_delay=0.0)
+        runner = CheckinRunner(
+            transport=FakeTransport(sign=[make_sign()] * len(GAME_CHECKIN_CONF)),
+            retry_base_delay=0.0,
+        )
         scheduler = Scheduler(storage=storage, config=config, checkin_runner=runner)
 
         # Stop the pass right after the first slot is attempted.

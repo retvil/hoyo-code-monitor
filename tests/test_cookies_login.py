@@ -26,9 +26,7 @@ def _with_config(raw: dict | None, *, error: bool = False):
             _CFG_TARGET,
             side_effect=lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError("boom")),
         )
-    return patch.object(
-        ConfigManager, "get_all", return_value=raw, autospec=True
-    )
+    return patch.object(ConfigManager, "get_all", return_value=raw, autospec=True)
 
 
 class TestCookieSkipFilters:
@@ -84,10 +82,10 @@ class TestNormalize:
         cookies = [
             {"name": "ltuid", "value": "123"},
             {"name": "ltoken", "value": "abc"},
-            {"name": "_ga", "value": "junk"},          # prefix default
-            {"name": "mi18nLang", "value": "en"},      # exact default
-            {"name": "", "value": "no-name"},          # empty name
-            {"name": "empty", "value": ""},            # empty value
+            {"name": "_ga", "value": "junk"},  # prefix default
+            {"name": "mi18nLang", "value": "en"},  # exact default
+            {"name": "", "value": "no-name"},  # empty name
+            {"name": "empty", "value": ""},  # empty value
         ]
         out = _normalize(cookies)
         assert out == {"ltuid": "123", "ltoken": "abc"}

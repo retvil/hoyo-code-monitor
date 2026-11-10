@@ -34,9 +34,7 @@ def _table_columns(conn: sqlite3.Connection, table: str) -> set[str]:
 
 
 def _tables(conn: sqlite3.Connection) -> set[str]:
-    return {row[0] for row in conn.execute(
-        "SELECT name FROM sqlite_master WHERE type = 'table'"
-    )}
+    return {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
 
 
 class TestMigrationUpChain:

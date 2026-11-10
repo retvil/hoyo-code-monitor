@@ -6,6 +6,7 @@ Language is stored in storage config under key "language".
 
 from __future__ import annotations
 
+import contextlib
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -36,7 +37,7 @@ LOCALE_MAP = {
 def system_lang() -> str:
     """Detect OS language, mapped to supported codes (fallback: en)."""
     try:
-        import locale  # noqa: PLC0415 -- stdlib, but deferred so the module stays import-light on embedded targets
+        import locale
 
         loc = (locale.getdefaultlocale()[0] or "").lower()
         prefix = loc.split("_")[0]
@@ -881,10 +882,8 @@ def get_lang(storage: Any = None) -> str:
     """Get current UI language code (stored value, else OS language)."""
     lang = None
     if storage is not None:
-        try:
+        with contextlib.suppress(Exception):
             lang = storage.get_config("language", "") or None
-        except Exception:
-            pass
     if not lang:
         return system_lang()
     return lang if lang in SUPPORTED else DEFAULT_LANG
@@ -893,7 +892,7 @@ def get_lang(storage: Any = None) -> str:
 def set_lang(storage: Any, lang: str) -> None:
     """Set UI language code."""
     if lang not in SUPPORTED:
-        raise ValueError(f"Unknown language: {lang}")  # noqa: TRY003 -- must name the bad value
+        raise ValueError(f"Unknown language: {lang}")
     storage.set_config("language", lang)
 
 

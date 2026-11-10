@@ -134,7 +134,7 @@ async def close_all() -> None:
                 # its own session/loop pairing instead of reading them late.
                 # The task reference is deliberately not stored: nothing awaits
                 # it and the loop owns its lifetime.
-                asyncio.ensure_future(_safe_close(s), loop=lp)  # noqa: RUF006
+                asyncio.ensure_future(_safe_close(s), loop=lp)  # noqa: RUF006 -- see comment above
 
             try:
                 owner_loop.call_soon_threadsafe(_close_on_owner)

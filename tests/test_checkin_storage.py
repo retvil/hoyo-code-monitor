@@ -61,18 +61,15 @@ class TestCheckinMigration:
                 ).fetchall()
             }
             assert "checkin_log" in tables
-            sql = conn.execute(
-                "SELECT sql FROM sqlite_master WHERE name='checkin_log'"
-            ).fetchone()[0]
+            sql = conn.execute("SELECT sql FROM sqlite_master WHERE name='checkin_log'").fetchone()[
+                0
+            ]
             assert "UNIQUE(account_id, game, claimed_date)" in sql
 
     def test_accounts_games_column_added_in_v15(self, storage: Storage) -> None:
         """Migration v15 adds the nullable per-account games filter column."""
         with storage._connection() as conn:
-            cols = {
-                row["name"]
-                for row in conn.execute("PRAGMA table_info(accounts)").fetchall()
-            }
+            cols = {row["name"] for row in conn.execute("PRAGMA table_info(accounts)").fetchall()}
             assert "games" in cols
             # Existing accounts keep the default (all games) sentinel: NULL.
             storage.add_account("solo", "123456", "os_euro")
@@ -124,9 +121,7 @@ class TestCheckinLogCRUD:
         storage.add_checkin_log(account_id, success_result(date="2026-09-23"))
         storage.add_checkin_log(
             account_id,
-            CheckinResult(
-                game="genshin", claimed_date="2026-09-24", status="already_claimed"
-            ),
+            CheckinResult(game="genshin", claimed_date="2026-09-24", status="already_claimed"),
         )
         last = storage.last_checkin_status(account_id, "genshin")
         assert last is not None
@@ -172,7 +167,9 @@ class TestCheckinLogCRUD:
         assert row["error_message"] == "boom"
         assert row["reward_name"] is None
 
-    def test_upsert_checkin_log_inserts_when_absent(self, storage: Storage, account_id: int) -> None:
+    def test_upsert_checkin_log_inserts_when_absent(
+        self, storage: Storage, account_id: int
+    ) -> None:
         """Upsert on a missing (account, game, date) inserts a fresh row."""
         row_id = storage.upsert_checkin_log(account_id, "hsr", "2026-09-24", "success")
         assert row_id > 0

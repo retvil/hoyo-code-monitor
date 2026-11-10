@@ -37,7 +37,7 @@ class SystemTray:
         ("Every 60 minutes", 3600),
     )
 
-    def __init__(  # noqa: PLR0913 -- 8 tray callbacks keep the factory signature flat (cli.py passes all 8 positionally)
+    def __init__(
         self,
         on_start: Callable[[], None],
         on_stop: Callable[[], None],
@@ -76,7 +76,7 @@ class SystemTray:
     def _create_icon_image(self) -> Image.Image:
         """Create a simple icon image for the system tray."""
         if not PYSTRAY_AVAILABLE or Image is None:
-            raise RuntimeError("PIL not available")  # noqa: TRY003 -- validation message needs interpolation, custom exception already specific
+            raise RuntimeError("PIL not available")
         # Create a 64x64 image with a simple design
         img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
@@ -184,9 +184,7 @@ class SystemTray:
         self._running = False
         self._update_menu()
 
-    def _on_set_interval(
-        self, _icon: pystray.Icon, _item: pystray.MenuItem, seconds: int
-    ) -> None:
+    def _on_set_interval(self, _icon: pystray.Icon, _item: pystray.MenuItem, seconds: int) -> None:
         """Handle scan interval change."""
         logger.info("Set scan interval requested: %ds", seconds)
         if self.on_set_interval is not None:
@@ -244,7 +242,7 @@ class SystemTray:
         self._update_menu()
 
 
-def create_tray_icon(  # noqa: PLR0913 -- flat factory surface mirroring SystemTray.__init__ (8 callbacks)
+def create_tray_icon(
     on_start: Callable[[], None],
     on_stop: Callable[[], None],
     on_show: Callable[[], None],

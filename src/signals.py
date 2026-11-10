@@ -42,6 +42,7 @@ class GracefulShutdown:
         self._shutdown_requested = False
         self._shutdown_complete = asyncio.Event()
         self._original_handlers: dict = {}
+        self._shutdown_task: asyncio.Task[None] | None = None
 
     def setup(self) -> None:
         """Register signal handlers for SIGINT and SIGTERM."""
@@ -81,8 +82,13 @@ class GracefulShutdown:
         self.loop.call_soon_threadsafe(self._schedule_shutdown)
 
     def _schedule_shutdown(self) -> None:
-        """Schedule the async shutdown coroutine."""
-        asyncio.create_task(self.shutdown())
+        """Schedule the async shutdown coroutine.
+
+        The task reference is stored on the instance so it is not garbage
+        collected before it runs (RUF006); ``shutdown`` completes on the same
+        loop that owns this task, and the instance outlives it.
+        """
+        self._shutdown_task = asyncio.create_task(self.shutdown())
 
     async def shutdown(self) -> None:
         """Execute graceful shutdown sequence.

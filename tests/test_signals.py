@@ -50,16 +50,12 @@ class TestGracefulShutdown:
         """Test initialization with cleanup callbacks."""
         callback1 = MagicMock()
         callback2 = MagicMock()
-        manager = GracefulShutdown(
-            loop=event_loop, cleanup_callbacks=[callback1, callback2]
-        )
+        manager = GracefulShutdown(loop=event_loop, cleanup_callbacks=[callback1, callback2])
         assert len(manager.cleanup_callbacks) == 2  # the two callbacks registered above
         assert callback1 in manager.cleanup_callbacks
         assert callback2 in manager.cleanup_callbacks
 
-    def test_setup_registers_signal_handlers(
-        self, shutdown_manager: GracefulShutdown
-    ) -> None:
+    def test_setup_registers_signal_handlers(self, shutdown_manager: GracefulShutdown) -> None:
         """Test that setup() registers signal handlers."""
         with patch("signal.signal") as mock_signal:
             shutdown_manager.setup()
@@ -67,9 +63,7 @@ class TestGracefulShutdown:
             assert mock_signal.call_count >= 1
             # Check SIGINT was registered
             calls = mock_signal.call_args_list
-            sigint_call = next(
-                (c for c in calls if c[0][0] == signal.SIGINT), None
-            )
+            sigint_call = next((c for c in calls if c[0][0] == signal.SIGINT), None)
             assert sigint_call is not None
             assert sigint_call[0][1] == shutdown_manager._signal_handler
 
@@ -95,9 +89,7 @@ class TestGracefulShutdown:
             scheduled_callback = mock_call_soon.call_args[0][0]
             assert scheduled_callback == shutdown_manager._schedule_shutdown
 
-    def test_second_signal_triggers_force_exit(
-        self, shutdown_manager: GracefulShutdown
-    ) -> None:
+    def test_second_signal_triggers_force_exit(self, shutdown_manager: GracefulShutdown) -> None:
         """Test that second signal triggers force exit."""
         shutdown_manager._shutdown_requested = True
 
@@ -114,8 +106,7 @@ class TestGracefulShutdown:
             signal.SIGTERM: signal.SIG_DFL,
         }
 
-        with patch("signal.signal") as mock_signal, \
-             patch("sys.exit") as mock_exit:
+        with patch("signal.signal") as mock_signal, patch("sys.exit") as mock_exit:
             shutdown_manager._force_exit()
 
             # Should restore the two handlers saved in _original_handlers
@@ -139,7 +130,7 @@ class TestGracefulShutdown:
             mock_to_thread.assert_called_once()
             call_args = mock_to_thread.call_args[0]
             assert callable(call_args[0])  # function to call (scheduler.shutdown)
-            assert call_args[1] is True   # wait=True
+            assert call_args[1] is True  # wait=True
 
     @pytest.mark.asyncio
     async def test_shutdown_waits_for_jobs(
@@ -148,8 +139,10 @@ class TestGracefulShutdown:
         """Test that shutdown waits for running jobs."""
         mock_scheduler.get_jobs.return_value = [MagicMock(), MagicMock()]
 
-        with patch("asyncio.sleep") as mock_sleep, \
-             patch.object(shutdown_manager.loop, "run_in_executor") as mock_run_in_executor:
+        with (
+            patch("asyncio.sleep") as mock_sleep,
+            patch.object(shutdown_manager.loop, "run_in_executor") as mock_run_in_executor,
+        ):
             mock_run_in_executor.return_value = asyncio.Future()
             mock_run_in_executor.return_value.set_result(None)
 
@@ -186,9 +179,7 @@ class TestGracefulShutdown:
         """Test that shutdown handles errors in cleanup callbacks gracefully."""
         failing_callback = MagicMock(side_effect=ValueError("Callback failed"))
         failing_callback.__name__ = "failing_callback"
-        manager = GracefulShutdown(
-            loop=event_loop, cleanup_callbacks=[failing_callback]
-        )
+        manager = GracefulShutdown(loop=event_loop, cleanup_callbacks=[failing_callback])
 
         with patch.object(manager.loop, "run_in_executor") as mock_run_in_executor:
             mock_run_in_executor.return_value = asyncio.Future()
@@ -202,9 +193,7 @@ class TestGracefulShutdown:
             assert "Error in cleanup callback" in caplog.text
 
     @pytest.mark.asyncio
-    async def test_shutdown_sets_completion_event(
-        self, shutdown_manager: GracefulShutdown
-    ) -> None:
+    async def test_shutdown_sets_completion_event(self, shutdown_manager: GracefulShutdown) -> None:
         """Test that shutdown sets the completion event."""
         assert not shutdown_manager._shutdown_complete.is_set()
 
@@ -217,9 +206,7 @@ class TestGracefulShutdown:
             assert shutdown_manager._shutdown_complete.is_set()
 
     @pytest.mark.asyncio
-    async def test_wait_for_shutdown(
-        self, shutdown_manager: GracefulShutdown
-    ) -> None:
+    async def test_wait_for_shutdown(self, shutdown_manager: GracefulShutdown) -> None:
         """Test wait_for_shutdown waits for completion."""
         with patch.object(shutdown_manager.loop, "run_in_executor") as mock_run_in_executor:
             mock_run_in_executor.return_value = asyncio.Future()
@@ -234,9 +221,7 @@ class TestGracefulShutdown:
             await shutdown_task
             assert shutdown_manager._shutdown_complete.is_set()
 
-    def test_is_shutdown_requested_property(
-        self, shutdown_manager: GracefulShutdown
-    ) -> None:
+    def test_is_shutdown_requested_property(self, shutdown_manager: GracefulShutdown) -> None:
         """Test is_shutdown_requested property."""
         assert shutdown_manager.is_shutdown_requested is False
 
@@ -269,9 +254,7 @@ class TestSetupSignalHandlers:
     ) -> None:
         """Test that setup_signal_handlers returns GracefulShutdown instance."""
         with patch("signal.signal"):
-            shutdown = setup_signal_handlers(
-                scheduler=mock_scheduler, loop=event_loop
-            )
+            shutdown = setup_signal_handlers(scheduler=mock_scheduler, loop=event_loop)
             assert isinstance(shutdown, GracefulShutdown)
             assert shutdown.scheduler is mock_scheduler
             assert shutdown.loop is event_loop
@@ -284,24 +267,17 @@ class TestSetupSignalHandlers:
             setup_signal_handlers(scheduler=mock_scheduler, loop=event_loop)
             assert mock_signal.call_count >= 1
 
-    def test_passes_cleanup_callbacks(
-        self, event_loop: asyncio.AbstractEventLoop
-    ) -> None:
+    def test_passes_cleanup_callbacks(self, event_loop: asyncio.AbstractEventLoop) -> None:
         """Test that cleanup callbacks are passed to GracefulShutdown."""
         callback = MagicMock()
         callback.__name__ = "test_callback"
         with patch("signal.signal"):
-            shutdown = setup_signal_handlers(
-                loop=event_loop, cleanup_callbacks=[callback]
-            )
+            shutdown = setup_signal_handlers(loop=event_loop, cleanup_callbacks=[callback])
             assert callback in shutdown.cleanup_callbacks
 
-    def test_uses_current_loop_when_none_provided(
-        self, mock_scheduler: MagicMock
-    ) -> None:
+    def test_uses_current_loop_when_none_provided(self, mock_scheduler: MagicMock) -> None:
         """Test that current event loop is used when none provided."""
-        with patch("signal.signal"), \
-             patch("asyncio.get_event_loop") as mock_get_loop:
+        with patch("signal.signal"), patch("asyncio.get_event_loop") as mock_get_loop:
             mock_loop = MagicMock()
             mock_get_loop.return_value = mock_loop
 
@@ -321,9 +297,7 @@ class TestGracefulShutdownWindows:
         loop.close()
 
     @pytest.mark.skipif(sys.platform != "win32", reason="Windows-specific test")
-    def test_registers_sigbreak_on_windows(
-        self, event_loop: asyncio.AbstractEventLoop
-    ) -> None:
+    def test_registers_sigbreak_on_windows(self, event_loop: asyncio.AbstractEventLoop) -> None:
         """Test that SIGBREAK is registered on Windows."""
         with patch("signal.signal") as mock_signal:
             manager = GracefulShutdown(loop=event_loop)
@@ -349,9 +323,7 @@ class TestGracefulShutdownUnix:
         loop.close()
 
     @pytest.mark.skipif(sys.platform == "win32", reason="Unix-specific test")
-    def test_registers_sigterm_on_unix(
-        self, event_loop: asyncio.AbstractEventLoop
-    ) -> None:
+    def test_registers_sigterm_on_unix(self, event_loop: asyncio.AbstractEventLoop) -> None:
         """Test that SIGTERM is registered on Unix."""
         with patch("signal.signal") as mock_signal:
             manager = GracefulShutdown(loop=event_loop)

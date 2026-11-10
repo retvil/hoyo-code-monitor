@@ -77,7 +77,9 @@ class TestConfigManagerInit:
         cm = ConfigManager(temp_config_file)
         assert cm.config_path == Path(temp_config_file)
 
-    def test_init_with_env_var(self, temp_config_file: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_init_with_env_var(
+        self, temp_config_file: str, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.setenv("CONFIG_PATH", temp_config_file)
         cm = ConfigManager()
         assert cm.config_path == Path(temp_config_file)
@@ -104,7 +106,7 @@ class TestConfigManagerLoad:
             "redemption_enabled": True,
             "redemption_min_gap_seconds": 10,
         }
-        with open(config_manager.config_path, "w", encoding="utf-8") as f:
+        with config_manager.config_path.open("w", encoding="utf-8") as f:
             toml.dump(custom, f)
 
         s = config_manager.load()
@@ -114,7 +116,7 @@ class TestConfigManagerLoad:
 
     def test_load_partial_config_merges_defaults(self, config_manager: ConfigManager) -> None:
         partial = {"poll_interval_seconds": 7200}
-        with open(config_manager.config_path, "w", encoding="utf-8") as f:
+        with config_manager.config_path.open("w", encoding="utf-8") as f:
             toml.dump(partial, f)
 
         s = config_manager.load()
@@ -123,7 +125,7 @@ class TestConfigManagerLoad:
         assert s.heartbeat_seconds == 5
 
     def test_load_invalid_toml_falls_back_to_defaults(self, config_manager: ConfigManager) -> None:
-        with open(config_manager.config_path, "w", encoding="utf-8") as f:
+        with config_manager.config_path.open("w", encoding="utf-8") as f:
             f.write("invalid toml content [[[")
 
         s = config_manager.load()

@@ -126,7 +126,7 @@ def list_accounts() -> None:
 @click.option("--lang", default="en-us", help="Language code.")
 @click.option("--s-lang-key", default="en-us", help="Secondary language key.")
 @click.option("--game", default="genshin", help="Game id: genshin, hsr, zzz, hi3, tot.")
-def add(  # noqa: PLR0913 -- click command surface: 7 option flags keep the CLI positional-friendly
+def add(
     name: str,
     uid: str,
     region: str,
@@ -182,7 +182,7 @@ def remove(name: str) -> None:
 @click.option("--game-biz", help="New game business identifier.")
 @click.option("--lang", help="New language code.")
 @click.option("--s-lang-key", help="New secondary language key.")
-def update(  # noqa: PLR0913 -- click command surface: 6 optional flags keep the CLI positional-friendly
+def update(
     name: str,
     uid: str | None = None,
     region: str | None = None,
@@ -503,7 +503,7 @@ def notify_test_toast() -> None:
     """Show a test Windows toast (no configuration needed)."""
     # Optional-dependency lazy import: winotify may be absent on non-Windows or
     # missing-extra installs; is_configured() probes it, so it must be deferred.
-    from src.system_notify import (  # noqa: PLC0415 -- optional dependency (winotify) probe
+    from src.system_notify import (
         is_configured,
         show_toast,
     )
@@ -519,7 +519,6 @@ def notify_test_toast() -> None:
 
 @cli.command()
 def status() -> None:
-
     """Show current status."""
     try:
         scheduler = create_scheduler_from_storage()
@@ -590,7 +589,7 @@ def run_once() -> None:
                         pass  # Duplicate or other error
 
             new_codes = len(new_code_list)
-            codes_redeemed, errors = _run_redemption(
+            codes_redeemed, _errors = _run_redemption(
                 scheduler,
                 new_code_list,
                 storage,
@@ -709,7 +708,7 @@ def autostart_status_cli() -> None:
 
 
 @cli.command()
-def tray() -> None:  # noqa: C901 -- glue command: wires a live scheduler into web_ui, a web thread, 6 menu callbacks and a blocking run loop
+def tray() -> None:
     """Run in system tray with live menu and embedded settings server."""
     _ensure_single_instance()
     scheduler = create_scheduler_from_storage()

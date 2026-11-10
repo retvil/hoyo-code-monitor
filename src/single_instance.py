@@ -37,7 +37,7 @@ def _is_process_alive(pid: int) -> bool:
             return False
     # ctypes fallback - Windows API only
     try:
-        import ctypes  # noqa: PLC0415 -- Windows-only stdlib fallback, kept lazy to stay importable everywhere
+        import ctypes
 
         kernel32 = ctypes.windll.kernel32
         # OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION=0x1000, FALSE, pid)
@@ -118,18 +118,18 @@ class SingleInstance:
 
         try:
             self.lock_path.parent.mkdir(parents=True, exist_ok=True)
-            self._fh = open(self.lock_path, "w", encoding="utf-8")
+            self._fh = self.lock_path.open("w", encoding="utf-8")
         except OSError as e:
             logger.warning("Single-instance lock file unavailable: %s", e)
             return False
         try:
-            import portalocker  # noqa: PLC0415 -- optional dependency, lazy import
+            import portalocker
 
             portalocker.lock(self._fh, portalocker.LOCK_EX | portalocker.LOCK_NB)
             self._use_portalocker = True
         except ImportError:
             try:
-                import msvcrt  # noqa: PLC0415 -- Windows-only stdlib, lazy import
+                import msvcrt
 
                 msvcrt.locking(self._fh.fileno(), msvcrt.LK_NBLCK, 1)
                 self._use_portalocker = False
@@ -159,14 +159,14 @@ class SingleInstance:
             if self._fh:
                 if self._use_portalocker:
                     try:
-                        import portalocker  # noqa: PLC0415 -- optional dependency, lazy import
+                        import portalocker
 
                         portalocker.unlock(self._fh)
                     except Exception:
                         pass
                 else:
                     try:
-                        import msvcrt  # noqa: PLC0415 -- Windows-only stdlib, lazy import
+                        import msvcrt
 
                         msvcrt.locking(self._fh.fileno(), msvcrt.LK_UNLCK, 1)
                     except Exception:

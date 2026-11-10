@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
-import os
 import tempfile
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -19,10 +20,8 @@ def temp_db() -> str:
         db_path = f.name
     yield db_path
     for ext in ("", "-wal", "-shm", "-journal"):
-        try:
-            os.unlink(db_path + ext)
-        except OSError:
-            pass
+        with contextlib.suppress(OSError):
+            Path(db_path + ext).unlink(missing_ok=True)
 
 
 @pytest.fixture
@@ -65,7 +64,13 @@ class TestPages:
 
     @pytest.mark.parametrize(
         "path",
-        ["/partials/scheduler-status", "/partials/stats", "/partials/recent-codes", "/partials/recent-logs", "/partials/health"],
+        [
+            "/partials/scheduler-status",
+            "/partials/stats",
+            "/partials/recent-codes",
+            "/partials/recent-logs",
+            "/partials/health",
+        ],
     )
     def test_partials_ok(self, client: TestClient, path: str) -> None:
         assert client.get(path).status_code == 200
@@ -75,7 +80,12 @@ class TestSourcesApi:
     def test_add_list_delete(self, client: TestClient) -> None:
         r = client.post(
             "/sources",
-            data={"name": "t1", "url": "https://example.com", "selector_type": "css", "selector": ".x"},
+            data={
+                "name": "t1",
+                "url": "https://example.com",
+                "selector_type": "css",
+                "selector": ".x",
+            },
         )
         assert r.status_code == 200
         assert "t1" in client.get("/sources").text
@@ -83,7 +93,15 @@ class TestSourcesApi:
         assert client.delete("/sources/t1").status_code == 404
 
     def test_enable_disable(self, client: TestClient) -> None:
-        client.post("/sources", data={"name": "t2", "url": "https://example.com", "selector_type": "css", "selector": ".x"})
+        client.post(
+            "/sources",
+            data={
+                "name": "t2",
+                "url": "https://example.com",
+                "selector_type": "css",
+                "selector": ".x",
+            },
+        )
         assert client.post("/sources/t2/disable").status_code == 200
         assert client.post("/sources/t2/enable").status_code == 200
 
@@ -93,12 +111,18 @@ class TestSourcesApi:
 
 class TestAccountsApi:
     def test_add_cookies_delete(self, client: TestClient) -> None:
-        assert client.post("/accounts", data={"name": "a1", "uid": "1", "region": "os_usa"}).status_code == 200
+        assert (
+            client.post(
+                "/accounts", data={"name": "a1", "uid": "1", "region": "os_usa"}
+            ).status_code
+            == 200
+        )
         r = client.post("/accounts/a1/cookies", data={"cookies": '{"ltuid": "1", "ltoken": "x"}'})
         assert r.status_code == 200
         r = client.get("/accounts/a1/cookies")
         assert r.status_code == 200
-        assert "ltoken" in r.text and "secret" not in r.text
+        assert "ltoken" in r.text
+        assert "secret" not in r.text
         assert client.delete("/accounts/a1").status_code == 200
 
     def test_bad_cookies_json(self, client: TestClient) -> None:
@@ -121,7 +145,12 @@ class TestCheckinsApi:
         assert client.get("/api/checkins/progress").status_code == 200
 
     def test_checkin_toggle(self, client: TestClient) -> None:
-        assert client.post("/accounts", data={"name": "ca", "uid": "4", "region": "os_usa"}).status_code == 200
+        assert (
+            client.post(
+                "/accounts", data={"name": "ca", "uid": "4", "region": "os_usa"}
+            ).status_code
+            == 200
+        )
         assert "badge-ok" in client.get("/accounts/ca/checkin-state").text
         assert "badge-bad" in client.post("/accounts/ca/checkin/toggle").text
         assert "badge-ok" in client.post("/accounts/ca/checkin/toggle").text
@@ -135,14 +164,20 @@ class TestCheckinsApi:
             "checkin_jitter_minutes": "10",
         }
         assert client.post("/checkins/settings", data=valid).status_code == 200
-        assert client.post(
-            "/checkins/settings",
-            data={**valid, "checkin_time": "25:99"},
-        ).status_code == 400
-        assert client.post(
-            "/checkins/settings",
-            data={**valid, "checkin_jitter_minutes": "121"},
-        ).status_code == 400
+        assert (
+            client.post(
+                "/checkins/settings",
+                data={**valid, "checkin_time": "25:99"},
+            ).status_code
+            == 400
+        )
+        assert (
+            client.post(
+                "/checkins/settings",
+                data={**valid, "checkin_jitter_minutes": "121"},
+            ).status_code
+            == 400
+        )
 
 
 class TestImportExportApi:
@@ -153,9 +188,10 @@ class TestImportExportApi:
         assert payload["app"] == "genshin-code-monitor"
         assert payload["codes"][0]["code"] == "EXPORTED1"
 
-        target_db = tempfile.NamedTemporaryFile(suffix=".db", delete=False).name
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+            target_db = tmp.name
         try:
-            from src import web_ui  # noqa: PLC0415 -- test-local import kept near its use
+            from src import web_ui
 
             original_storage = web_ui.Storage
             web_ui.Storage = lambda *_a, **_k: Storage(target_db)
@@ -166,10 +202,8 @@ class TestImportExportApi:
         finally:
             web_ui.Storage = original_storage
             for suffix in ("", "-wal", "-shm", "-journal"):
-                try:
-                    os.unlink(target_db + suffix)
-                except OSError:
-                    pass
+                with contextlib.suppress(OSError):
+                    Path(target_db + suffix).unlink(missing_ok=True)
 
     def test_import_rejects_invalid_json(self, client: TestClient) -> None:
         response = client.post("/import", data={"payload": "not-json"})
@@ -243,7 +277,9 @@ class TestMiscApi:
 
         mock_redeemer = AsyncMock()
         mock_redeemer.redeem_code = AsyncMock(
-            return_value=RedemptionResult(success=True, reward="R", message="OK", raw_response={"retcode": 0})
+            return_value=RedemptionResult(
+                success=True, reward="R", message="OK", raw_response={"retcode": 0}
+            )
         )
         mock_redeemer.__aenter__ = AsyncMock(return_value=mock_redeemer)
         mock_redeemer.__aexit__ = AsyncMock(return_value=None)

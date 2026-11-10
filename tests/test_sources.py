@@ -126,7 +126,7 @@ class TestCSSExtractor:
 
     def test_extract_from_table(self) -> None:
         extractor = CSSExtractor()
-        html = '<table><tr><td><code>GENSHIN111</code></td></tr><tr><td><b><code>STARRAIL222</code></b></td></tr></table>'
+        html = "<table><tr><td><code>GENSHIN111</code></td></tr><tr><td><b><code>STARRAIL222</code></b></td></tr></table>"
         codes = extractor.extract(html, "td code")
         assert "GENSHIN111" in codes
         assert "STARRAIL222" in codes
@@ -254,9 +254,13 @@ class TestSourceFetcher:
             assert fetcher._session is not None
 
     @pytest.mark.asyncio
-    async def test_fetch_with_aiohttp_success(self, storage: Storage, source_config: SourceConfig) -> None:
+    async def test_fetch_with_aiohttp_success(
+        self, storage: Storage, source_config: SourceConfig
+    ) -> None:
         mock_response = AsyncMock()
-        mock_response.text = AsyncMock(return_value='<html><div class="code">GENSHIN123</div></html>')
+        mock_response.text = AsyncMock(
+            return_value='<html><div class="code">GENSHIN123</div></html>'
+        )
         mock_response.raise_for_status = MagicMock()
         mock_response.__aenter__ = AsyncMock(return_value=mock_response)
         mock_response.__aexit__ = AsyncMock(return_value=None)
@@ -272,7 +276,7 @@ class TestSourceFetcher:
 
     @pytest.mark.asyncio
     async def test_fetch_http_error(self, storage: Storage, source_config: SourceConfig) -> None:
-        import aiohttp  # noqa: PLC0415 -- test-local import kept near its use
+        import aiohttp
 
         mock_response = AsyncMock()
         mock_response.__aenter__ = AsyncMock(side_effect=aiohttp.ClientError("Connection failed"))
@@ -292,7 +296,9 @@ class TestSourceFetcher:
         storage.add_source("source3", "https://example3.com", "css", ".code", enabled=False)
 
         mock_response = AsyncMock()
-        mock_response.text = AsyncMock(return_value='<html><div class="code">GENSHIN123</div></html>')
+        mock_response.text = AsyncMock(
+            return_value='<html><div class="code">GENSHIN123</div></html>'
+        )
         mock_response.raise_for_status = MagicMock()
         mock_response.__aenter__ = AsyncMock(return_value=mock_response)
         mock_response.__aexit__ = AsyncMock(return_value=None)
@@ -376,9 +382,7 @@ class TestSourceFetcher:
         assert result == {"bad": [], "good": ["GOODCODE"]}
 
     @pytest.mark.asyncio
-    async def test_fetch_all_enabled_failure_increments_error_count(
-        self, storage: Storage
-    ) -> None:
+    async def test_fetch_all_enabled_failure_increments_error_count(self, storage: Storage) -> None:
         """Regression: a failed fetch must bump ``sources.error_count``.
 
         The increment used to raise ``OperationalError: no such column:
@@ -422,9 +426,7 @@ class TestSourceFetcher:
         assert source["error_count"] == 0
 
     @pytest.mark.asyncio
-    async def test_fetch_all_enabled_success_records_last_success(
-        self, storage: Storage
-    ) -> None:
+    async def test_fetch_all_enabled_success_records_last_success(self, storage: Storage) -> None:
         """A successful fetch must record a non-NULL last_success timestamp."""
         storage.add_source("good", "https://good.example", "css", ".code", rate_limit_seconds=0)
         assert storage.get_source("good")["last_success"] is None
@@ -439,9 +441,7 @@ class TestSourceFetcher:
         assert storage.get_source("good")["last_success"] is not None
 
     @pytest.mark.asyncio
-    async def test_fetch_all_enabled_failure_clears_last_success(
-        self, storage: Storage
-    ) -> None:
+    async def test_fetch_all_enabled_failure_clears_last_success(self, storage: Storage) -> None:
         """A failed fetch must reset last_success to NULL (no stale 'active' state)."""
         storage.add_source("bad", "https://bad.example", "css", ".code", rate_limit_seconds=0)
         storage.mark_source_success("bad")
@@ -525,15 +525,13 @@ class TestSourceFetcher:
         source's error counter. Before the fix the retry loop body never executed
         and the function silently returned ``[]`` with no error log.
         """
-        import aiohttp  # noqa: PLC0415 -- test-local import kept near its use
+        import aiohttp
 
         source_config.max_retries = 0
         source_config.retry_base_delay = 0.0
 
         mock_response = AsyncMock()
-        mock_response.__aenter__ = AsyncMock(
-            side_effect=aiohttp.ClientError("Connection refused")
-        )
+        mock_response.__aenter__ = AsyncMock(side_effect=aiohttp.ClientError("Connection refused"))
         mock_response.__aexit__ = AsyncMock(return_value=None)
         mock_session = AsyncMock()
         mock_session.get = MagicMock(return_value=mock_response)
@@ -545,17 +543,16 @@ class TestSourceFetcher:
         # One attempt was made despite max_retries=0.
         assert mock_session.get.call_count == 1
 
+    @pytest.mark.usefixtures("source_config")
     @pytest.mark.asyncio
-    async def test_zero_retries_all_paths_increments_error_count(
-        self, storage: Storage, source_config: SourceConfig
-    ) -> None:
+    async def test_zero_retries_all_paths_increments_error_count(self, storage: Storage) -> None:
         """``fetch_all_enabled`` with max_retries=0 must still bump the error counter.
 
         Regression for S4: a 0-retry source that fails on its only attempt must
         surface through the same error path (logger + increment_source_error) as
         a 1-retry source that fails.
         """
-        import aiohttp  # noqa: PLC0415 -- test-local import kept near its use
+        import aiohttp
 
         storage.add_source(
             "zero",
@@ -568,9 +565,7 @@ class TestSourceFetcher:
         # Configure the actual aiohttp session so fetch_source runs the real
         # retry loop with max_retries=0 and fails.
         mock_response = AsyncMock()
-        mock_response.__aenter__ = AsyncMock(
-            side_effect=aiohttp.ClientError("Connection refused")
-        )
+        mock_response.__aenter__ = AsyncMock(side_effect=aiohttp.ClientError("Connection refused"))
         mock_response.__aexit__ = AsyncMock(return_value=None)
         mock_session = AsyncMock()
         mock_session.get = MagicMock(return_value=mock_response)

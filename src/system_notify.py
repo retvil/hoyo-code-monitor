@@ -45,11 +45,10 @@ MAX_CODES_PER_TOAST = 5
 def is_configured() -> bool:
     """Return whether the optional toast dependency is importable."""
     try:
-        import winotify  # noqa: F401, PLC0415 -- optional dependency probe
-
-        return True  # noqa: TRY300 -- probe result reads better inline
+        import winotify  # noqa: F401 -- importable-availability probe, not a value
     except ImportError:
         return False
+    return True
 
 
 def show_toast(title: str, message: str) -> bool:
@@ -57,7 +56,7 @@ def show_toast(title: str, message: str) -> bool:
     if not title and not message:
         return False
     try:
-        from winotify import Notification  # noqa: PLC0415 -- optional dependency
+        from winotify import Notification
     except ImportError as e:
         logger.debug("Toast unavailable, winotify not installed: %s", e)
         return False
@@ -69,10 +68,10 @@ def show_toast(title: str, message: str) -> bool:
         # which is a different (and heavier) API. Keep it a simple blocking
         # call - a hung notification must not hold a background thread.
         notification.show()
-        return True  # noqa: TRY300 -- success reads better inline
     except Exception as e:
         logger.debug("Toast failed: %s", e)
         return False
+    return True
 
 
 async def notify_toast(title: str, message: str) -> bool:
@@ -85,7 +84,9 @@ async def notify_new_codes_toast(codes: list[str]) -> bool:
     if not codes:
         return False
     shown = ", ".join(codes[:MAX_CODES_PER_TOAST])
-    extra = f" (+{len(codes) - MAX_CODES_PER_TOAST} more)" if len(codes) > MAX_CODES_PER_TOAST else ""
+    extra = (
+        f" (+{len(codes) - MAX_CODES_PER_TOAST} more)" if len(codes) > MAX_CODES_PER_TOAST else ""
+    )
     return await notify_toast(f"New codes: {len(codes)}", f"{shown}{extra}")
 
 

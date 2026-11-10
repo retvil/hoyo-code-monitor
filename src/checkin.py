@@ -114,6 +114,7 @@ def _parse_today(raw: object) -> int:
         logger.warning("Unparseable `today` value %r; defaulting to 0", raw)
         return 0
 
+
 # Length of the random part in the DS signature.
 DS_RANDOM_LENGTH: int = 6
 
@@ -276,9 +277,7 @@ class CheckinRunner:
             max_retries: Network-error retries per API call.
             retry_base_delay: Base backoff delay in seconds.
         """
-        self.transport: CheckinTransport = transport or AiohttpCheckinTransport(
-            timeout=timeout
-        )
+        self.transport: CheckinTransport = transport or AiohttpCheckinTransport(timeout=timeout)
         self.max_retries = max_retries
         self.retry_base_delay = retry_base_delay
 
@@ -305,7 +304,7 @@ class CheckinRunner:
         """Look up per-game check-in config or raise."""
         conf = GAME_CHECKIN_CONF.get(game)
         if conf is None:
-            raise CheckinError(f"Unsupported game: {game}")  # noqa: TRY003
+            raise CheckinError(f"Unsupported game: {game}")
         return conf
 
     @staticmethod
@@ -313,7 +312,7 @@ class CheckinRunner:
         """Validate auth cookies before any HTTP call."""
         missing = [c for c in ("ltuid", "ltoken") if not cookies.get(c)]
         if missing:
-            raise CheckinError(f"Missing required cookies: {missing}")  # noqa: TRY003
+            raise CheckinError(f"Missing required cookies: {missing}")
 
     def generate_ds(
         self,
@@ -336,8 +335,10 @@ class CheckinRunner:
             DS header value.
         """
         stamp = t if t is not None else int(time.time())
-        rand = r if r is not None else "".join(
-            random.choices(string.ascii_letters + string.digits, k=DS_RANDOM_LENGTH)
+        rand = (
+            r
+            if r is not None
+            else "".join(random.choices(string.ascii_letters + string.digits, k=DS_RANDOM_LENGTH))
         )
         digest = hashlib.md5(
             f"salt={OS_DS_SALT}&t={stamp}&r={rand}&b={body}&q={query}".encode()
@@ -507,9 +508,7 @@ class CheckinRunner:
         # to trigger an auto cookie-refresh; the rest is the human hint.
         return f"{COOKIE_EXPIRED_MARKER}: check-in unavailable, refresh account cookies"
 
-    def _failed(
-        self, game: str, claimed_date: str, message: str
-    ) -> CheckinResult:
+    def _failed(self, game: str, claimed_date: str, message: str) -> CheckinResult:
         """Build a failed CheckinResult."""
         return CheckinResult(game, claimed_date, STATUS_FAILED, message=message)
 
@@ -523,9 +522,7 @@ class CheckinRunner:
             # Not an error: the account simply has no role in this game.
             # Skipped so it does not drag the pass-level success flag down;
             # the slot is retried next day in case a character appears.
-            return CheckinResult(
-                game, claimed_date, STATUS_SKIPPED, message=message
-            )
+            return CheckinResult(game, claimed_date, STATUS_SKIPPED, message=message)
         return self._failed(game, claimed_date, message)
 
     async def _signed_result(
@@ -611,9 +608,7 @@ class CheckinRunner:
             return self._failed(game, claimed_date, str(e))
 
         if state["retcode"] != RETCODE_SUCCESS:
-            return self._api_error_result(
-                game, claimed_date, state["retcode"], state["message"]
-            )
+            return self._api_error_result(game, claimed_date, state["retcode"], state["message"])
         if state["is_sign"]:
             return await self._signed_result(ctx, cookies, claimed_date, state)
         if state["first_bind"]:
@@ -626,9 +621,7 @@ class CheckinRunner:
             )
 
         try:
-            raw = await self._call_with_retry(
-                f"{game}/sign", lambda: self.claim(ctx, cookies)
-            )
+            raw = await self._call_with_retry(f"{game}/sign", lambda: self.claim(ctx, cookies))
         except (TimeoutError, aiohttp.ClientError) as e:
             logger.exception("Check-in sign failed for %s", game)
             return self._failed(game, claimed_date, str(e))

@@ -77,8 +77,8 @@ class FakeTransport:
     async def get_json(
         self,
         url: str,
-        headers: dict | None = None,  # noqa: ARG002
-        params: dict | None = None,  # noqa: ARG002
+        headers: dict | None = None,  # noqa: ARG002 -- keyword-matched by production call sites
+        params: dict | None = None,  # noqa: ARG002 -- keyword-matched by production call sites
     ) -> dict:
         self.calls.append(("GET", url))
         if url.endswith("/info"):
@@ -90,9 +90,9 @@ class FakeTransport:
     async def post_json(
         self,
         url: str,
-        headers: dict | None = None,  # noqa: ARG002
-        params: dict | None = None,  # noqa: ARG002
-        body: dict | None = None,  # noqa: ARG002
+        headers: dict | None = None,  # noqa: ARG002 -- keyword-matched by production call sites
+        params: dict | None = None,  # noqa: ARG002 -- keyword-matched by production call sites
+        body: dict | None = None,  # noqa: ARG002 -- keyword-matched by production call sites
     ) -> dict:
         self.calls.append(("POST", url))
         if url.endswith("/sign"):
@@ -262,9 +262,7 @@ class TestRunTearsOfThemis:
         assert transport.count("GET", "/info") == 1
         assert transport.count("POST", "/sign") == 1
         # ToT shares the HSR event host but runs its own activity.
-        assert transport.calls[0][1].startswith(
-            GAME_CHECKIN_CONF["tot"]["base_url"]
-        )
+        assert transport.calls[0][1].startswith(GAME_CHECKIN_CONF["tot"]["base_url"])
 
     @pytest.mark.asyncio
     async def test_run_tot_no_character_is_skipped(self, cookies: dict) -> None:
@@ -368,7 +366,7 @@ class TestRunRetry:
                 super().__init__()
                 self.info_calls = 0
 
-            async def get_json(self, url, headers=None, params=None):  # noqa: ARG002
+            async def get_json(self, url, headers=None, params=None):  # noqa: ARG002 -- kwarg-matched by production
                 if url.endswith("/info"):
                     self.info_calls += 1
                     if self.info_calls < EXPECTED_INFO_CALLS_AFTER_RETRIES:
@@ -388,7 +386,7 @@ class TestRunRetry:
         """Exhausted retries surface as failed, not an exception."""
 
         class DeadTransport(FakeTransport):
-            async def get_json(self, url, headers=None, params=None):  # noqa: ARG002
+            async def get_json(self, url, headers=None, params=None):  # noqa: ARG002 -- kwarg-matched by production
                 self.calls.append(("GET", url))
                 raise aiohttp.ClientConnectionError("down")
 

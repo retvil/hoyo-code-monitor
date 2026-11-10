@@ -164,9 +164,7 @@ class TestSourceHealth:
         )
         stale_ts = _iso(STALE_MINUTES_AGO)
         with storage._connection() as conn:
-            conn.execute(
-                "UPDATE sources SET last_success = ? WHERE name = ?", (stale_ts, "old")
-            )
+            conn.execute("UPDATE sources SET last_success = ? WHERE name = ?", (stale_ts, "old"))
         row = source_health(storage)["sources"][0]
         assert is_source_stale(row["last_success"]) is True
 
@@ -193,7 +191,7 @@ class TestSourceStatus:
     """
 
     @staticmethod
-    def _iso_seconds_ago(seconds: float, *, aware: bool = True) -> str:
+    def _iso_seconds_ago(seconds: float) -> str:
         """ISO-8601 UTC timestamp for now minus ``seconds``.
 
         Aware (UTC) timestamps are what the write side (mark_source_success,
@@ -295,7 +293,9 @@ class TestSwitchFragments:
     @pytest.mark.parametrize("enabled", [True, False])
     def test_switch_reflects_state(self, render: Any, enabled: bool) -> None:
         html = render(ACCOUNT_NAME, enabled)
-        assert f"id='{'redeem' if 'redeem' in render.__name__ else 'checkin'}-{ACCOUNT_NAME}'" in html
+        assert (
+            f"id='{'redeem' if 'redeem' in render.__name__ else 'checkin'}-{ACCOUNT_NAME}'" in html
+        )
         assert ("checked" in html) is enabled
         assert (">ON<" in html) is enabled
         assert (">OFF<" in html) is not enabled
@@ -400,11 +400,9 @@ class TestPageCtx:
         """Release notes follow the UI language when the body has sections."""
         raw = (
             "## What's new (English)\nEnglish notes here\n\n"
-            "## Что нового (Русский)\nРусские заметки здесь\n"  # noqa: RUF001  # noqa: RUF001
+            "## Что нового (Русский)\nРусские заметки здесь\n"
         )
-        update = UpdateInfo(
-            "9.9.9", "1.2.2", "https://x", "english notes", release_notes_raw=raw
-        )
+        update = UpdateInfo("9.9.9", "1.2.2", "https://x", "english notes", release_notes_raw=raw)
         ru = update_ctx(update, lang="ru")["update_notes_text"]
         en = update_ctx(update, lang="en")["update_notes_text"]
         assert "Русские заметки здесь" in ru
@@ -416,11 +414,9 @@ class TestPageCtx:
         """Languages without their own section get the English one."""
         raw = (
             "## What's new (English)\nEnglish notes here\n\n"
-            "## Что нового (Русский)\nРусские заметки здесь\n"  # noqa: RUF001  # noqa: RUF001
+            "## Что нового (Русский)\nРусские заметки здесь\n"
         )
-        update = UpdateInfo(
-            "9.9.9", "1.2.2", "https://x", "english notes", release_notes_raw=raw
-        )
+        update = UpdateInfo("9.9.9", "1.2.2", "https://x", "english notes", release_notes_raw=raw)
         de = update_ctx(update, lang="de")["update_notes_text"]
         assert "English notes here" in de
         assert "Русские заметки" not in de
@@ -433,7 +429,7 @@ class TestPageCtx:
     def test_pick_notes_lang_no_match_returns_whole_body(self) -> None:
         """Sections exist but none matches: show everything, not nothing."""
         body = (
-            "## Что нового (Русский)\nРусские заметки.\n\n"  # noqa: RUF001  # noqa: RUF001
+            "## Что нового (Русский)\nРусские заметки.\n\n"
             "## Was ist neu (Deutsch)\nDeutsche Notizen."
         )
         assert pick_notes_lang(body, "ja") == body

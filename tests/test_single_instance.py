@@ -63,7 +63,9 @@ class TestStaleLockDetection:
         # Spawn a short-lived subprocess and capture its PID
         proc = subprocess.Popen(
             [sys.executable, "-c", "import os, time; time.sleep(0.5)"],
-            creationflags=subprocess.CREATE_NEW_CONSOLE if hasattr(subprocess, 'CREATE_NEW_CONSOLE') else 0,
+            creationflags=subprocess.CREATE_NEW_CONSOLE
+            if hasattr(subprocess, "CREATE_NEW_CONSOLE")
+            else 0,
         )
         dead_pid = proc.pid
         # Immediately kill the subprocess so it becomes a dead PID
@@ -97,7 +99,9 @@ class TestStaleLockDetection:
             assert guard1.acquire() is True
             assert guard1.acquire() in (True, False)  # guard1 already holds it
             # guard2 must be refused: lockers report held, fallback sees live PID
-            assert guard2.acquire() is False, "Expected acquire to fail while a live holder owns the lock"
+            assert guard2.acquire() is False, (
+                "Expected acquire to fail while a live holder owns the lock"
+            )
         finally:
             guard1.release()
             guard2.release()
