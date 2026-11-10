@@ -1,5 +1,45 @@
 # Changelog
 
+## [1.5.2] - 2026-11-10
+
+### Changed
+- **CI/CD hardening after GitHub runner image migration to Windows Server 2025:**
+  - `makensis` (NSIS) is no longer on the hosted-runner `PATH`; the installer
+    build has moved to Inno Setup (`ISCC.exe`, preinstalled on the new image).
+    `installer.iss` now drives the build; the old `installer.nsi` is kept for
+    reference but is no longer invoked by CI.
+  - `docker` job: fixed a docker-tag syntax error that emitted
+    `ghcr.io/<repo>:` (invalid reference) on non-release pushes; the
+    release-only tag is now emitted conditionally. `Dockerfile` now installs
+    `libatomic1` (the runtime shared-lib the Playwright node driver links
+    against; `libatomic-dev` is not packaged for Debian trixie slim).
+  - `requirements.txt` / `pyproject.toml`: pinned `ruff==0.17.4` so local
+    dev and CI use the identical toolchain (a 0.17.3 → 0.17.4 drift had
+    introduced the new `PLR0917` positional-arg metric that red-lined CI).
+  - `pyproject.toml` [tool.ruff.lint] ignore-list: added `PLR0917` alongside
+    `PLR0913` (both flag the deliberately-wide CLI/storage signatures).
+- **Packaging fix:** `tool.setuptools.packages.find` now uses `where=["."]`
+  instead of `where=["src"]`, so the top-level `src` package is actually
+  discovered. Previously `pip install -e .` produced an empty package wheel
+  and CI's `pytest` failed with `ModuleNotFoundError: No module named 'src'`.
+
+### Fixed
+- **`test_redeemer.py` unawaited-coroutine `RuntimeWarning`:** the logging
+  test mocked `session.get` as an `AsyncMock`, but `session.get(url)` is
+  entered via `async with` without an `await`, so the `AsyncMock`'s
+  returned coroutine was never awaited and surfaced at GC time as a warning.
+  Switched to `MagicMock` (matching the 5 sibling tests in the same file)
+  so the async context manager is entered synchronously and no coroutine leaks.
+- `test_storage.py` rollback test: kept `pytest.raises` on the *outer* side
+  of `storage._connection()` so the exception reaches the context manager's
+  `__exit__` and triggers `conn.rollback()`; reordering the two blocks broke
+  the assertion.
+
+### Notes
+- This release is primarily infrastructure/tooling: no user-facing feature
+  changes. The 1.5.1 runtime behavior is unchanged; the app version string
+  (constants.APP_VERSION, wheel metadata, Inno Setup) now reports 1.5.2.
+
 ## [1.5.1] - 2026-11-03
 
 ### Fixed

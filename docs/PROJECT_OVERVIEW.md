@@ -1,7 +1,7 @@
 # HoYo Code Monitor — Project Overview
 
 ## Working title
-HoYo Code Monitor (HCM), current release **1.5.0**.
+HoYo Code Monitor (HCM), current release **1.5.2**.
 
 ## Problem
 HoYoverse promo codes are scattered across wikis, HoYoLAB, socials and streams,
