@@ -55,7 +55,7 @@ dev = [
     "pytest-asyncio>=0.23.0",
     "responses>=0.25.0",
     "aioresponses>=0.7.0",
-    "ruff>=0.3.0,<0.18",
+    "ruff==0.17.4",
     "mypy>=1.8.0",
     "types-toml>=0.10.0",
     "pytest-cov>=4.1.0",
@@ -105,7 +105,7 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "C4", "C9", "N", "T20", "W", "PT", "PTH", "ERA", "SIM", "PD", "RUF", "TRY", "RET", "ARG", "PL", "TCH", "PYI"]
-ignore = ["E501", "PLR2004", "PLC0415", "TRY003", "PLR0913", "RUF001", "C901", "PLR0912", "PLR0915"]
+ignore = ["E501", "PLR2004", "PLC0415", "TRY003", "PLR0913", "PLR0917", "RUF001", "C901", "PLR0912", "PLR0915"]
 fixable = ["ALL"]
 unfixable = []
 per-file-ignores = { "tests/*" = ["S101", "S106"], "src/i18n.py" = ["RUF001"] }
