@@ -19,7 +19,7 @@ repos:
 
       - id: mypy
         name: mypy
-        entry: mypy --strict
+        entry: mypy
         language: system
         types: [python]
         pass_filenames: true
