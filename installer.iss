@@ -32,7 +32,7 @@ PrivilegesRequiredOverridesAllowed=dialog
 OutputDir=..
 ; Emit the same artefact name as the NSIS build so the CI smoke test,
 ; artifact upload, and release-asset steps keep working unchanged.
-OutputBaseName=hoyo-code-monitor-{#MyAppVersion}-setup
+OutputBaseFilename=hoyo-code-monitor-{#MyAppVersion}-setup
 SetupIconFile=assets\icon.ico
 UninstallDisplayIcon={app}\assets\icon.ico
 UninstallDisplayName={#MyAppName}

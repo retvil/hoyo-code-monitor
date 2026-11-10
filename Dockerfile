@@ -28,8 +28,14 @@ WORKDIR /app
 # Install system runtime libs. The app uses Playwright's OWN chromium
 # (downloaded into the user's ms-playwright cache), not the distro's
 # `chromium`/`chromium-driver`, so those are intentionally NOT installed.
+# `playwright install-deps` (line 51) needs apt's C toolchain: libatomic-dev
+# provides the shared libatomic.so.1 that the Playwright node driver links
+# against; without it, `python -m playwright install-deps chromium` fails with
+# "libatomic.so.1: cannot open shared object file" (exit code 127).
 RUN apt-get update && apt-get install -y --no-install-recommends \
     fonts-liberation \
+    libatomic1 \
+    libatomic-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy installed packages from builder
