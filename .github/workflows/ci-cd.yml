@@ -174,8 +174,11 @@ jobs:
         with:
           context: .
           push: ${{ github.event_name == 'release' }}
+          # On non-release pushes (main/dev) tag_name is empty, so the second
+          # tag would be "ghcr.io/<repo>:" — an invalid reference. Only emit it
+          # when we're actually on a release.
           tags: |
             ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:${{ github.event.release.tag_name }}
+            ${{ github.event_name == 'release' && format('ghcr.io/{0}:{1}', github.repository, github.event.release.tag_name) || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
