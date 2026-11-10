@@ -85,11 +85,11 @@ Repository = "https://github.com/retvil/hoyo-code-monitor"
 Issues = "https://github.com/retvil/hoyo-code-monitor/issues"
 
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["."]
 include = ["src*"]
 
 [tool.setuptools.package-data]
-"*" = ["templates/*.html", "*.toml"]
+"src" = ["templates/*.html", "*.toml"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
