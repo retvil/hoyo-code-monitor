@@ -80,8 +80,15 @@ jobs:
         shell: powershell
         run: |
           $ver = (Select-String -Path pyproject.toml -Pattern '^version\s*=\s*"(.+)"').Matches[0].Groups[1].Value
-          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
-          if (-not (Test-Path $iscc)) { $iscc = (Get-Command ISCC.exe -ErrorAction Stop).Source }
+          # Inno Setup ships on the GitHub-hosted windows runner image. Try the
+          # standard install paths, then PATH, in that order.
+          $candidates = @(
+            "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
+            "C:\Program Files\Inno Setup 6\ISCC.exe"
+          )
+          $iscc = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $iscc) { $iscc = (Get-Command ISCC.exe -ErrorAction SilentlyContinue).Source }
+          if (-not $iscc) { Write-Error "ISCC.exe (Inno Setup compiler) not found on this runner"; exit 1 }
           & $iscc "/DMyAppVersion=$ver" installer.iss
 
       - name: Smoke test installer
