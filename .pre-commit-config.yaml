@@ -1,0 +1,25 @@
+# Pre-commit hooks: run `pip install pre-commit` then `pre-commit install`.
+# The local ruff/mypy checks mirror the GitHub Actions CI (see .github/workflows).
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff (check)
+        entry: ruff check --output-format=full
+        language: system
+        types: [python]
+        pass_filenames: true
+
+      - id: ruff-format
+        name: ruff (format)
+        entry: ruff format
+        language: system
+        types: [python]
+        pass_filenames: true
+
+      - id: mypy
+        name: mypy
+        entry: mypy --strict
+        language: system
+        types: [python]
+        pass_filenames: true
