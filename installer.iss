@@ -70,7 +70,7 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Parameter
 [Registry]
 ; Autostart on login (mirrors NSIS SEC_AUTOSTART; value name is "HoYoCodeMonitor"
 ; to stay compatible with src/autostart.py which reads the same key).
-Root: HKA; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "HoYoCodeMonitor"; ValueData: """{app}\{#MyAppExeName}"" tray"; Tasks: autostart
+Root: HKA; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "HoYoCodeMonitor"; ValueData: '"{app}\{#MyAppExeName}" tray'; Tasks: autostart
 
 ; Record the install location in HKCU\Software\HoYo Code Monitor so the
 ; NSIS-style InstallDirRegKey lookup keeps working for upgrades/reinstalls.

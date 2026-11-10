@@ -77,11 +77,12 @@ jobs:
           pyinstaller genshin-code-monitor.spec --clean
 
       - name: Build Inno Setup installer
+        shell: powershell
         run: |
           $ver = (Select-String -Path pyproject.toml -Pattern '^version\s*=\s*"(.+)"').Matches[0].Groups[1].Value
-          $isscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
-          if (-not (Test-Path $isscc)) { $isscc = (Get-Command ISCC.exe -ErrorAction Stop).Source }
-          & $isscc "/DMYAPPVERSION=$ver" installer.iss
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { $iscc = (Get-Command ISCC.exe -ErrorAction Stop).Source }
+          & $iscc "/DMyAppVersion=$ver" installer.iss
 
       - name: Smoke test installer
         run: |
