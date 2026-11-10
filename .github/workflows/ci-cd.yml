@@ -76,13 +76,12 @@ jobs:
         run: |
           pyinstaller genshin-code-monitor.spec --clean
 
-      - name: Install NSIS
-        run: choco install nsis -y
-
-      - name: Build NSIS installer
+      - name: Build Inno Setup installer
         run: |
           $ver = (Select-String -Path pyproject.toml -Pattern '^version\s*=\s*"(.+)"').Matches[0].Groups[1].Value
-          makensis -DVERSION=$ver installer.nsi
+          $isscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $isscc)) { $isscc = (Get-Command ISCC.exe -ErrorAction Stop).Source }
+          & $isscc "/DMYAPPVERSION=$ver" installer.iss
 
       - name: Smoke test installer
         run: |
