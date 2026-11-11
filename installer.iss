@@ -29,7 +29,7 @@ DisableDirPage=yes
 ; Per-user install, no admin rights (mirrors NSIS RequestExecutionLevel user).
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
-OutputDir=..
+OutputDir=out
 ; Emit the same artefact name as the NSIS build so the CI smoke test,
 ; artifact upload, and release-asset steps keep working unchanged.
 OutputBaseFilename=hoyo-code-monitor-{#MyAppVersion}-setup
