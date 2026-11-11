@@ -92,19 +92,23 @@ jobs:
           & $iscc "/DMyAppVersion=$ver" installer.iss
 
       - name: Smoke test installer
+        shell: powershell
         run: |
           & "dist\hoyo-code-monitor\hoyo-code-monitor.exe" --help
           if ($LASTEXITCODE -ne 0) { exit 1 }
           $ver = (Select-String -Path pyproject.toml -Pattern '^version\s*=\s*"(.+)"').Matches[0].Groups[1].Value
-          # Inno Setup writes to OutputDir (set to '..' in installer.iss), i.e. the
-          # repo root — not the working directory NSIS used to emit into.
-          $setup = Join-Path $PWD "hoyo-code-monitor-$ver-setup.exe"
-          if (-not (Test-Path $setup)) {
-            Write-Host "Installer not found in repo root. Searching..."
-            Get-ChildItem -Recurse -Filter "hoyo-code-monitor-*setup.exe" -Path $PWD | Select-Object -First 5
+          # Inno Setup honors OutputDir='..' in installer.iss, so the setup exe
+          # lands in the repo root (one level above the runner workdir). Search
+          # both locations before failing.
+          $candidates = @("$PWD\hoyo-code-monitor-$ver-setup.exe", "..\hoyo-code-monitor-$ver-setup.exe")
+          $setup = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $setup) {
+            Write-Host "Installer not found in workdir or parent. Searching..."
+            Get-ChildItem -Recurse -Filter "hoyo-code-monitor-*setup.exe" -Path "$PWD",".." -ErrorAction SilentlyContinue | Select-Object -First 5
             exit 1
           }
           if ((Get-Item $setup).Length -le 5MB) { exit 1 }
+          Write-Host "Smoke test passed: $setup ($([math]::Round(((Get-Item $setup).Length / 1MB),2)) MB)"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
