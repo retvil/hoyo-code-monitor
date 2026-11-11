@@ -96,10 +96,12 @@ jobs:
           & "dist\hoyo-code-monitor\hoyo-code-monitor.exe" --help
           if ($LASTEXITCODE -ne 0) { exit 1 }
           $ver = (Select-String -Path pyproject.toml -Pattern '^version\s*=\s*"(.+)"').Matches[0].Groups[1].Value
-          $setup = "hoyo-code-monitor-$ver-setup.exe"
+          # Inno Setup writes to OutputDir (set to '..' in installer.iss), i.e. the
+          # repo root — not the working directory NSIS used to emit into.
+          $setup = Join-Path $PWD "hoyo-code-monitor-$ver-setup.exe"
           if (-not (Test-Path $setup)) {
-            Write-Host "Installer not found in CWD. Searching..."
-            Get-ChildItem -Recurse -Filter "$setup" -Path . | Select-Object -First 5
+            Write-Host "Installer not found in repo root. Searching..."
+            Get-ChildItem -Recurse -Filter "hoyo-code-monitor-*setup.exe" -Path $PWD | Select-Object -First 5
             exit 1
           }
           if ((Get-Item $setup).Length -le 5MB) { exit 1 }
