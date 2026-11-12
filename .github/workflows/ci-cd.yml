@@ -97,17 +97,36 @@ jobs:
           & "dist\hoyo-code-monitor\hoyo-code-monitor.exe" --help
           if ($LASTEXITCODE -ne 0) { exit 1 }
           $ver = (Select-String -Path pyproject.toml -Pattern '^version\s*=\s*"(.+)"').Matches[0].Groups[1].Value
-          # Inno Setup now writes its output to 'out\hoyo-code-monitor-<ver>-setup.exe'
-          # (OutputDir=out in installer.iss) so the artifact is always co-located
-          # with the rest of the build tree in the runner workdir.
-          $setup = "out\hoyo-code-monitor-$ver-setup.exe"
-          if (-not (Test-Path $setup)) {
-            Write-Host "Installer not found. Searching..."
-            Get-ChildItem -Recurse -Filter "hoyo-code-monitor-*setup.exe" -Path . | Select-Object -First 5
+          $fileName = "hoyo-code-monitor-$ver-setup.exe"
+          # Deterministic search, in order of likelihood:
+          #   1. CWD/out/            (OutputDir=out interpreted relative to the runner workdir)
+          #   2. CWD/               (OutputDir empty / CWD default)
+          #   3. parent/out/        (OutputDir=out relative to the .iss location, one level up)
+          #   4. parent/            (the parent of the workdir itself)
+          $roots = @($PWD, (Split-Path $PWD -Parent))
+          $searchPaths = @()
+          foreach ($r in $roots) {
+            $searchPaths += "$r\out\$fileName"
+            $searchPaths += "$r\$fileName"
+          }
+          $setup = $searchPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $setup) {
+            Write-Host "Installer not found. Recursive search across workdir + parent + out/:"
+            foreach ($r in $roots) {
+              Get-ChildItem -Recurse -Filter "hoyo-code-monitor-*setup.exe" -Path $r -ErrorAction SilentlyContinue |
+                Select-Object -First 5 | ForEach-Object { Write-Host "  $($_.FullName) ($([math]::Round($_.Length/1MB,2)) MB)" }
+            }
             exit 1
           }
-          if ((Get-Item $setup).Length -le 5MB) { exit 1 }
-          Write-Host "Smoke test passed: $setup"
+          if ((Get-Item $setup).Length -le 5MB) {
+            Write-Host "Installer $setup is smaller than 5MB — build likely failed."
+            exit 1
+          }
+          # Normalize: place a copy at the runner workdir root so the artifact
+          # upload globs and release-asset paths below are stable regardless of
+          # which of the searched locations the compiler actually used.
+          Copy-Item $setup ".\$fileName" -Force
+          Write-Host "Smoke test passed: $setup -> .\$fileName ($([math]::Round(((Get-Item $setup).Length / 1MB),2)) MB)"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -116,19 +135,20 @@ jobs:
           path: |
             dist/hoyo-code-monitor/*.exe
             out/*.exe
+            hoyo-code-monitor-*setup.exe
           retention-days: 30
 
       - name: Create release assets
         if: github.event_name == 'release'
         run: |
-          echo "RELEASE_ASSETS=out/hoyo-code-monitor-${{ github.event.release.tag_name }}-setup.exe" >> $GITHUB_ENV
+          echo "RELEASE_ASSETS=hoyo-code-monitor-${{ github.event.release.tag_name }}-setup.exe" >> $GITHUB_ENV
 
       - name: Upload release assets
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            out/hoyo-code-monitor-${{ github.event.release.tag_name }}-setup.exe
+            hoyo-code-monitor-${{ github.event.release.tag_name }}-setup.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -152,6 +172,7 @@ jobs:
           files: |
             release/dist/hoyo-code-monitor/*.exe
             release/out/*.exe
+            release/*.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
