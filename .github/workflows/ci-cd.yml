@@ -98,22 +98,24 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit 1 }
           $ver = (Select-String -Path pyproject.toml -Pattern '^version\s*=\s*"(.+)"').Matches[0].Groups[1].Value
           $fileName = "hoyo-code-monitor-$ver-setup.exe"
-          # Deterministic search, in order of likelihood:
-          #   1. CWD/out/            (OutputDir=out interpreted relative to the runner workdir)
-          #   2. CWD/               (OutputDir empty / CWD default)
-          #   3. parent/out/        (OutputDir=out relative to the .iss location, one level up)
-          #   4. parent/            (the parent of the workdir itself)
-          $roots = @($PWD, (Split-Path $PWD -Parent))
-          $searchPaths = @()
-          foreach ($r in $roots) {
-            $searchPaths += "$r\out\$fileName"
-            $searchPaths += "$r\$fileName"
-          }
-          $setup = $searchPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+          # Inno Setup's OutputDir=out is resolved relative to the .iss location
+          # (repo root), so the installer may land in the workdir's out/ or in the
+          # parent's out/ (or root). Search both, plus the CWD itself.
+          # Note: $PWD is a PathInfo object — cast to string for correct
+          # string concatenation in the search paths below.
+          $cwd = "$PWD"
+          $parent = Split-Path $cwd -Parent
+          $candidates = @(
+            "$cwd\out\$fileName",
+            "$cwd\$fileName",
+            "$parent\out\$fileName",
+            "$parent\$fileName"
+          )
+          $setup = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
           if (-not $setup) {
-            Write-Host "Installer not found. Recursive search across workdir + parent + out/:"
-            foreach ($r in $roots) {
-              Get-ChildItem -Recurse -Filter "hoyo-code-monitor-*setup.exe" -Path $r -ErrorAction SilentlyContinue |
+            Write-Host "Installer not found in any expected location. Searching recursively..."
+            foreach ($root in @($cwd, $parent)) {
+              Get-ChildItem -Recurse -Filter "hoyo-code-monitor-*setup.exe" -Path $root -ErrorAction SilentlyContinue |
                 Select-Object -First 5 | ForEach-Object { Write-Host "  $($_.FullName) ($([math]::Round($_.Length/1MB,2)) MB)" }
             }
             exit 1
@@ -122,11 +124,10 @@ jobs:
             Write-Host "Installer $setup is smaller than 5MB — build likely failed."
             exit 1
           }
-          # Normalize: place a copy at the runner workdir root so the artifact
-          # upload globs and release-asset paths below are stable regardless of
-          # which of the searched locations the compiler actually used.
-          Copy-Item $setup ".\$fileName" -Force
-          Write-Host "Smoke test passed: $setup -> .\$fileName ($([math]::Round(((Get-Item $setup).Length / 1MB),2)) MB)"
+          # Copy to CWD root so the artifact upload glob (*.exe) and release
+          # asset path (hoyo-code-monitor-<tag>-setup.exe) are stable.
+          Copy-Item $setup $cwd -Force
+          Write-Host "Smoke test passed: $setup ($([math]::Round(((Get-Item $setup).Length / 1MB),2)) MB)"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
