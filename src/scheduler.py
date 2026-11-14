@@ -23,6 +23,7 @@ if TYPE_CHECKING:
 
 import contextlib
 
+from src import system_notify
 from src.checkin import (
     COOKIE_EXPIRED_MARKER,
     GAME_CHECKIN_CONF,
@@ -270,6 +271,11 @@ class Scheduler:
                 return
             self._tally_result(acc["name"], game, result, summary)
             if result.status == STATUS_FAILED and COOKIE_EXPIRED_MARKER in (result.message or ""):
+                # Surface the cookie-expired state so the Web UI can show the
+                # Re-login badge. We still attempt headless auto-refresh below,
+                # but even on failure the user needs to know.
+                self.storage.set_account_cookie_state(acc["name"], "expired")
+                await self._notify_cookie_expired(acc["name"])
                 await self._auto_refresh_cookies(acc)
         except (TimeoutError, aiohttp.ClientError, CheckinError) as e:
             logger.exception("Check-in slot failed for %s/%s", acc["name"], game)
@@ -345,6 +351,14 @@ class Scheduler:
             )
             return
         self.storage.store_account_cookies(account_name, fresh)
+
+    async def _notify_cookie_expired(self, account_name: str) -> None:
+        """Best-effort Windows toast that the account's cookies are stale."""
+        if system_notify.is_configured():
+            await system_notify.notify_toast(
+                f"Cookie expired: {account_name}",
+                "Redeem failed — open the app and click Re-login for this account",
+            )
         self.storage.set_config(f"last_cookie_refresh_{account_name}", str(int(time.time())))
         logger.info(
             "Auto cookie refresh succeeded for %s; next check-in run uses the fresh cookies",
@@ -620,6 +634,12 @@ class Scheduler:
                                         -2017,
                                         -2018,
                                     )
+                                    _rc = res.raw_response.get("retcode")
+                                    if _rc in (10001, -100):
+                                        self.storage.set_account_cookie_state(
+                                            acc["name"], "expired"
+                                        )
+                                        await self._notify_cookie_expired(acc["name"])
                                     existing = self.storage.get_code(code, game=code_game)
                                     new_reward = (
                                         res.reward
@@ -640,6 +660,7 @@ class Scheduler:
                                         error_message=None if claimed else res.message,
                                     )
                                     if claimed:
+                                        self.storage.set_account_cookie_state(acc["name"], "ok")
                                         codes_redeemed += 1
                                         with contextlib.suppress(Exception):
                                             await notify_redeemed(

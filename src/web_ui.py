@@ -528,6 +528,7 @@ async def accounts_page(request: Request) -> HTMLResponse:
     for acc in accounts:
         cookies = storage.load_account_cookies(acc["name"]) or {}
         acc["has_cookies"] = bool(cookies.get("ltuid") and cookies.get("ltoken"))
+        acc["cookie_expired"] = storage.get_account_cookie_state(acc["name"]) == "expired"
     sched_status = scheduler.status if scheduler else None
     return templates.TemplateResponse(
         request,
@@ -590,6 +591,7 @@ async def set_account_cookies(name: str, cookies: str = Form(...)) -> dict[str, 
     except (json.JSONDecodeError, TypeError, ValueError) as e:
         raise HTTPException(status_code=400, detail=f"Invalid cookies JSON: {e}") from e
     storage.store_account_cookies(name, cookies_dict)
+    storage.set_account_cookie_state(name, "ok")
     return {"success": True, "message": f"Cookies set for account '{name}'"}
 
 
@@ -616,6 +618,9 @@ async def login_account(name: str, timeout: int = 300) -> dict[str, Any]:
         # report the detail instead of a bare 500 page
         raise HTTPException(status_code=502, detail=f"Browser login failed: {e}") from e
     storage.store_account_cookies(name, cookies)
+    # A fresh browser login means the session is live again: clear any
+    # "expired" marker so the UI badge drops.
+    storage.set_account_cookie_state(name, "ok")
     return {"success": True, "message": f"Cookies saved for '{name}'", "keys": sorted(cookies)}
 
 
@@ -1236,6 +1241,13 @@ async def redeem_single_code(code: str) -> dict[str, Any]:
                     game=_ag,
                 )
                 claimed = res.success or res.raw_response.get("retcode") in (-2017, -2018)
+                # A cookie-expired retcode from Hoyolab means the stored session
+                # is dead; surface it as a per-account "expired" state so the UI
+                # can show a Re-login affordance without the user digging through
+                # the redemption log.
+                _rc = res.raw_response.get("retcode")
+                if _rc in (10001, -100):
+                    storage.set_account_cookie_state(acc["name"], "expired")
                 storage.update_code_redemption(
                     row["code"], claimed, res.reward if res.success else None, game=row_game
                 )

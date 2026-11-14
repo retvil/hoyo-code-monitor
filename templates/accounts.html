@@ -14,7 +14,7 @@
         <tbody>
             {% for acc in accounts %}
             <tr>
-                <td><strong>{{ acc.name }}</strong>{% if not acc.has_cookies %} <span class="badge badge-bad" title="{{ t('checkin_cookie_hint') }}">{{ t('no_cookies') }}</span>{% endif %}</td>
+                <td><strong>{{ acc.name }}</strong>{% if acc.cookie_expired %} <span class="badge badge-bad" title="{{ t('relogin_hint') }}">{{ t('cookie_expired') }}</span>{% elif not acc.has_cookies %} <span class="badge badge-bad" title="{{ t('checkin_cookie_hint') }}">{{ t('no_cookies') }}</span>{% endif %}</td>
                 <td class="mono">{{ acc.uid }}</td>
                 <td>{{ acc.region }}</td>
                 <td>{% if acc.game in game_accents %}<span class="badge" style="background: {{ game_accents[acc.game].accent }}22; color: {{ game_accents[acc.game].accent }};">{{ game_accents[acc.game].short }}</span>{% else %}<span class="badge badge-info">{{ acc.game or 'genshin' }}</span>{% endif %}</td>
@@ -25,6 +25,7 @@
                     <button class="btn" style="padding: 4px 10px; font-size: 0.8rem;" onclick="openCookies('{{ acc.name }}')">{{ t('set_cookies') }}</button>
                     <button class="btn" style="padding: 4px 10px; font-size: 0.8rem;" hx-get="/accounts/{{ acc.name }}/cookies" hx-target="#view-{{ acc.name }}" hx-swap="innerHTML">{{ t('view') }}</button>
                     <button class="btn btn-primary" style="padding: 4px 10px; font-size: 0.8rem;" hx-post="/accounts/{{ acc.name }}/login" hx-target="#login-{{ acc.name }}" hx-swap="innerHTML" hx-indicator="#login-spin-{{ acc.name }}" hx-on::response-error="document.getElementById('login-{{ acc.name }}').innerHTML='Error: '+event.detail.xhr.responseText" {% if scheduler and scheduler.running %}disabled{% endif %}>{{ t('auto_login') }} <span id="login-spin-{{ acc.name }}" class="spinner htmx-indicator" aria-hidden="true"></span></button>
+                    <button class="btn btn-primary" style="padding: 4px 10px; font-size: 0.8rem;" title="{{ t('relogin_hint') }}" hx-post="/accounts/{{ acc.name }}/login" hx-target="#login-{{ acc.name }}" hx-swap="innerHTML" hx-on::response-error="document.getElementById('login-{{ acc.name }}').innerHTML='Error: '+event.detail.xhr.responseText">{{ t('relogin') }}</button>
                     <button class="btn btn-danger" style="padding: 4px 10px; font-size: 0.8rem;" hx-delete="/accounts/{{ acc.name }}" hx-confirm="Delete account '{{ acc.name }}'?" hx-swap="none" onclick="setTimeout(()=>location.reload(),800)">{{ t('delete') }}</button>
                     <span id="login-{{ acc.name }}" style="font-size: 0.8rem;"></span>
                     <div id="view-{{ acc.name }}" style="font-size: 0.8rem; margin-top: 4px;"></div>

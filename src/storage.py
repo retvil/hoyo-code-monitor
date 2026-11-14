@@ -1151,6 +1151,21 @@ class Storage:
             return {}
         return self._decrypt_maybe(val)
 
+    # --- Per-account cookie state ---
+    # "ok" | "expired": surfaced in the Web UI so a stale session is visible
+    # without having to read the redemption log. Written by the scheduler and
+    # the redeem path when the Hoyolab API reports a cookie failure; reset to
+    # "ok" on a successful re-login / cookie store.
+
+    def set_account_cookie_state(self, account_name: str, state: str) -> None:
+        """Record the account's cookie state ("ok" or "expired")."""
+        self.set_config(f"account_cookie_state_{account_name}", state)
+
+    def get_account_cookie_state(self, account_name: str) -> str:
+        """Read the account's cookie state; defaults to "ok" when unset."""
+        val = self.get_config(f"account_cookie_state_{account_name}")
+        return val if val in ("ok", "expired") else "ok"
+
     def is_account_redeem_enabled(self, account_name: str) -> bool:
         """Check per-account auto-redeem flag (falls back to global flag)."""
         val = self.get_config(f"account_redeem_{account_name}")
