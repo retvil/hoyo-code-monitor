@@ -43,7 +43,8 @@ def browsers_dir() -> Path:
 
     Frozen exe: persistent app-data dir (the bundle temp dir is wiped on exit,
     so the default driver-relative lookup fails). Source: respect
-    PLAYWRIGHT_BROWSERS_PATH or the standard user cache.
+    PLAYWRIGHT_BROWSERS_PATH or Playwright's own default on Windows, which is
+    %LOCALAPPDATA%\\ms-playwright (not %USERPROFILE%\\.cache\\ms-playwright).
     """
     env = os.environ.get("PLAYWRIGHT_BROWSERS_PATH")
     if env:
@@ -57,15 +58,41 @@ def browsers_dir() -> Path:
         d.mkdir(parents=True, exist_ok=True)
         os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(d)
         return d
+    # Playwright's actual default on Windows is %LOCALAPPDATA%\ms-playwright.
+    localappdata = os.environ.get("LOCALAPPDATA")
+    if localappdata:
+        return Path(localappdata) / "ms-playwright"
     return Path.home() / ".cache" / "ms-playwright"
 
 
 def chromium_executable() -> Path | None:
-    """Find a downloaded full Chromium executable, if any."""
-    for exe in sorted(browsers_dir().glob("chromium-*/chrome-*/chrome.exe")):
-        if exe.is_file():
-            return exe
-    return None
+    """Find a downloaded full Chromium executable, if any.
+
+    Playwright stores Chromium as <dir>/chrome-win/chrome.exe (older) or
+    <dir>/chrome-win64/chrome.exe (newer). Search both layouts and pick
+    the highest-numbered revision.
+    """
+
+    def _rev(p: Path) -> int:
+        try:
+            return int(p.parent.parent.name.split("-")[-1])
+        except (ValueError, IndexError):
+            return 0
+
+    candidates = sorted(
+        (
+            p
+            for pattern in (
+                "chromium-*/chrome-win/chrome.exe",
+                "chromium-*/chrome-win64/chrome.exe",
+            )
+            for p in browsers_dir().glob(pattern)
+            if p.is_file()
+        ),
+        key=_rev,
+        reverse=True,
+    )
+    return candidates[0] if candidates else None
 
 
 def ensure_chromium() -> None:
