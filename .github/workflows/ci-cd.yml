@@ -127,7 +127,8 @@ jobs:
           # Copy to CWD root so the artifact upload glob (*.exe) and release
           # asset path (hoyo-code-monitor-<tag>-setup.exe) are stable.
           Copy-Item $setup $cwd -Force
-          Write-Host "Smoke test passed: $setup ($([math]::Round(((Get-Item $setup).Length / 1MB),2)) MB)"
+          $sizeMB = [math]::Round((Get-Item $setup).Length / 1048576, 2)
+          Write-Host "Smoke test passed: $setup ($sizeMB MB)"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
