@@ -8,17 +8,25 @@ Get token from @BotFather, chat id from @userinfobot.
 from __future__ import annotations
 
 import asyncio
+import html
 import logging
 from typing import Any
+from urllib.parse import quote
 
 from src.http_session import get_session
 
 logger = logging.getLogger(__name__)
 
-API_URL = "https://api.telegram.org/bot{token}/sendMessage"
+API_URL_TEMPLATE = "https://api.telegram.org/bot{token}/sendMessage"
 
 # Telegram is chatty but small; a tighter bound than the pool default.
 SEND_TIMEOUT = 15.0
+
+
+def _build_api_url(bot_token: str) -> str:
+    """Build the Telegram API URL, quoting the token to protect against
+    special characters and to prevent accidental URL structure injection."""
+    return API_URL_TEMPLATE.format(token=quote(bot_token, safe=""))
 
 
 async def send_telegram(bot_token: str, chat_id: str, text: str) -> bool:
@@ -30,14 +38,12 @@ async def send_telegram(bot_token: str, chat_id: str, text: str) -> bool:
     max_retries = 3
     base_delay = 1.0
     timeout = aiohttp.ClientTimeout(total=SEND_TIMEOUT)
-    # Borrowed from the shared pool rather than built per call. The previous
-    # implementation constructed a ClientSession *inside* the retry loop, so a
-    # single failing send could burn up to three sessions (and their sockets).
     session = get_session()
+    api_url = _build_api_url(bot_token)
     for attempt in range(max_retries):
         try:
             async with session.post(
-                API_URL.format(token=bot_token),
+                api_url,
                 json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"},
                 timeout=timeout,
             ) as r:
@@ -79,7 +85,10 @@ async def notify_new_codes(storage: Any, codes: list[str]) -> None:
     cfg = notify_configured(storage)
     if not cfg or not codes:
         return
-    shown = ", ".join(f"<code>{c}</code>" for c in codes[:10])
+    # Codes are alphanumeric, safe to wrap in <code> tags. Account names and
+    # rewards are user-supplied and must be escaped to prevent HTML injection
+    # via Telegram's HTML parser.
+    shown = ", ".join(f"<code>{html.escape(c)}</code>" for c in codes[:10])
     extra = f" (+{len(codes) - 10} more)" if len(codes) > 10 else ""
     await send_telegram(cfg[0], cfg[1], f"🎁 New Genshin codes ({len(codes)}): {shown}{extra}")
 
@@ -89,4 +98,10 @@ async def notify_redeemed(storage: Any, code: str, account: str, reward: str) ->
     cfg = notify_configured(storage)
     if not cfg:
         return
-    await send_telegram(cfg[0], cfg[1], f"✅ <code>{code}</code> redeemed for {account}: {reward}")
+    # Account names and rewards are user-supplied; escape to prevent HTML
+    # injection via Telegram's HTML parser (e.g., <img src=x onerror=...>).
+    safe_account = html.escape(account)
+    safe_reward = html.escape(reward) if reward else ""
+    await send_telegram(
+        cfg[0], cfg[1], f"✅ <code>{html.escape(code)}</code> redeemed for {safe_account}: {safe_reward}"
+    )

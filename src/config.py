@@ -6,6 +6,7 @@ browser session state never belong here — they live in the session store.
 
 from __future__ import annotations
 
+import logging
 import os
 import threading
 from dataclasses import asdict, dataclass, field
@@ -16,6 +17,8 @@ from typing import Any, ClassVar
 from src.constants import MIN_REDEMPTION_GAP
 from src.exceptions import ConfigError
 from src.paths import default_config_path
+
+logger = logging.getLogger(__name__)
 
 try:
     import tomllib  # Python 3.11+
@@ -107,7 +110,12 @@ class ConfigManager:
                         raw = tomllib.load(f)
                     raw = self._migrate(raw)
                     self._settings = Settings.from_dict({**self.DEFAULTS.to_dict(), **raw})
-                except Exception:
+                except Exception as exc:
+                    logger.warning(
+                        "Primary config parse failed (%s: %s); trying legacy parser",
+                        type(exc).__name__,
+                        exc,
+                    )
                     try:
                         if _toml_legacy:
                             raw = _toml_legacy.load(str(self.config_path))
@@ -115,7 +123,14 @@ class ConfigManager:
                             self._settings = Settings.from_dict({**self.DEFAULTS.to_dict(), **raw})
                         else:
                             raise
-                    except Exception:
+                    except Exception as exc2:
+                        logger.error(
+                            "Config file %s is corrupt or unreadable (%s: %s); "
+                            "falling back to defaults. Fix or delete the file to restore settings.",
+                            self.config_path,
+                            type(exc2).__name__,
+                            exc2,
+                        )
                         self._settings = Settings()
             else:
                 self._settings = Settings()

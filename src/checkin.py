@@ -278,6 +278,8 @@ class CheckinRunner:
             retry_base_delay: Base backoff delay in seconds.
         """
         self.transport: CheckinTransport = transport or AiohttpCheckinTransport(timeout=timeout)
+        if max_retries < 0:
+            raise ValueError(f"max_retries must be >= 0, got {max_retries}")
         self.max_retries = max_retries
         self.retry_base_delay = retry_base_delay
 
@@ -392,22 +394,23 @@ class CheckinRunner:
         Returns:
             Raw JSON payload.
         """
+        attempts = max(1, self.max_retries)
         last_error: Exception | None = None
-        for attempt in range(self.max_retries + 1):
+        for attempt in range(attempts + 1):
             try:
                 return await fn()
             except CheckinError:
                 raise
             except (TimeoutError, aiohttp.ClientError) as e:
                 last_error = e
-                if attempt >= self.max_retries:
+                if attempt >= attempts:
                     break
                 delay = self.retry_base_delay * (2**attempt)
                 logger.warning(
                     "Check-in %s attempt %d/%d failed: %s; retry in %.1fs",
                     label,
                     attempt + 1,
-                    self.max_retries + 1,
+                    attempts + 1,
                     e,
                     delay,
                 )

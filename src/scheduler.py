@@ -12,7 +12,7 @@ import sqlite3
 import threading
 import time
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
@@ -161,10 +161,10 @@ class Scheduler:
                     setattr(self._status, key, value)
 
     def _calculate_next_run(self) -> str:
-        """Calculate next run time as ISO format string."""
+        """Calculate next run time as ISO format string (UTC)."""
         interval_seconds = getattr(self.config, "poll_interval_seconds", 900)
-        next_run = datetime.now().timestamp() + interval_seconds
-        return datetime.fromtimestamp(next_run).isoformat()
+        next_run = datetime.now(UTC).timestamp() + interval_seconds
+        return datetime.fromtimestamp(next_run, UTC).isoformat()
 
     def _checkin_enabled(self) -> bool:
         """Global daily check-in kill-switch (storage config, default on)."""
@@ -323,19 +323,22 @@ class Scheduler:
         cooldown_min = int(self.storage.get_config("cookie_refresh_cooldown_minutes", "60") or 60)
         return (time.time() - last) >= cooldown_min * 60
 
-    async def _auto_refresh_cookies(self, acc: dict[str, Any]) -> None:
+    async def _auto_refresh_cookies(self, acc: dict[str, Any]) -> bool:
         """Re-capture the account's cookies from the saved browser profile.
 
         Triggered when a check-in slot failed with the cookie-expired marker.
         Best-effort: a refresh failure never fails the pass, and no retry is
         scheduled here — the next daily run simply tries the cookies again.
+
+        Returns:
+            True if fresh cookies were captured, False otherwise.
         """
         if not self._cookie_auto_refresh_enabled():
-            return
+            return False
         account_name = acc["name"]
         if not self._cookie_refresh_due(account_name):
             logger.info("Cookie auto-refresh for %s skipped (cooldown)", account_name)
-            return
+            return False
         logger.info("Auto-refreshing cookies for %s (headless)", account_name)
         try:
             fresh = await _capture_cookies(
@@ -343,14 +346,18 @@ class Scheduler:
             )
         except Exception as e:
             logger.warning("Auto cookie refresh failed for %s: %s", account_name, e)
-            return
+            return False
         if not fresh.get("ltoken"):
             logger.info(
                 "Auto cookie refresh for %s: no live session in profile; run Auto-login to restore",
                 account_name,
             )
-            return
+            return False
         self.storage.store_account_cookies(account_name, fresh)
+        # Record successful refresh so the cooldown gate lets subsequent
+        # expiry events retry after the configured interval (default: 60 min).
+        self.storage.set_config(f"last_cookie_refresh_{account_name}", str(int(time.time())))
+        return True
 
     async def _notify_cookie_expired(self, account_name: str) -> None:
         """Best-effort Windows toast that the account's cookies are stale."""
@@ -359,9 +366,8 @@ class Scheduler:
                 f"Cookie expired: {account_name}",
                 "Redeem failed — open the app and click Re-login for this account",
             )
-        self.storage.set_config(f"last_cookie_refresh_{account_name}", str(int(time.time())))
         logger.info(
-            "Auto cookie refresh succeeded for %s; next check-in run uses the fresh cookies",
+            "Cookie expired notification sent for %s; auto-refresh attempted separately",
             account_name,
         )
 
@@ -419,7 +425,7 @@ class Scheduler:
 
         summary["success"] = summary["failed"] == 0
         self._update_status(
-            last_checkin_run=datetime.now().isoformat(),
+            last_checkin_run=datetime.now(UTC).isoformat(),
             last_checkin_success=summary["success"],
             last_checkin_claimed=summary["games_claimed"],
             last_checkin_failed=summary["failed"],
@@ -511,8 +517,6 @@ class Scheduler:
             getattr(self.config, "redemption_enabled", False)
             and getattr(self.config, "uid", None)
             and getattr(self.config, "region", None)
-            and self.config.cookies.get("ltuid")
-            and self.config.cookies.get("ltoken")
         )
 
         redeem_accounts: list[dict[str, Any]] = []
@@ -521,6 +525,19 @@ class Scheduler:
             redeem_accounts = [
                 a for a in accounts if self.storage.is_account_redeem_enabled(a["name"])
             ]
+            # Validate per-account cookie presence (self.config.cookies is the
+            # legacy global store; per-account cookies live in the DB and are
+            # checked in the redemption loop itself).
+            valid = []
+            for acc in redeem_accounts:
+                cookies = self.storage.load_account_cookies(acc["name"])
+                if cookies and cookies.get("ltuid") and cookies.get("ltoken"):
+                    valid.append(acc)
+                else:
+                    logger.warning(
+                        "Redemption account %s has no valid cookies; skipping", acc["name"]
+                    )
+            redeem_accounts = valid
             if not redeem_accounts:
                 logger.warning("Redemption enabled but no accounts have auto-redeem on")
                 can_redeem = False
@@ -531,10 +548,6 @@ class Scheduler:
                 missing.append("uid")
             if not getattr(self.config, "region", None):
                 missing.append("region")
-            if not self.config.cookies.get("ltuid"):
-                missing.append("ltuid cookie")
-            if not self.config.cookies.get("ltoken"):
-                missing.append("ltoken cookie")
             logger.warning("Redemption enabled but missing config: %s", ", ".join(missing))
 
         return can_redeem, redeem_accounts
@@ -607,73 +620,11 @@ class Scheduler:
                             # Log redemption per account
                             for acc in redeem_accounts:
                                 try:
-                                    from src.constants import (
-                                        GAME_CONF,
-                                    )
-
-                                    acc_game = acc.get("game") or "genshin"
-                                    gconf = GAME_CONF.get(acc_game, GAME_CONF["genshin"])
-                                    acc_cookies = self.storage.load_account_cookies(acc["name"])
-                                    if not acc_cookies:
-                                        logger.warning(
-                                            "No cookies saved for account %s; skipping redemption",
-                                            acc["name"],
-                                        )
-                                        continue
-                                    res = await self.redeemer.redeem_code(
-                                        code=code,
-                                        cookies=acc_cookies,
-                                        uid=acc["uid"],
-                                        region=acc["region"],
-                                        game_biz=acc.get("game_biz") or gconf["game_biz"],
-                                        lang=acc.get("lang", "en-us"),
-                                        s_lang_key=acc.get("s_lang_key", "en-us"),
-                                        game=acc_game,
-                                    )
-                                    claimed = res.success or res.raw_response.get("retcode") in (
-                                        -2017,
-                                        -2018,
-                                    )
-                                    _rc = res.raw_response.get("retcode")
-                                    if _rc in (10001, -100):
-                                        self.storage.set_account_cookie_state(
-                                            acc["name"], "expired"
-                                        )
-                                        await self._notify_cookie_expired(acc["name"])
-                                    existing = self.storage.get_code(code, game=code_game)
-                                    new_reward = (
-                                        res.reward
-                                        if res.success
-                                        else (existing or {}).get("reward")
-                                    )
-                                    self.storage.update_code_redemption(
-                                        code=code,
-                                        redeemed=claimed,
-                                        reward=new_reward,
-                                        game=code_game,
-                                    )
-                                    self.storage.add_redemption_log(
-                                        code=code,
-                                        account_id=acc["id"],
-                                        status="success" if claimed else "failed",
-                                        reward=res.reward if res.success else None,
-                                        error_message=None if claimed else res.message,
+                                    claimed = await self._redeem_code_for_account(
+                                        code, acc, gap
                                     )
                                     if claimed:
-                                        self.storage.set_account_cookie_state(acc["name"], "ok")
                                         codes_redeemed += 1
-                                        with contextlib.suppress(Exception):
-                                            await notify_redeemed(
-                                                self.storage,
-                                                code,
-                                                acc["name"],
-                                                res.reward or "claimed",
-                                            )
-                                        # Local toast: no config, no network; best-effort.
-                                        with contextlib.suppress(Exception):
-                                            await notify_redeemed_toast(
-                                                code, acc["name"], res.reward or "claimed"
-                                            )
                                 except Exception as e:
                                     logger.exception(
                                         "Error redeeming code %s for %s",
@@ -688,11 +639,28 @@ class Scheduler:
                             logger.exception("Error redeeming code %s", code[:4] + "****")
                             errors.append(f"Redemption error for {code[:4]}****: {e}")
 
+                except sqlite3.OperationalError as e:
+                    logger.warning(
+                        "Database error storing code %s: %s",
+                        code[:4] + "****",
+                        e,
+                    )
+                    errors.append(f"Storage error for {code[:4]}****: {e}")
+                except sqlite3.ProgrammingError as e:
+                    logger.error(
+                        "Schema error storing code %s: %s",
+                        code[:4] + "****",
+                        e,
+                    )
+                    errors.append(f"Storage error for {code[:4]}****: {e}")
                 except sqlite3.IntegrityError:
                     continue
                 except Exception as e:
                     logger.exception("Error storing code %s", code[:4] + "****")
                     errors.append(f"Storage error for {code[:4]}****: {e}")
+
+                # Cap errors list to prevent unbounded growth
+                errors = errors[:50]
 
         if new_codes:
             with contextlib.suppress(Exception):
@@ -707,6 +675,85 @@ class Scheduler:
             "codes_redeemed": codes_redeemed,
             "errors": errors,
         }
+
+    async def _redeem_code_for_account(
+        self,
+        code: str,
+        acc: dict[str, Any],
+        gap: int,
+    ) -> bool:
+        """Redeem a single code for one account.
+
+        Returns True if the code was successfully claimed for this account.
+        """
+        # Import inside method to avoid circular imports.
+        from src.constants import (
+            GAME_CONF,
+        )
+
+        acc_game = acc.get("game") or "genshin"
+        gconf = GAME_CONF.get(acc_game, GAME_CONF["genshin"])
+        acc_cookies = self.storage.load_account_cookies(acc["name"])
+        if not acc_cookies:
+            logger.warning(
+                "No cookies saved for account %s; skipping redemption",
+                acc["name"],
+            )
+            return False
+        res = await self.redeemer.redeem_code(
+            code=code,
+            cookies=acc_cookies,
+            uid=acc["uid"],
+            region=acc["region"],
+            game_biz=acc.get("game_biz") or gconf["game_biz"],
+            lang=acc.get("lang", "en-us"),
+            s_lang_key=acc.get("s_lang_key", "en-us"),
+            game=acc_game,
+        )
+        claimed = res.success or res.raw_response.get("retcode") in (
+            -2017,
+            -2018,
+        )
+        _rc = res.raw_response.get("retcode")
+        if _rc in (10001, -100):
+            self.storage.set_account_cookie_state(
+                acc["name"], "expired"
+            )
+            await self._notify_cookie_expired(acc["name"])
+        existing = self.storage.get_code(code, game=acc_game)
+        new_reward = (
+            res.reward
+            if res.success
+            else (existing or {}).get("reward")
+        )
+        self.storage.update_code_redemption(
+            code=code,
+            redeemed=claimed,
+            reward=new_reward,
+            game=acc_game,
+        )
+        self.storage.add_redemption_log(
+            code=code,
+            account_id=acc["id"],
+            status="success" if claimed else "failed",
+            reward=res.reward if res.success else None,
+            error_message=None if claimed else res.message,
+        )
+        if claimed:
+            self.storage.set_account_cookie_state(acc["name"], "ok")
+            with contextlib.suppress(Exception):
+                await notify_redeemed(
+                    self.storage,
+                    code,
+                    acc["name"],
+                    res.reward or "claimed",
+                )
+            # Local toast: no config, no network; best-effort.
+            with contextlib.suppress(Exception):
+                await notify_redeemed_toast(
+                    code, acc["name"], res.reward or "claimed"
+                )
+        return claimed
 
     async def _redeem_new_codes(
         self,
@@ -728,77 +775,21 @@ class Scheduler:
         errors = []
 
         for code in new_codes:
-            try:
-                # Log redemption per account
-                for acc in redeem_accounts:
-                    try:
-                        from src.constants import (
-                            GAME_CONF,
-                        )
-
-                        acc_game = acc.get("game") or "genshin"
-                        gconf = GAME_CONF.get(acc_game, GAME_CONF["genshin"])
-                        acc_cookies = self.storage.load_account_cookies(acc["name"])
-                        if not acc_cookies:
-                            logger.warning(
-                                "No cookies saved for account %s; skipping redemption",
-                                acc["name"],
-                            )
-                            continue
-                        res = await self.redeemer.redeem_code(
-                            code=code,
-                            cookies=acc_cookies,
-                            uid=acc["uid"],
-                            region=acc["region"],
-                            game_biz=acc.get("game_biz") or gconf["game_biz"],
-                            lang=acc.get("lang", "en-us"),
-                            s_lang_key=acc.get("s_lang_key", "en-us"),
-                            game=acc_game,
-                        )
-                        claimed = res.success or res.raw_response.get("retcode") in (
-                            -2017,
-                            -2018,
-                        )
-                        existing = self.storage.get_code(code, game=acc_game)
-                        new_reward = res.reward if res.success else (existing or {}).get("reward")
-                        self.storage.update_code_redemption(
-                            code=code,
-                            redeemed=claimed,
-                            reward=new_reward,
-                            game=acc_game,
-                        )
-                        self.storage.add_redemption_log(
-                            code=code,
-                            account_id=acc["id"],
-                            status="success" if claimed else "failed",
-                            reward=res.reward if res.success else None,
-                            error_message=None if claimed else res.message,
-                        )
-                        if claimed:
-                            codes_redeemed += 1
-                            with contextlib.suppress(Exception):
-                                await notify_redeemed(
-                                    self.storage,
-                                    code,
-                                    acc["name"],
-                                    res.reward or "claimed",
-                                )
-                            # Local toast: no config, no network; best-effort.
-                            with contextlib.suppress(Exception):
-                                await notify_redeemed_toast(
-                                    code, acc["name"], res.reward or "claimed"
-                                )
-                    except Exception as e:
-                        logger.exception(
-                            "Error redeeming code %s for %s",
-                            code[:4] + "****",
-                            acc["name"],
-                        )
-                        errors.append(f"Redemption error for {code[:4]}**** ({acc['name']}): {e}")
-                    await asyncio.sleep(gap)
-            except Exception as e:
-                logger.exception("Error redeeming code %s", code[:4] + "****")
-                errors.append(f"Redemption error for {code[:4]}****: {e}")
+            for acc in redeem_accounts:
+                try:
+                    claimed = await self._redeem_code_for_account(code, acc, gap)
+                    if claimed:
+                        codes_redeemed += 1
+                except Exception as e:
+                    logger.exception(
+                        "Error redeeming code %s for %s",
+                        code[:4] + "****",
+                        acc["name"],
+                    )
+                    errors.append(
+                        f"Redemption error for {code[:4]}**** ({acc['name']}): {e}"
+                    )
+                await asyncio.sleep(gap)
 
         return codes_redeemed, errors
 
@@ -842,7 +833,7 @@ class Scheduler:
 
             while not self._stop_event.is_set():
                 # Run check cycle
-                cycle_start = datetime.now()
+                cycle_start = datetime.now(UTC)
                 self._update_status(last_run=cycle_start.isoformat())
 
                 try:

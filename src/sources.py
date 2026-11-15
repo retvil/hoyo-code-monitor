@@ -6,10 +6,12 @@ Provides pluggable source configuration and extraction strategies.
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import json
 import logging
 import random
 import re
+import socket
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, Self
@@ -48,6 +50,60 @@ def is_plausible_code(text: str) -> bool:
 
 def _dedup(items: list[str]) -> list[str]:
     return list(dict.fromkeys(items))
+
+
+# Private/reserved RFC 1918 + RFC 6890 ranges blocked to prevent SSRF.
+_BLOCKED_NETWORKS = [
+    ipaddress.ip_network("0.0.0.0/8"),
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("100.64.0.0/10"),
+    ipaddress.ip_network("127.0.0.0/8"),
+    ipaddress.ip_network("169.254.0.0/16"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.0.0.0/24"),
+    ipaddress.ip_network("192.0.2.0/24"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("198.18.0.0/15"),
+    ipaddress.ip_network("198.51.100.0/24"),
+    ipaddress.ip_network("203.0.113.0/24"),
+    ipaddress.ip_network("224.0.0.0/4"),
+    ipaddress.ip_network("240.0.0.0/4"),
+    ipaddress.ip_network("255.255.255.255/32"),
+]
+
+
+def validate_source_url(url: str) -> None:
+    """Validate a source URL against SSRF attacks.
+
+    Raises:
+        SourceValidationError: if the URL uses a non-HTTP scheme or resolves
+            to a private/reserved IP address.
+    """
+    parsed = urlparse(url)
+
+    # Reject non-HTTP schemes
+    if parsed.scheme not in ("http", "https"):
+        raise SourceValidationError(
+            f"URL scheme '{parsed.scheme}' is not allowed; only http and https are permitted"
+        )
+
+    hostname = parsed.hostname
+    if not hostname:
+        raise SourceValidationError("URL must contain a valid hostname")
+
+    # Resolve hostname and check all resolved addresses against blocked ranges
+    try:
+        addr_infos = socket.getaddrinfo(hostname, parsed.port or 80)
+    except socket.gaierror as exc:
+        raise SourceValidationError(f"Unable to resolve hostname '{hostname}': {exc}") from exc
+
+    for addr_info in addr_infos:
+        ip = ipaddress.ip_address(addr_info[4][0])
+        for network in _BLOCKED_NETWORKS:
+            if ip in network:
+                raise SourceValidationError(
+                    f"URL resolves to private/reserved IP {ip} ({network}) — request blocked"
+                )
 
 
 class Extractor(Protocol):
@@ -152,11 +208,33 @@ class RegexExtractor:
         self._cache: dict[str, re.Pattern[str]] = {}
 
     def extract(self, content: str, selector: str) -> list[str]:
+        _validate_regex_safety(selector)
         pat = self._cache.get(selector)
         if pat is None:
             pat = re.compile(selector)
             self._cache[selector] = pat
         return pat.findall(content)
+
+
+# Patterns that indicate potentially dangerous nested quantifiers (ReDoS risk).
+# A token followed by `{m,n}` is a quantified group; if that token itself
+# contains `*`, `+`, or `{m,n}` it can cause catastrophic backtracking.
+_NESTED_QUANTIFIER_RE = re.compile(r"\([^)]*[*+{][^)]*\)[*+{]|\([^)]*\([^)]*[*+{][^)]*\)[^)]*\)[*+{]}")
+
+
+def _validate_regex_safety(pattern: str) -> None:
+    """Reject regex patterns with nested quantifiers that could cause ReDoS.
+
+    A nested quantifier is a group containing another quantifier, e.g.
+    ``(a+)+`` or ``(a*b*){2,4}``. These can trigger exponential backtracking.
+
+    Raises:
+        SourceValidationError: if the pattern contains nested quantifiers.
+    """
+    if _NESTED_QUANTIFIER_RE.search(pattern):
+        raise SourceValidationError(
+            f"Regex pattern contains nested quantifiers and was rejected for safety: {pattern!r}"
+        )
 
 
 EXTRACTORS: dict[str, Extractor] = {
@@ -370,6 +448,8 @@ class SourceFetcher:
         if not self._session:
             raise RuntimeError("Session not initialized. Use async context manager.")
 
+        validate_source_url(source.url)
+
         headers = {"User-Agent": self.user_agent}
         headers.update(source.headers)
 
@@ -383,7 +463,10 @@ class SourceFetcher:
 
         for attempt in range(attempts):
             try:
-                async with self._session.get(source.url, headers=headers) as response:
+                source_timeout = aiohttp.ClientTimeout(total=getattr(source, "timeout_seconds", 30))
+                async with self._session.get(
+                    source.url, headers=headers, timeout=source_timeout
+                ) as response:
                     response.raise_for_status()
                     content = await response.text()
 
@@ -444,9 +527,9 @@ class SourceFetcher:
     async def _fetch_with_browser(self, source: SourceConfig) -> list[str]:
         """Fetch using Playwright for JS-rendered content."""
         browser = await self._get_browser()
-        page = await browser.new_page()
-
+        page = None
         try:
+            page = await browser.new_page()
             await page.goto(
                 source.url, wait_until="networkidle", timeout=source.timeout_seconds * 1000
             )
@@ -475,7 +558,8 @@ class SourceFetcher:
             )
             return codes
         finally:
-            await page.close()
+            if page is not None:
+                await page.close()
 
     def _host_of(self, url: str) -> str:
         """Hostname used to group sources for per-host rate limiting."""

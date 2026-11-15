@@ -62,17 +62,16 @@ def get_session(
     loop = asyncio.get_running_loop()
     key = id(loop)
     with _registry_lock:
-        entry = _registry.get(key)
+        entry = _registry.pop(key, None)
         if entry is not None:
             cached_loop, session = entry
-            # ``id()`` is only unique among *live* objects: a loop that was
-            # closed and garbage-collected can have its address reused by a new
-            # loop. Comparing identity as well as liveness keeps a session
-            # bound to a dead loop from being handed to a live one.
             if cached_loop is loop and not session.closed:
+                # Put it back — still valid.
+                _registry[key] = entry
                 return session
-            # Stale or closed entry — drop it and build a fresh session.
-            del _registry[key]
+            # Stale or closed entry — drop it and build a fresh session below.
+        # Build inside the lock so two threads racing on the same stale
+        # loop-id cannot both create separate sessions (TOCTOU).
         session = aiohttp.ClientSession(
             timeout=timeout if timeout is not None else DEFAULT_TIMEOUT,
             headers={"User-Agent": user_agent or DEFAULT_USER_AGENT},

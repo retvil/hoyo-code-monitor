@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import sqlite3
+import threading
 import uuid
 from collections.abc import Iterator
 from datetime import UTC, datetime
@@ -18,10 +19,15 @@ from typing import Any
 from cryptography.fernet import Fernet
 
 from src.checkin import STATUS_FAILED, CheckinResult
+from src.constants import GAMES
 from src.migrations import CURRENT_VERSION, run_migrations
 from src.paths import default_db_path
 
 logger = logging.getLogger(__name__)
+
+# Module-level lock protecting the Fernet key initialization sequence so
+# two Storage instances racing at startup cannot both generate new keys.
+_FERNET_KEY_LOCK = threading.Lock()
 
 
 class Storage:
@@ -54,14 +60,21 @@ class Storage:
 
         Returns:
             Fernet instance for encryption/decryption.
+        Raises:
+            ConfigError: If GENSHIN_ENCRYPTION_KEY is set but invalid.
         """
-        # 1. Env
+        # 1. Env — if the user explicitly set a key, it must be valid.
+        # Falling through to a freshly-generated key would silently make all
+        # previously-encrypted cookies permanently undecryptable.
         key_env = os.environ.get("GENSHIN_ENCRYPTION_KEY")
         if key_env:
             try:
                 return Fernet(key_env.encode() if isinstance(key_env, str) else key_env)
             except Exception as e:
-                logger.warning("Invalid GENSHIN_ENCRYPTION_KEY: %s, falling back", e)
+                raise ConfigError(
+                    f"GENSHIN_ENCRYPTION_KEY is set but invalid: {e}. "
+                    "Fix or unset the variable; do not leave a malformed value."
+                ) from e
 
         # Try keyring (optional dependency, kept lazy so missing it never blocks storage)
         try:
@@ -83,25 +96,37 @@ class Storage:
         except Exception:
             pass
 
-        # 4. Generate new key and persist
-        key = Fernet.generate_key().decode()
-        try:
-            import keyring
-
-            keyring.set_password("genshin-code-monitor", "encryption-key", key)
-            logger.info("Generated new encryption key and stored in keyring")
-        except Exception:
-            pass
-        try:
+        # 4. Generate new key and persist — serialize so concurrent Storage()
+        #    instances cannot race and each generate a different key (which
+        #    would silently invalidate all previously-encrypted cookies).
+        with _FERNET_KEY_LOCK:
+            # Re-check inside the lock: another thread may have persisted
+            # a key while we were waiting.
             key_path = self.db_path.parent / ".key"
-            key_path.parent.mkdir(parents=True, exist_ok=True)
-            key_path.write_text(key, encoding="utf-8")
-            with contextlib.suppress(Exception):
-                key_path.chmod(0o600)
-            logger.info("Stored encryption key at %s", key_path)
-        except Exception as e:
-            logger.warning("Could not persist encryption key: %s; using ephemeral key", e)
-        return Fernet(key.encode())
+            alt_path = Path("data") / ".key"
+            for p in (key_path, alt_path):
+                if p.exists():
+                    return Fernet(p.read_text(encoding="utf-8").strip().encode())
+            key = Fernet.generate_key().decode()
+            try:
+                import keyring
+
+                keyring.set_password("genshin-code-monitor", "encryption-key", key)
+                logger.info("Generated new encryption key and stored in keyring")
+            except Exception:
+                pass
+            try:
+                key_path = self.db_path.parent / ".key"
+                key_path.parent.mkdir(parents=True, exist_ok=True)
+                key_path.write_text(key, encoding="utf-8")
+                try:
+                    key_path.chmod(0o600)
+                except OSError:
+                    pass
+                logger.info("Stored encryption key at %s", key_path)
+            except Exception as e:
+                logger.warning("Could not persist encryption key: %s; using ephemeral key", e)
+            return Fernet(key.encode())
 
     @contextlib.contextmanager
     def _connection(self) -> Iterator[sqlite3.Connection]:
@@ -118,6 +143,7 @@ class Storage:
         conn.row_factory = sqlite3.Row
         try:
             conn.execute("PRAGMA journal_mode=WAL;")
+            conn.execute("PRAGMA wal_autocheckpoint=1000;")
             conn.execute("PRAGMA busy_timeout=30000;")
             conn.execute("PRAGMA foreign_keys=ON;")
         except Exception:
@@ -325,7 +351,7 @@ class Storage:
             True if row was updated, False if code not found.
         """
         if redeemed_at is None and redeemed:
-            redeemed_at = datetime.now()
+            redeemed_at = datetime.now(UTC)
 
         with self._connection() as conn:
             if game:
@@ -363,6 +389,7 @@ class Storage:
         search: str | None = None,
         status: str | None = None,
         game: str | None = None,
+        order_by_redeemed: bool = False,
     ) -> list[dict[str, Any]]:
         """List codes with pagination and filters.
 
@@ -397,13 +424,19 @@ class Storage:
         if conds:
             query += " WHERE " + " AND ".join(conds)
 
-        # Fetch extra for status filtering in Python (local-scale DBs)
+        # Fetch extra for status filtering in Python (local-scale DBs).
+        # NOTE: status filtering requires joining with redemption_log to compute
+        # display_status, which is done in Python after _attach_sources_and_status.
+        # For large databases (>10k codes), this should be pushed into SQL via a
+        # computed column or a view. Current limit of 5000 is acceptable for
+        # typical local usage.
         fetch_limit = limit + offset
         need_status_filter = status and status != "all"
         if need_status_filter:
-            fetch_limit = 5000
+            fetch_limit = min(5000, max(fetch_limit, limit + offset))
 
-        query += " ORDER BY attempted_at DESC LIMIT ? OFFSET ?"
+        order_clause = "redeemed_at DESC" if order_by_redeemed else "attempted_at DESC"
+        query += f" ORDER BY {order_clause} LIMIT ? OFFSET ?"
         if need_status_filter:
             rows_query = query.replace("LIMIT ? OFFSET ?", "LIMIT ?")
             with self._connection() as conn:
@@ -563,6 +596,47 @@ class Storage:
                 "failed": failed,
                 "by_source": by_source,
             }
+
+    def get_all_stats_single_query(self) -> dict[str, dict[str, Any]]:
+        """Get redemption stats for all games in one query (replaces 5 get_stats calls).
+
+        Returns:
+            Dictionary keyed by game id with stats matching ``get_stats()``
+            (minus ``by_source`` which requires a join per game).
+        """
+        with self._connection() as conn:
+            rows = conn.execute(
+                "SELECT game, COUNT(*), SUM(redeemed) FROM codes GROUP BY game"
+            ).fetchall()
+        result: dict[str, dict[str, Any]] = {}
+        for gid in GAMES:
+            row = next((r for r in rows if r[0] == gid), None)
+            if row:
+                result[gid] = {
+                    "total_codes": row[1],
+                    "successful": row[2] or 0,
+                    "failed": (row[1] or 0) - (row[2] or 0),
+                    "by_source": {},
+                }
+            else:
+                result[gid] = {
+                    "total_codes": 0,
+                    "successful": 0,
+                    "failed": 0,
+                    "by_source": {},
+                }
+        return result
+
+    def get_all_stats(self) -> dict[str, dict[str, Any]]:
+        """Get redemption statistics for all games in a single query batch.
+
+        Returns:
+            Dictionary keyed by game id, each value matching ``get_stats()``.
+        """
+        result: dict[str, dict[str, Any]] = {}
+        for gid in GAMES:
+            result[gid] = self.get_stats(game=gid)
+        return result
 
     # --- Sources CRUD ---
 
@@ -1134,7 +1208,13 @@ class Storage:
             pass
         try:
             parsed = json.loads(value)
-            return parsed if isinstance(parsed, dict) else {}
+            if isinstance(parsed, dict):
+                logger.warning(
+                    "Loaded plaintext cookies from storage; expected encrypted data. "
+                    "If this is unexpected, check for database corruption."
+                )
+                return parsed
+            return {}
         except Exception:
             logger.warning("Failed to decode account cookies; returning empty")
             return {}

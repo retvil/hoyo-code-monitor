@@ -23,6 +23,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from src.config import ConfigManager
 from src.constants import (
     APP_VERSION,
+    GAMES,
     MASK_VISIBLE_CHARS,
     MAX_CHECKIN_JITTER_MINUTES,
 )
@@ -86,8 +87,13 @@ def _set_scheduler(value: Any) -> None:
 # anyone who ever observes it — a log line, a screenshot, a shared screen, a
 # stale browser tab — an unlimited window in which to replay it. Deriving the
 # token from the current UTC date bounds that window to a single day while
-# needing no server-side state: every render within the same day agrees, and a
-# restarted frozen build keeps working without re-seeding anything.
+# needing no server-side state: every render within the same day agrees.
+#
+# The seed is persisted to disk so that restarts within the same UTC day do
+# not invalidate tokens already issued to open browser tabs. It rotates
+# automatically at the UTC midnight boundary (the token itself changes even
+# if the seed is the same), and the stored seed is replaced on the next
+# startup after midnight so stale tabs eventually get a clean rejection.
 #
 # Delivery is double-submit. The token is written to the non-HttpOnly
 # ``hcm_csrf`` cookie on ``/api/csrf-token`` *and* embedded in every rendered
@@ -96,9 +102,48 @@ def _set_scheduler(value: Any) -> None:
 # cookie, so the cookie is a convenience for the client rather than the thing
 # being trusted. A self-consistent attacker-forged header+cookie pair still
 # fails, because the secret is only ever handed to a same-origin page.
-_CSRF_SEED = secrets.token_urlsafe(32)
+
+_CSRF_SEED_FILE = "_csrf_seed"
 _CSRF_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 _CSRF_COOKIE = "hcm_csrf"
+
+
+def _load_or_create_csrf_seed() -> str:
+    """Load the persisted CSRF seed, or create and persist a new one.
+
+    The seed survives process restarts so that tokens issued earlier in the
+    same UTC day remain valid for open tabs. It is replaced on the next
+    startup after the UTC day has changed (checked via the stored date).
+    """
+    from src.paths import app_data_dir
+
+    seed_path = app_data_dir() / _CSRF_SEED_FILE
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
+    try:
+        if seed_path.exists():
+            raw = seed_path.read_text(encoding="utf-8").strip()
+            # Format: "<date>|<seed>" — validate the date so a stale seed
+            # from a previous day is replaced on next startup.
+            if "|" in raw:
+                stored_date, stored_seed = raw.split("|", 1)
+                if stored_date == today and len(stored_seed) >= 32:
+                    return stored_seed
+    except Exception:
+        logger.debug("Could not read CSRF seed file", exc_info=True)
+
+    seed = secrets.token_urlsafe(32)
+    try:
+        seed_path.write_text(f"{today}|{seed}", encoding="utf-8")
+        try:
+            seed_path.chmod(0o600)
+        except OSError:
+            pass
+    except Exception:
+        logger.debug("Could not persist CSRF seed", exc_info=True)
+    return seed
+
+
+_CSRF_SEED: str = _load_or_create_csrf_seed()
 
 
 def _csrf_day() -> str:
@@ -181,6 +226,12 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     # when standalone (otherwise the dashboard would show a dead scheduler).
     if _get_scheduler() is None:
         _set_scheduler(create_scheduler_from_storage())
+
+    if os.environ.get("HCM_TESTING") == "1":
+        logger.warning(
+            "HCM_TESTING=1 is set — CSRF protection is DISABLED. "
+            "Remove this environment variable before deploying to production."
+        )
 
     # Prime the update cache in the background so the first page render reads
     # a warm cache instead of paying for a GitHub round-trip. Deliberately not
@@ -269,8 +320,10 @@ async def csrf_token(request: Request) -> JSONResponse:
     The header is still validated against the server secret, so the cookie is
     a delivery channel rather than the thing being trusted.
 
-    The cookie is deliberately not HttpOnly: the page's own script must read
-    it to echo the value back in the header.
+    The cookie is deliberately **not** HttpOnly (httponly=False): the page's
+    own script must read it to echo the value back in the header. The template
+    also embeds the token in a <meta name="csrf-token"> tag as a fallback for
+    tabs that were open before the most recent rotation.
     """
     token = _csrf_token()
     response = JSONResponse(content={"csrf_token": token})
@@ -281,6 +334,7 @@ async def csrf_token(request: Request) -> JSONResponse:
         _CSRF_COOKIE,
         token,
         max_age=86400,
+        httponly=False,  # intentional: JS reads it to echo X-CSRF-Token
         samesite="strict",
         secure=request.base_url.scheme == "https",
     )
@@ -320,10 +374,11 @@ async def dashboard(request: Request, game: str = "") -> HTMLResponse:
     # Get stats (global or per game)
     stats = storage.get_stats(game=current_game or None)
 
-    # Per-game summary cards (always show all games)
+    # Per-game summary cards (always show all games) — one query instead of 5
+    all_stats = storage.get_all_stats_single_query()
     game_cards = []
     for gid in GAMES:
-        gs = storage.get_stats(game=gid)
+        gs = all_stats.get(gid, {"total_codes": 0, "successful": 0, "failed": 0})
         game_cards.append(
             {
                 "id": gid,
@@ -339,10 +394,10 @@ async def dashboard(request: Request, game: str = "") -> HTMLResponse:
     codes = storage.list_codes(limit=20, only_unredeemed=False, game=current_game or None)
 
     # Get redeemed codes (filtered by game, newest first by redemption time)
-    redeemed_codes = [
-        c for c in storage.list_codes(limit=200, game=current_game or None) if c.get("redeemed")
-    ]
-    redeemed_codes.sort(key=lambda c: c.get("redeemed_at") or "", reverse=True)
+    redeemed_codes = storage.list_codes(
+        limit=200, game=current_game or None, order_by_redeemed=True
+    )
+    redeemed_codes = [c for c in redeemed_codes if c.get("redeemed")]
 
     # Get sources
     sources = storage.list_sources()
@@ -497,11 +552,12 @@ async def test_source(name: str, request: Request) -> dict[str, Any]:
             detail=f"Rate limited, try in {_RATE_LIMIT_SECONDS - (now - last):.1f}s",
         )
     # Prune stale entries in place (TTL cleanup to prevent memory leak on long runs)
-    for k in [
-        key
-        for key in _test_rate_limit
-        if now - _test_rate_limit[key] >= _TEST_RATE_LIMIT_TTL_SECONDS
-    ]:
+    stale = [
+        k
+        for k, v in _test_rate_limit.items()
+        if now - v >= _TEST_RATE_LIMIT_TTL_SECONDS
+    ]
+    for k in stale:
         del _test_rate_limit[k]
     _test_rate_limit[key] = now
 
@@ -517,7 +573,7 @@ async def test_source(name: str, request: Request) -> dict[str, Any]:
             codes = await fetcher.fetch_source(source)
         return {"success": True, "codes": codes, "count": len(codes)}
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": _safe_detail(e)}
 
 
 @app.get("/accounts", response_class=HTMLResponse)
@@ -646,8 +702,12 @@ async def get_account_cookies(name: str) -> HTMLResponse:
             )
         else:
             shown = value
+        # User-supplied values (cookie names/values) must be escaped to prevent
+        # reflected XSS via crafted cookie names like "<script>alert(1)</script>".
+        key_escaped = __import__("html").escape(str(key))
+        shown_escaped = __import__("html").escape(str(shown)) if shown is not None else ""
         parts.append(
-            f"<span class='badge badge-info'>{key}</span> <span class='mono'>{shown}</span>"
+            f"<span class='badge badge-info'>{key_escaped}</span> <span class='mono'>{shown_escaped}</span>"
         )
     return HTMLResponse("<br>".join(parts))
 
@@ -697,6 +757,31 @@ async def update_config(
     """Update configuration from settings form (form-data)."""
     config_manager = ConfigManager()
     try:
+        from pathlib import Path
+        from src.paths import app_data_dir
+        _APP_DATA_DIR = app_data_dir()
+
+        def _validate_safe_path(value: str, setting: str) -> None:
+            """Reject path-traversal and absolute paths outside the app data dir."""
+            if ".." in value:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"{setting} must not contain '..' (path traversal not allowed)",
+                )
+            candidate = Path(value)
+            if candidate.is_absolute():
+                try:
+                    candidate = candidate.resolve()
+                    _APP_DATA_DIR.resolve()
+                    candidate.relative_to(_APP_DATA_DIR)
+                except ValueError:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"{setting} must be within the app data directory ({_APP_DATA_DIR})",
+                    )
+
+        _validate_safe_path(db_path, "db_path")
+        _validate_safe_path(log_file, "log_file")
         values = {
             "poll_interval_seconds": poll_interval_seconds,
             "source_timeout_seconds": source_timeout_seconds,
@@ -1068,9 +1153,12 @@ def _account_games_checkboxes_html(
             f"<input type='checkbox' name='games' value='{g}' {checked} "
             f"style='width: 15px; height: 15px;'> {g}</label>"
         )
+    # Account names are user-supplied; escape to prevent reflected XSS via
+    # a crafted name like "<script>alert(1)</script>".
+    name_escaped = __import__("html").escape(name)
     return (
-        f"<div id='games-{name}'>"
-        f"<form hx-post='/accounts/{name}/games' hx-target='#games-{name}' hx-swap='outerHTML'>"
+        f"<div id='games-{name_escaped}'>"
+        f"<form hx-post='/accounts/{name_escaped}/games' hx-target='#games-{name_escaped}' hx-swap='outerHTML'>"
         f"<button type='button' class='btn' style='padding: 2px 8px; font-size: 0.75rem;'>Games:</button> "
         + "".join(boxes)
         + "<button type='submit' class='btn btn-primary' "
@@ -1248,8 +1336,10 @@ async def redeem_single_code(code: str) -> dict[str, Any]:
                 _rc = res.raw_response.get("retcode")
                 if _rc in (10001, -100):
                     storage.set_account_cookie_state(acc["name"], "expired")
+                existing = storage.get_code(row["code"], game=row_game)
+                reward = res.reward if res.success else (existing or {}).get("reward")
                 storage.update_code_redemption(
-                    row["code"], claimed, res.reward if res.success else None, game=row_game
+                    row["code"], claimed, reward, game=row_game
                 )
                 storage.add_redemption_log(
                     code=row["code"],
@@ -1393,9 +1483,12 @@ async def import_data(payload: str = Form(...)) -> dict[str, Any]:
             skipped += 1
             continue
         try:
+            game_raw = item.get("game", "genshin") or "genshin"
+            if game_raw not in GAMES:
+                raise ValueError(f"Unknown game: {game_raw!r}; allowed: {sorted(GAMES)}")
             for src in item.get("sources", ["import"]) or ["import"]:
                 try:
-                    storage.add_code(code, str(src), game=str(item.get("game", "genshin")))
+                    storage.add_code(code, str(src), game=game_raw)
                     break
                 except Exception:
                     continue
@@ -1465,8 +1558,9 @@ async def partial_sparkline(request: Request) -> HTMLResponse:
         pts.append(f"{x:.1f},{y:.1f}")
     polyline = " ".join(pts)
     area = f"{pad},{h - pad} " + polyline + f" {w - pad},{h - pad}"
+    _html = __import__("html")
     bars = "".join(
-        f"<circle cx='{x}' cy='{y}' r='2.5' fill='var(--accent)'><title>{d['day']}: {d['count']}</title></circle>"
+        f"<circle cx='{x}' cy='{y}' r='2.5' fill='var(--accent)'><title>{_html.escape(str(d['day']))}: {d['count']}</title></circle>"
         for (x, y), d in zip((p.split(",") for p in pts), data, strict=True)
     )
     svg = (

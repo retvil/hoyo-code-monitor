@@ -229,7 +229,7 @@ class Redeemer:
                     else:
                         parts.append(str(item))
                 reward = ", ".join(parts)
-            if not reward:
+            if not reward and response_data:
                 reward = message if message and message != "OK" else "Redeemed"
 
         return RedemptionResult(
