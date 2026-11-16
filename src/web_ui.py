@@ -668,7 +668,10 @@ async def login_account(name: str, timeout: int = 300) -> dict[str, Any]:
     except TimeoutError as e:
         raise HTTPException(status_code=408, detail=_safe_detail(e)) from e
     except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=_safe_detail(e)) from e
+        # Playwright / Chromium launch failure. Show the raw detail (not
+        # mask_secret-mangled) so the user can act on it — e.g. "Executable
+        # doesn't exist at ...", "Playwright is not installed", "download failed".
+        raise HTTPException(status_code=502, detail=f"Browser login failed: {e}") from e
     except Exception as e:
         # e.g. playwright._impl._errors.Error (browser launch failure):
         # report the detail instead of a bare 500 page

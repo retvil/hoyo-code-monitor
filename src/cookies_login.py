@@ -110,7 +110,10 @@ def ensure_chromium() -> None:
         )
 
     except ImportError as e:
-        raise RuntimeError("Playwright is not installed (pip install playwright)") from e
+        # Surface the real reason: a missing bundled _driver module (PyInstaller
+        # build that omitted playwright._impl), a missing node.exe, etc. The
+        # old generic message hid all of that behind "not installed".
+        raise RuntimeError(f"Playwright driver unavailable in this build: {e}") from e
     target = browsers_dir()
     logger.info("Chromium not found, downloading to %s (~170MB, one-time)", target)
     env = dict(get_driver_env())
@@ -208,7 +211,12 @@ async def capture_cookies(
         )
 
     except ImportError as e:
-        raise RuntimeError("Playwright is not installed (pip install playwright)") from e
+        # Distinguish "the Python module isn't bundled at all" (PyInstaller
+        # build bug) from "it's bundled but the driver is missing".
+        raise RuntimeError(
+            f"Cannot import playwright.async_api in this build: {e}. "
+            "Rebuild the exe with playwright._impl submodules included."
+        ) from e
 
     deadline = time.time() + timeout_seconds
     # Blocking download (~170MB first run) must not stall the event loop

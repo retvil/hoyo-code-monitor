@@ -1,7 +1,20 @@
 # -*- mode: python ; coding: utf-8 -*-
 from pathlib import Path
 
+from PyInstaller.utils.hooks import collect_submodules, collect_data_files
+
 block_cipher = None
+
+# Playwright uses dynamic imports that PyInstaller's static analysis cannot
+# detect: playwright._impl._driver (launched as a node.exe subprocess),
+# playwright.async_api / sync_api, and ~50 _impl submodules. The stock
+# hook only collects *data* files (driver/, node.exe, py.typed), not the
+# Python source, so a bare `import playwright` in the frozen exe fails with
+# "Playwright is not installed". Collect all _impl submodules explicitly.
+playwright_hidden = (
+    collect_submodules("playwright._impl")
+    + ["playwright.async_api", "playwright.sync_api"]
+)
 
 a = Analysis(
     ['src/cli.py'],
@@ -10,6 +23,7 @@ a = Analysis(
     datas=[
         ('templates', 'templates'),
         ('config.toml', '.'),
+        *collect_data_files("playwright"),
     ],
     hiddenimports=[
         'src',
@@ -21,62 +35,7 @@ a = Analysis(
         'keyring',
         'qrcode',
         'playwright',
-        'playwright._impl',
-        'playwright._impl._api_structures',
-        'playwright._impl._artifact',
-        'playwright._impl._assertions',
-        'playwright._impl._async_base',
-        'playwright._impl._browser',
-        'playwright._impl._browser_context',
-        'playwright._impl._browser_type',
-        'playwright._impl._cdp_session',
-        'playwright._impl._clock',
-        'playwright._impl._connection',
-        'playwright._impl._console_message',
-        'playwright._impl._credentials',
-        'playwright._impl._debugger',
-        'playwright._impl._dialog',
-        'playwright._impl._disposable',
-        'playwright._impl._download',
-        'playwright._impl._driver',
-        'playwright._impl._element_handle',
-        'playwright._impl._errors',
-        'playwright._impl._event_context_manager',
-        'playwright._impl._fetch',
-        'playwright._impl._file_chooser',
-        'playwright._impl._form_data',
-        'playwright._impl._frame',
-        'playwright._impl._glob',
-        'playwright._impl._greenlets',
-        'playwright._impl._har_router',
-        'playwright._impl._helper',
-        'playwright._impl._impl_to_api_mapping',
-        'playwright._impl._input',
-        'playwright._impl._js_handle',
-        'playwright._impl._json_pipe',
-        'playwright._impl._local_utils',
-        'playwright._impl._locator',
-        'playwright._impl._map',
-        'playwright._impl._network',
-        'playwright._impl._object_factory',
-        'playwright._impl._page',
-        'playwright._impl._path_utils',
-        'playwright._impl._playwright',
-        'playwright._impl._screencast',
-        'playwright._impl._selectors',
-        'playwright._impl._set_input_files_helpers',
-        'playwright._impl._str_utils',
-        'playwright._impl._stream',
-        'playwright._impl._sync_base',
-        'playwright._impl._tracing',
-        'playwright._impl._transport',
-        'playwright._impl._video',
-        'playwright._impl._waiter',
-        'playwright._impl._web_error',
-        'playwright._impl._web_storage',
-        'playwright._impl._writable_stream',
-        'playwright.async_api',
-        'playwright.sync_api',
+        *playwright_hidden,
         'psutil',
         'portalocker',
         'prometheus_client',
@@ -133,7 +92,6 @@ a = Analysis(
         'yapf_third_party',
         'librt',
         'patchright',
-        'greenlet',
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
