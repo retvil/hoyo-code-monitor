@@ -620,9 +620,7 @@ class Scheduler:
                             # Log redemption per account
                             for acc in redeem_accounts:
                                 try:
-                                    claimed = await self._redeem_code_for_account(
-                                        code, acc, gap
-                                    )
+                                    claimed = await self._redeem_code_for_account(code, acc)
                                     if claimed:
                                         codes_redeemed += 1
                                 except Exception as e:
@@ -647,10 +645,9 @@ class Scheduler:
                     )
                     errors.append(f"Storage error for {code[:4]}****: {e}")
                 except sqlite3.ProgrammingError as e:
-                    logger.error(
-                        "Schema error storing code %s: %s",
+                    logger.exception(
+                        "Schema error storing code %s",
                         code[:4] + "****",
-                        e,
                     )
                     errors.append(f"Storage error for {code[:4]}****: {e}")
                 except sqlite3.IntegrityError:
@@ -680,9 +677,11 @@ class Scheduler:
         self,
         code: str,
         acc: dict[str, Any],
-        gap: int,
     ) -> bool:
         """Redeem a single code for one account.
+
+        The caller owns the inter-account delay (``asyncio.sleep(gap)``),
+        so this helper does not take a gap.
 
         Returns True if the code was successfully claimed for this account.
         """
@@ -716,16 +715,10 @@ class Scheduler:
         )
         _rc = res.raw_response.get("retcode")
         if _rc in (10001, -100):
-            self.storage.set_account_cookie_state(
-                acc["name"], "expired"
-            )
+            self.storage.set_account_cookie_state(acc["name"], "expired")
             await self._notify_cookie_expired(acc["name"])
         existing = self.storage.get_code(code, game=acc_game)
-        new_reward = (
-            res.reward
-            if res.success
-            else (existing or {}).get("reward")
-        )
+        new_reward = res.reward if res.success else (existing or {}).get("reward")
         self.storage.update_code_redemption(
             code=code,
             redeemed=claimed,
@@ -750,9 +743,7 @@ class Scheduler:
                 )
             # Local toast: no config, no network; best-effort.
             with contextlib.suppress(Exception):
-                await notify_redeemed_toast(
-                    code, acc["name"], res.reward or "claimed"
-                )
+                await notify_redeemed_toast(code, acc["name"], res.reward or "claimed")
         return claimed
 
     async def _redeem_new_codes(
@@ -777,7 +768,7 @@ class Scheduler:
         for code in new_codes:
             for acc in redeem_accounts:
                 try:
-                    claimed = await self._redeem_code_for_account(code, acc, gap)
+                    claimed = await self._redeem_code_for_account(code, acc)
                     if claimed:
                         codes_redeemed += 1
                 except Exception as e:
@@ -786,9 +777,7 @@ class Scheduler:
                         code[:4] + "****",
                         acc["name"],
                     )
-                    errors.append(
-                        f"Redemption error for {code[:4]}**** ({acc['name']}): {e}"
-                    )
+                    errors.append(f"Redemption error for {code[:4]}**** ({acc['name']}): {e}")
                 await asyncio.sleep(gap)
 
         return codes_redeemed, errors

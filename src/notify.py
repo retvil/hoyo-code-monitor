@@ -103,5 +103,7 @@ async def notify_redeemed(storage: Any, code: str, account: str, reward: str) ->
     safe_account = html.escape(account)
     safe_reward = html.escape(reward) if reward else ""
     await send_telegram(
-        cfg[0], cfg[1], f"✅ <code>{html.escape(code)}</code> redeemed for {safe_account}: {safe_reward}"
+        cfg[0],
+        cfg[1],
+        f"✅ <code>{html.escape(code)}</code> redeemed for {safe_account}: {safe_reward}",
     )

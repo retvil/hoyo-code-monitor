@@ -219,7 +219,9 @@ class RegexExtractor:
 # Patterns that indicate potentially dangerous nested quantifiers (ReDoS risk).
 # A token followed by `{m,n}` is a quantified group; if that token itself
 # contains `*`, `+`, or `{m,n}` it can cause catastrophic backtracking.
-_NESTED_QUANTIFIER_RE = re.compile(r"\([^)]*[*+{][^)]*\)[*+{]|\([^)]*\([^)]*[*+{][^)]*\)[^)]*\)[*+{]}")
+_NESTED_QUANTIFIER_RE = re.compile(
+    r"\([^)]*[*+{][^)]*\)[*+{]|\([^)]*\([^)]*[*+{][^)]*\)[^)]*\)[*+{]}"
+)
 
 
 def _validate_regex_safety(pattern: str) -> None:

@@ -12,7 +12,7 @@ import os
 import re
 import secrets
 import time
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -134,10 +134,8 @@ def _load_or_create_csrf_seed() -> str:
     seed = secrets.token_urlsafe(32)
     try:
         seed_path.write_text(f"{today}|{seed}", encoding="utf-8")
-        try:
+        with suppress(OSError):
             seed_path.chmod(0o600)
-        except OSError:
-            pass
     except Exception:
         logger.debug("Could not persist CSRF seed", exc_info=True)
     return seed
@@ -552,11 +550,7 @@ async def test_source(name: str, request: Request) -> dict[str, Any]:
             detail=f"Rate limited, try in {_RATE_LIMIT_SECONDS - (now - last):.1f}s",
         )
     # Prune stale entries in place (TTL cleanup to prevent memory leak on long runs)
-    stale = [
-        k
-        for k, v in _test_rate_limit.items()
-        if now - v >= _TEST_RATE_LIMIT_TTL_SECONDS
-    ]
+    stale = [k for k, v in _test_rate_limit.items() if now - v >= _TEST_RATE_LIMIT_TTL_SECONDS]
     for k in stale:
         del _test_rate_limit[k]
     _test_rate_limit[key] = now
@@ -759,32 +753,38 @@ async def update_config(
 ) -> dict[str, Any]:
     """Update configuration from settings form (form-data)."""
     config_manager = ConfigManager()
-    try:
-        from pathlib import Path
-        from src.paths import app_data_dir
-        _APP_DATA_DIR = app_data_dir()
 
-        def _validate_safe_path(value: str, setting: str) -> None:
-            """Reject path-traversal and absolute paths outside the app data dir."""
-            if ".." in value:
+    # Validate paths before touching config: path-traversal / out-of-dir values
+    # are rejected up front, so a bad input never reaches config_manager.set.
+    from pathlib import Path
+
+    from src.paths import app_data_dir
+
+    app_data_dir_path = app_data_dir()
+
+    def _validate_safe_path(value: str, setting: str) -> None:
+        """Reject path-traversal and absolute paths outside the app data dir."""
+        if ".." in value:
+            raise HTTPException(
+                status_code=400,
+                detail=f"{setting} must not contain '..' (path traversal not allowed)",
+            )
+        candidate = Path(value)
+        if candidate.is_absolute():
+            try:
+                candidate = candidate.resolve()
+                app_data_dir_path.resolve()
+                candidate.relative_to(app_data_dir_path)
+            except ValueError:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"{setting} must not contain '..' (path traversal not allowed)",
-                )
-            candidate = Path(value)
-            if candidate.is_absolute():
-                try:
-                    candidate = candidate.resolve()
-                    _APP_DATA_DIR.resolve()
-                    candidate.relative_to(_APP_DATA_DIR)
-                except ValueError:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"{setting} must be within the app data directory ({_APP_DATA_DIR})",
-                    )
+                    detail=f"{setting} must be within the app data directory ({app_data_dir_path})",
+                ) from None
 
-        _validate_safe_path(db_path, "db_path")
-        _validate_safe_path(log_file, "log_file")
+    _validate_safe_path(db_path, "db_path")
+    _validate_safe_path(log_file, "log_file")
+
+    try:
         values = {
             "poll_interval_seconds": poll_interval_seconds,
             "source_timeout_seconds": source_timeout_seconds,
@@ -1341,9 +1341,7 @@ async def redeem_single_code(code: str) -> dict[str, Any]:
                     storage.set_account_cookie_state(acc["name"], "expired")
                 existing = storage.get_code(row["code"], game=row_game)
                 reward = res.reward if res.success else (existing or {}).get("reward")
-                storage.update_code_redemption(
-                    row["code"], claimed, reward, game=row_game
-                )
+                storage.update_code_redemption(row["code"], claimed, reward, game=row_game)
                 storage.add_redemption_log(
                     code=row["code"],
                     account_id=acc["id"],
@@ -1485,10 +1483,12 @@ async def import_data(payload: str = Form(...)) -> dict[str, Any]:
         if existing:
             skipped += 1
             continue
+        game_raw = item.get("game", "genshin") or "genshin"
+        if game_raw not in GAMES:
+            # An item referencing an unknown game is unimportable; skip it.
+            skipped += 1
+            continue
         try:
-            game_raw = item.get("game", "genshin") or "genshin"
-            if game_raw not in GAMES:
-                raise ValueError(f"Unknown game: {game_raw!r}; allowed: {sorted(GAMES)}")
             for src in item.get("sources", ["import"]) or ["import"]:
                 try:
                     storage.add_code(code, str(src), game=game_raw)

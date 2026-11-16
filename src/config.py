@@ -124,12 +124,11 @@ class ConfigManager:
                         else:
                             raise
                     except Exception as exc2:
-                        logger.error(
-                            "Config file %s is corrupt or unreadable (%s: %s); "
+                        logger.exception(
+                            "Config file %s is corrupt or unreadable (%s); "
                             "falling back to defaults. Fix or delete the file to restore settings.",
                             self.config_path,
                             type(exc2).__name__,
-                            exc2,
                         )
                         self._settings = Settings()
             else:

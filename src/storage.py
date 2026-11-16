@@ -20,6 +20,7 @@ from cryptography.fernet import Fernet
 
 from src.checkin import STATUS_FAILED, CheckinResult
 from src.constants import GAMES
+from src.exceptions import ConfigError
 from src.migrations import CURRENT_VERSION, run_migrations
 from src.paths import default_db_path
 
@@ -119,10 +120,8 @@ class Storage:
                 key_path = self.db_path.parent / ".key"
                 key_path.parent.mkdir(parents=True, exist_ok=True)
                 key_path.write_text(key, encoding="utf-8")
-                try:
+                with contextlib.suppress(OSError):
                     key_path.chmod(0o600)
-                except OSError:
-                    pass
                 logger.info("Stored encryption key at %s", key_path)
             except Exception as e:
                 logger.warning("Could not persist encryption key: %s; using ephemeral key", e)
@@ -1208,16 +1207,16 @@ class Storage:
             pass
         try:
             parsed = json.loads(value)
-            if isinstance(parsed, dict):
-                logger.warning(
-                    "Loaded plaintext cookies from storage; expected encrypted data. "
-                    "If this is unexpected, check for database corruption."
-                )
-                return parsed
-            return {}
         except Exception:
             logger.warning("Failed to decode account cookies; returning empty")
             return {}
+        if not isinstance(parsed, dict):
+            return {}
+        logger.warning(
+            "Loaded plaintext cookies from storage; expected encrypted data. "
+            "If this is unexpected, check for database corruption."
+        )
+        return parsed
 
     def store_account_cookies(self, account_name: str, cookies: dict[str, str]) -> None:
         """Store encrypted per-account cookies."""
