@@ -331,7 +331,13 @@ class TestCatchUpMissedCheckins:
         storage.set_config("checkin_jitter_minutes", "0")
         transport = FakeTransport(sign=[make_sign() for _ in GAME_CHECKIN_CONF])
         scheduler = make_scheduler(storage, transport)
-        result = await scheduler.catch_up_missed_checkins()
+        # Mock datetime.now() to a time AFTER 01:00 so the catch-up gate passes
+        # regardless of when the test actually runs.
+        fake_now = datetime(2026, 1, 15, 12, 0, 0)
+        with patch("src.scheduler.datetime") as mock_dt:
+            mock_dt.now.return_value = fake_now
+            mock_dt.side_effect = lambda *a, **k: datetime(*a, **k)
+            result = await scheduler.catch_up_missed_checkins()
         assert result is not None
         assert result["games_claimed"] == EXPECTED_GAMES_CLAIMED
         assert len(storage.get_checkin_logs()) == EXPECTED_LOG_COUNT
@@ -373,7 +379,11 @@ class TestCatchUpMissedCheckins:
         )
         transport = FakeTransport(sign=[make_sign() for _ in GAME_CHECKIN_CONF])
         scheduler = make_scheduler(storage, transport)
-        result = await scheduler.catch_up_missed_checkins()
+        fake_now = datetime(2026, 1, 15, 12, 0, 0)
+        with patch("src.scheduler.datetime") as mock_dt:
+            mock_dt.now.return_value = fake_now
+            mock_dt.side_effect = lambda *a, **k: datetime(*a, **k)
+            result = await scheduler.catch_up_missed_checkins()
         assert result is not None
         assert result["failed"] == 0
 
