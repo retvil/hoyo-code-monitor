@@ -101,7 +101,7 @@ jobs:
           # Inno Setup's OutputDir=out is resolved relative to the .iss location
           # (repo root), so the installer may land in the workdir's out/ or in the
           # parent's out/ (or root). Search both, plus the CWD itself.
-          # Note: $PWD is a PathInfo object — cast to string for correct
+          # Note: $PWD is a PathInfo object. Cast to string for correct
           # string concatenation in the search paths below.
           $cwd = "$PWD"
           $parent = Split-Path $cwd -Parent
@@ -116,12 +116,12 @@ jobs:
             Write-Host "Installer not found in any expected location. Searching recursively..."
             foreach ($root in @($cwd, $parent)) {
               Get-ChildItem -Recurse -Filter "hoyo-code-monitor-*setup.exe" -Path $root -ErrorAction SilentlyContinue |
-                Select-Object -First 5 | ForEach-Object { Write-Host "  $($_.FullName) ($([math]::Round($_.Length/1MB,2)) MB)" }
+                Select-Object -First 5 | ForEach-Object { Write-Host "  $($_.FullName)" }
             }
             exit 1
           }
           if ((Get-Item $setup).Length -le 5MB) {
-            Write-Host "Installer $setup is smaller than 5MB — build likely failed."
+            Write-Host "Installer $setup is smaller than 5MB. Build likely failed."
             exit 1
           }
           # Copy to CWD root so the artifact upload glob (*.exe) and release
@@ -203,7 +203,7 @@ jobs:
           context: .
           push: ${{ github.event_name == 'release' }}
           # On non-release pushes (main/dev) tag_name is empty, so the second
-          # tag would be "ghcr.io/<repo>:" — an invalid reference. Only emit it
+          # tag would be "ghcr.io/<repo>:" (an invalid reference). Only emit it
           # when we're actually on a release.
           tags: |
             ghcr.io/${{ github.repository }}:latest
