@@ -336,7 +336,7 @@ class TestCatchUpMissedCheckins:
         fake_now = datetime(2026, 1, 15, 12, 0, 0)
         with patch("src.scheduler.datetime") as mock_dt:
             mock_dt.now.return_value = fake_now
-            mock_dt.side_effect = lambda *a, **k: datetime(*a, **k)
+            mock_dt.side_effect = datetime
             result = await scheduler.catch_up_missed_checkins()
         assert result is not None
         assert result["games_claimed"] == EXPECTED_GAMES_CLAIMED
@@ -382,7 +382,7 @@ class TestCatchUpMissedCheckins:
         fake_now = datetime(2026, 1, 15, 12, 0, 0)
         with patch("src.scheduler.datetime") as mock_dt:
             mock_dt.now.return_value = fake_now
-            mock_dt.side_effect = lambda *a, **k: datetime(*a, **k)
+            mock_dt.side_effect = datetime
             result = await scheduler.catch_up_missed_checkins()
         assert result is not None
         assert result["failed"] == 0
