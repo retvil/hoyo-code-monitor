@@ -319,25 +319,60 @@ function setTheme(theme){
 </main>
 <div id="toasts" aria-live="polite"></div>
 <script>
-function showToast(msg, ok) {
+function showToast(msg, ok, toastMsg, toastOk) {
     var box = document.getElementById('toasts');
     if (!box) return;
     var el = document.createElement('div');
-    el.className = 'toast ' + (ok === false ? 'err' : 'ok');
-    el.textContent = msg;
+    var isErr = (ok === false) || (toastOk === 'false');
+    el.className = 'toast ' + (isErr ? 'err' : 'ok');
+    // Use the toast-specific message if provided, otherwise the main msg
+    el.textContent = toastMsg || msg;
     box.appendChild(el);
-    setTimeout(function() { el.remove(); }, 5000);
+    // Errors stay longer so the user can read them
+    setTimeout(function() { el.remove(); }, isErr ? 8000 : 4000);
 }
 document.body.addEventListener('htmx:afterRequest', function(e) {
     var xhr = e.detail.xhr;
     if (!xhr) return;
     try {
+        // Handle HTML fragment responses (new redeem endpoints)
+        var contentType = xhr.getResponseHeader('Content-Type') || '';
+        if (contentType.indexOf('text/html') !== -1) {
+            var parser = new DOMParser();
+            var doc = parser.parseFromString(xhr.responseText, 'text/html');
+            var span = doc.querySelector('[data-toast]');
+            if (span) {
+                showToast(span.textContent, null, span.getAttribute('data-toast'), span.getAttribute('data-toast-ok'));
+            }
+            return;
+        }
+        // Handle JSON responses (legacy endpoints)
         var data = JSON.parse(xhr.responseText);
         var msg = data.message || data.result || data.detail;
-        if (msg) showToast(typeof msg === 'string' ? msg : JSON.stringify(msg), xhr.status < 400);
-    } catch (err) { /* non-JSON swap, ignore */ }
+        if (msg) {
+            var okFlag = (xhr.status < 400) && (data.success !== false);
+            showToast(typeof msg === 'string' ? msg : JSON.stringify(msg), okFlag);
+        }
+    } catch (err) { /* non-JSON / non-HTML swap, ignore */ }
 });
 </script>
+<style>
+/* Inline redeem result styling (shown next to the button) */
+.redeem-result-ok {
+    display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 4px;
+    background: #d1fae5; color: #065f46; font-size: 0.78rem; font-weight: 500;
+    animation: fadeInRight 0.25s ease-out;
+}
+.redeem-result-err {
+    display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 4px;
+    background: #fee2e2; color: #991b1b; font-size: 0.78rem; font-weight: 500;
+    animation: fadeInRight 0.25s ease-out;
+}
+@keyframes fadeInRight {
+    from { opacity: 0; transform: translateX(-8px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+</style>
 <script>
 // CSRF: echo the server-issued token on every state-changing request.
 // The server validates X-CSRF-Token against its own secret, so this header

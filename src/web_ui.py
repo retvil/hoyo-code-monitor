@@ -1293,8 +1293,8 @@ async def partial_checkin_progress(request: Request) -> HTMLResponse:
     )
 
 
-@app.post("/codes/{code}/redeem")
-async def redeem_single_code(code: str) -> dict[str, Any]:
+@app.post("/codes/{code}/redeem", response_model=None)
+async def redeem_single_code(code: str, request: Request) -> dict[str, Any] | HTMLResponse:
     """Redeem one code for all accounts with auto-redeem ON."""
     from src.redeemer import (
         Redeemer,
@@ -1310,7 +1310,7 @@ async def redeem_single_code(code: str) -> dict[str, Any]:
     if not accounts:
         raise HTTPException(status_code=400, detail="No accounts with auto-redeem enabled")
     gap = int(storage.get_config("redemption_min_gap_seconds", "8") or 8)
-    results = []
+    results: list[dict[str, Any]] = []
     redeemer = Redeemer()
     async with redeemer:
         for acc in accounts:
@@ -1332,10 +1332,6 @@ async def redeem_single_code(code: str) -> dict[str, Any]:
                     game=_ag,
                 )
                 claimed = res.success or res.raw_response.get("retcode") in (-2017, -2018)
-                # A cookie-expired retcode from Hoyolab means the stored session
-                # is dead; surface it as a per-account "expired" state so the UI
-                # can show a Re-login affordance without the user digging through
-                # the redemption log.
                 _rc = res.raw_response.get("retcode")
                 if _rc in (10001, -100):
                     storage.set_account_cookie_state(acc["name"], "expired")
@@ -1351,12 +1347,33 @@ async def redeem_single_code(code: str) -> dict[str, Any]:
                     if claimed
                     else f"{res.message} (retcode {res.raw_response.get('retcode')})",
                 )
-                results.append(f"{acc['name']}: {'OK' if claimed else res.message}")
+                results.append(
+                    {"account": acc["name"], "ok": claimed, "msg": "OK" if claimed else res.message}
+                )
             except Exception as e:
-                results.append(f"{acc['name']}: error {e}")
+                results.append({"account": acc["name"], "ok": False, "msg": str(e)})
             await asyncio.sleep(gap)
-    any_success = any(": OK" in r for r in results)
-    return {"success": any_success, "result": "; ".join(results)}
+    any_success = any(r["ok"] for r in results)
+
+    # When called via HTMX, return a styled HTML fragment instead of raw JSON
+    # so the swap renders a readable result next to the button.
+    if request.headers.get("HX-Request") == "true":
+        import html as _html
+
+        items = [
+            _html.escape(f"{r['account']}: {'✓' if r['ok'] else '✗'} {_html.escape(r['msg'])}")
+            for r in results
+        ]
+        cls = "redeem-result-ok" if any_success else "redeem-result-err"
+        return HTMLResponse(
+            content=f'<span class="{cls}" data-toast="{_html.escape("; ".join(items))}" '
+            f'data-toast-ok="{str(any_success).lower()}">{_html.escape("; ".join(items))}</span>'
+        )
+
+    return {
+        "success": any_success,
+        "result": "; ".join(f"{r['account']}: {'OK' if r['ok'] else r['msg']}" for r in results),
+    }
 
 
 @app.delete("/codes/{code}")
@@ -1376,8 +1393,8 @@ async def cleanup_dead() -> dict[str, Any]:
     return {"success": True, "result": f"Removed {count} dead codes"}
 
 
-@app.post("/redeem/all")
-async def redeem_all_codes() -> dict[str, Any]:
+@app.post("/redeem/all", response_model=None)
+async def redeem_all_codes(request: Request) -> dict[str, Any] | HTMLResponse:
     """Redeem all unredeemed, non-expired codes for accounts with auto-redeem ON."""
     from src.redeemer import (
         Redeemer,
@@ -1393,6 +1410,8 @@ async def redeem_all_codes() -> dict[str, Any]:
         if c.get("display_status") == "pending"
     ]
     if not codes:
+        if request.headers.get("HX-Request") == "true":
+            return HTMLResponse(content='<span class="redeem-result-ok">Nothing to redeem</span>')
         return {"success": True, "result": "Nothing to redeem"}
     gap = int(storage.get_config("redemption_min_gap_seconds", "8") or 8)
     done, failed = 0, 0
@@ -1439,7 +1458,19 @@ async def redeem_all_codes() -> dict[str, Any]:
                 except Exception:
                     failed += 1
                 await asyncio.sleep(gap)
-    return {"success": True, "result": f"Redeemed: {done}, failed: {failed}"}
+    result_text = f"Redeemed: {done}, failed: {failed}"
+    ok = failed == 0
+
+    if request.headers.get("HX-Request") == "true":
+        import html as _html
+
+        cls = "redeem-result-ok" if ok else "redeem-result-err"
+        return HTMLResponse(
+            content=f'<span class="{cls}" data-toast="{_html.escape(result_text)}" '
+            f'data-toast-ok="{str(ok).lower()}">{_html.escape(result_text)}</span>'
+        )
+
+    return {"success": True, "result": result_text}
 
 
 @app.get("/export")
