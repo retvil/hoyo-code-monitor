@@ -79,6 +79,7 @@ jobs:
       - name: Build Inno Setup installer
         shell: powershell
         run: |
+          Set-Location $env:GITHUB_WORKSPACE
           $ver = (Select-String -Path pyproject.toml -Pattern '^version\s*=\s*"(.+)"').Matches[0].Groups[1].Value
           $candidates = @(
             "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
@@ -87,16 +88,11 @@ jobs:
           $iscc = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
           if (-not $iscc) { $iscc = (Get-Command ISCC.exe -ErrorAction SilentlyContinue).Source }
           if (-not $iscc) { Write-Error "ISCC.exe (Inno Setup compiler) not found on this runner"; exit 1 }
-          $workdir = (Get-Location).Path
           & $iscc "/DMyAppVersion=$ver" installer.iss
-          # ISCC writes to 'out/' relative to the workdir. Copy the installer
-          # to the workdir root so the smoke-test step can find it there.
-          $target = Join-Path $workdir "hoyo-code-monitor-$ver-setup.exe"
-          $found = Get-ChildItem -Recurse -Filter "hoyo-code-monitor-$ver-setup.exe" -Path $workdir -ErrorAction SilentlyContinue | Select-Object -First 1
-          if (-not $found) {
-            # Fallback: GITHUB_WORKSPACE is one level above the workdir
-            $found = Get-ChildItem -Recurse -Filter "hoyo-code-monitor-$ver-setup.exe" -Path $env:GITHUB_WORKSPACE -ErrorAction SilentlyContinue | Select-Object -First 1
-          }
+          # ISCC writes to 'out/' relative to GITHUB_WORKSPACE (its CWD).
+          # Copy the installer to GITHUB_WORKSPACE root for the smoke test.
+          $target = Join-Path $env:GITHUB_WORKSPACE "hoyo-code-monitor-$ver-setup.exe"
+          $found = Get-ChildItem -Recurse -Filter "hoyo-code-monitor-$ver-setup.exe" -Path $env:GITHUB_WORKSPACE -ErrorAction SilentlyContinue | Select-Object -First 1
           if (-not $found) { Write-Error "Inno installer not found after compile"; exit 1 }
           Copy-Item $found.FullName $target -Force
           Write-Host "Installer ready: $target"
@@ -104,21 +100,15 @@ jobs:
       - name: Smoke test installer
         shell: powershell
         run: |
-          # Capture the workdir BEFORE running any external command (some
-          # tools can change the CWD). The Inno build step copied the
-          # installer to this directory.
-          $workdir = (Get-Location).Path
+          # Normalize to GITHUB_WORKSPACE so both steps share the same base path.
+          Set-Location $env:GITHUB_WORKSPACE
           & "dist\hoyo-code-monitor\hoyo-code-monitor.exe" --help
           if ($LASTEXITCODE -ne 0) { exit 1 }
           $ver = (Select-String -Path pyproject.toml -Pattern '^version\s*=\s*"(.+)"').Matches[0].Groups[1].Value
-          $setupPath = Join-Path $workdir "hoyo-code-monitor-$ver-setup.exe"
+          $setupPath = Join-Path (Get-Location).Path "hoyo-code-monitor-$ver-setup.exe"
           if (-not (Test-Path $setupPath)) {
-            # Fallback: check GITHUB_WORKSPACE root (one level above workdir)
-            $setupPath = Join-Path $env:GITHUB_WORKSPACE "hoyo-code-monitor-$ver-setup.exe"
-          }
-          if (-not (Test-Path $setupPath)) {
-            Write-Host "ERROR: Installer not found in $workdir or GITHUB_WORKSPACE. Searching $workdir..."
-            Get-ChildItem -Recurse -Filter "*setup.exe" -Path $workdir -ErrorAction SilentlyContinue | Select-Object -First 10 | ForEach-Object { Write-Host "  $($_.FullName)" }
+            Write-Host "ERROR: Installer not found at $setupPath. Searching..."
+            Get-ChildItem -Recurse -Filter "*setup.exe" -Path (Get-Location).Path -ErrorAction SilentlyContinue | Select-Object -First 10 | ForEach-Object { Write-Host "  $($_.FullName)" }
             exit 1
           }
           $size = (Get-Item $setupPath).Length
