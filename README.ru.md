@@ -86,7 +86,7 @@
 
 Скачайте установщик из [Releases](https://github.com/retvil/hoyo-code-monitor/releases):
 
-- **Windows** — `hoyo-code-monitor-1.4.0-setup.exe` (установка для текущего пользователя, права администратора не нужны)
+- **Windows** — `hoyo-code-monitor-1.5.2-setup.exe` (установка для текущего пользователя, права администратора не нужны)
 
 Тихая установка: `setup.exe /S`. Компоненты: ярлык на рабочем столе, автозагрузка Windows (оба включены по умолчанию).
 
@@ -97,13 +97,13 @@
 ```powershell
 # 1. Установите и запустите — приложение живёт в системном трее
 # 2. Добавьте аккаунт (регион: os_usa / os_euro / os_asia / os_cht)
-genshin-code-monitor accounts add main <UID> <REGION>
+hoyo-code-monitor accounts add main <UID> <REGION>
 
 # 3. Один раз получите куки (откроется браузер, залогиньтесь один раз)
-genshin-code-monitor accounts login main
+hoyo-code-monitor accounts login main
 
 # 4. Включите автопогашение (или тумблером у аккаунта в Web UI)
-genshin-code-monitor config set redemption_enabled true
+hoyo-code-monitor config set redemption_enabled true
 ```
 
 5. Откройте дашборд: `http://127.0.0.1:8000` — Dashboard, Sources, Accounts, Config (переключатель EN/RU/DE/FR/JA/ZH в сайдбаре).
@@ -121,8 +121,8 @@ python -m playwright install chromium
 Запуск в трее (рекомендуется) / разовая проверка / Web UI:
 
 ```powershell
-genshin-code-monitor tray
-genshin-code-monitor run-once
+hoyo-code-monitor tray
+hoyo-code-monitor run-once
 python -m uvicorn src.web_ui:app --host 127.0.0.1 --port 8000
 ```
 

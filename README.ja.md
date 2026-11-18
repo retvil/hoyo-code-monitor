@@ -97,13 +97,13 @@ v1.6.0の監査で45件を4つの重要度レベルにわたり修正しまし�
 ```powershell
 # 1. インストールして起動 — アプリはシステムトレイに常駐
 # 2. アカウント追加 (region: os_usa / os_euro / os_asia / os_cht)
-genshin-code-monitor accounts add main <UID> <REGION>
+hoyo-code-monitor accounts add main <UID> <REGION>
 
 # 3. Cookieを一度だけ取得 (ブラウザが開くので一度ログイン)
-genshin-code-monitor accounts login main
+hoyo-code-monitor accounts login main
 
 # 4. 自動交換を有効化 (またはWeb UIでアカウント別に切替)
-genshin-code-monitor config set redemption_enabled true
+hoyo-code-monitor config set redemption_enabled true
 ```
 
 5. ダッシュボードを開く: `http://127.0.0.1:8000` — Dashboard、Sources、Accounts、Config (サイドバーでEN/RU/DE/FR/JA/ZH切替)。
@@ -121,8 +121,8 @@ python -m playwright install chromium
 トレイモード (推奨) / 単発チェック / Web UI:
 
 ```powershell
-genshin-code-monitor tray
-genshin-code-monitor run-once
+hoyo-code-monitor tray
+hoyo-code-monitor run-once
 python -m uvicorn src.web_ui:app --host 127.0.0.1 --port 8000
 ```
 

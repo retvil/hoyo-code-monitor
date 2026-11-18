@@ -86,7 +86,7 @@ v1.6.0 审计修复了 45 个不同严重级别的问题。主要变更：
 
 从 [Releases](https://github.com/retvil/hoyo-code-monitor/releases) 下载安装程序：
 
-- **Windows** — `hoyo-code-monitor-1.4.0-setup.exe` (按用户安装，无需管理员权限)
+- **Windows** — `hoyo-code-monitor-1.5.2-setup.exe` (按用户安装，无需管理员权限)
 
 静默安装：`setup.exe /S`。组件：桌面快捷方式、Windows 开机自启 (默认全部开启)。
 
@@ -97,13 +97,13 @@ v1.6.0 审计修复了 45 个不同严重级别的问题。主要变更：
 ```powershell
 # 1. 安装并启动 —— 应用常驻系统托盘
 # 2. 添加账号 (region: os_usa / os_euro / os_asia / os_cht)
-genshin-code-monitor accounts add main <UID> <REGION>
+hoyo-code-monitor accounts add main <UID> <REGION>
 
 # 3. 获取一次 Cookie (会打开浏览器，登录一次即可)
-genshin-code-monitor accounts login main
+hoyo-code-monitor accounts login main
 
 # 4. 启用自动兑换 (或在 Web 界面按账号开关)
-genshin-code-monitor config set redemption_enabled true
+hoyo-code-monitor config set redemption_enabled true
 ```
 
 5. 打开仪表盘：`http://127.0.0.1:8000` — Dashboard、Sources、Accounts、Config (侧边栏可切换 EN/RU/DE/FR/JA/ZH)。
@@ -121,8 +121,8 @@ python -m playwright install chromium
 托盘模式 (推荐) / 单次检查 / Web 界面：
 
 ```powershell
-genshin-code-monitor tray
-genshin-code-monitor run-once
+hoyo-code-monitor tray
+hoyo-code-monitor run-once
 python -m uvicorn src.web_ui:app --host 127.0.0.1 --port 8000
 ```
 

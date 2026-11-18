@@ -97,13 +97,13 @@ Installation silencieuse : `setup.exe /S`. Composants : raccourci bureau, démar
 ```powershell
 # 1. Installez et lancez — l'appli vit dans la barre système
 # 2. Ajoutez un compte (région : os_usa / os_euro / os_asia / os_cht)
-genshin-code-monitor accounts add main <UID> <REGION>
+hoyo-code-monitor accounts add main <UID> <REGION>
 
 # 3. Capturez les cookies une fois (le navigateur s'ouvre, connectez-vous une fois)
-genshin-code-monitor accounts login main
+hoyo-code-monitor accounts login main
 
 # 4. Activez l'échange auto (ou interrupteur par compte dans la Web UI)
-genshin-code-monitor config set redemption_enabled true
+hoyo-code-monitor config set redemption_enabled true
 ```
 
 5. Ouvrez le tableau de bord : `http://127.0.0.1:8000` — Dashboard, Sources, Accounts, Config (sélecteur EN/RU/DE/FR/JA/ZH dans la barre latérale).
@@ -121,8 +121,8 @@ python -m playwright install chromium
 Mode barre système (recommandé) / vérification unique / Web UI :
 
 ```powershell
-genshin-code-monitor tray
-genshin-code-monitor run-once
+hoyo-code-monitor tray
+hoyo-code-monitor run-once
 python -m uvicorn src.web_ui:app --host 127.0.0.1 --port 8000
 ```
 

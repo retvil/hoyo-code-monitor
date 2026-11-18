@@ -94,13 +94,13 @@ Silent install: `setup.exe /S`. Components: desktop shortcut, Windows autostart 
 ```powershell
 # 1. Install and launch — the app lives in the system tray
 # 2. Add an account (region: os_usa / os_euro / os_asia / os_cht)
-genshin-code-monitor accounts add main <UID> <REGION>
+hoyo-code-monitor accounts add main <UID> <REGION>
 
 # 3. Capture cookies once (browser opens, you log in once)
-genshin-code-monitor accounts login main
+hoyo-code-monitor accounts login main
 
 # 4. Enable auto-redeem (or toggle per account in the Web UI)
-genshin-code-monitor config set redemption_enabled true
+hoyo-code-monitor config set redemption_enabled true
 ```
 
 5. Open the dashboard: `http://127.0.0.1:8000` — Dashboard, Sources, Accounts, Config (EN/RU/DE/FR/JA/ZH switcher in sidebar).
@@ -118,8 +118,8 @@ python -m playwright install chromium
 Run in tray (recommended) / one-shot check / Web UI:
 
 ```powershell
-genshin-code-monitor tray
-genshin-code-monitor run-once
+hoyo-code-monitor tray
+hoyo-code-monitor run-once
 python -m uvicorn src.web_ui:app --host 127.0.0.1 --port 8000
 ```
 
