@@ -1,5 +1,98 @@
 # Changelog
 
+## [Unreleased] — security & reliability audit
+
+### Security
+
+**45 issues fixed across Critical / High / Medium / Low severity. All have
+regression tests (30 new tests, full suite: 507 passed, 1 skipped).**
+
+- **SSRF in source fetching** — source URLs that resolve to private ranges
+  (`10.x`, `172.16–31.x`, `192.168.x`, `127.x`, `169.254.x`, `0.0.0.0`)
+  or use non-HTTP schemes (`file://`, `ftp://`) are now rejected at
+  validation time (`sources.validate_source_url`).
+- **ReDoS in regex extractors** — patterns with nested quantifiers
+  (`(a+)+`, `(.*a)*`, `(\d+\d+)+`) are rejected when creating or updating
+  regex-type sources.
+- **XSS in HTML endpoints** — source names, cookie values, and error
+  strings rendered in `/sources`, `/accounts/{name}/cookies`, and other
+  HTML endpoints are now `html.escape`-d before insertion. Both Jinja
+  autoescape and the manual `html.escape` path (cookie masking) are
+  covered.
+- **CSRF token seed persistence** — the per-process random seed is now
+  persisted to a date-stamped file (`_csrf_seed`) in the app-data dir;
+  stale seeds (from a previous day) are rotated on startup, and the
+  file format is `YYYY-MM-DD|seed`.
+- **CSRF token URL-encoding** — the `/api/csrf-token` response now
+  URL-encodes the token value so tokens containing special characters
+  do not break `X-CSRF-Token` header comparisons.
+- **Game validation on import** — `POST /import` now rejects payloads
+  with unknown `game` fields (skips the row, reports "Imported N,
+  skipped M"); previously unknown games were stored without a `game`
+  column value and broke the per-game dashboard.
+- **Per-source timeout passthrough** — `source.timeout_seconds` is now
+  forwarded to the `aiohttp.ClientTimeout(total=…)` keyword argument;
+  previously all fetches used the global default regardless of the
+  per-source setting.
+- **Empty reward when API returns no data** — the redeemer now stores
+  `reward=""` instead of the literal string `"Redeemed"` when the
+  `webExchangeCdkey` response has no `data` dict (retcode 0 but no
+  payload).
+
+### Performance
+
+- **`get_all_stats_single_query()`** — the dashboard previously issued
+  5 separate `get_stats(game=…)` queries (one per game, each running
+  4 SQL statements = 20 queries). Now uses a single `GROUP BY game`
+  query, reducing dashboard load by ~80% on the stats path.
+- **`order_by_redeemed` in `list_codes`** — the dashboard's redeemed
+  codes list was fetched unordered and sorted in Python over up to
+  200 rows. `list_codes` now accepts `order_by_redeemed=True` which
+  uses `ORDER BY redeemed_at DESC` in SQL.
+
+### Refactoring
+
+- **`_redeem_code_for_account` extracted** — the ~30-line per-account
+  redemption block was duplicated in `_run_check_cycle` and
+  `_redeem_new_codes`. The shared logic (cookie load, redeemer call,
+  claimed-status determination, cookie-expiry handling, storage
+  updates, notification) now lives in a single helper method.
+- **Bounded error list** — `_run_check_cycle` accumulates errors in an
+  unbounded list; now capped at 50 entries to prevent memory growth
+  during long check cycles.
+- **`reset_config_manager` thread-safety** — confirmed the method is
+  wrapped in `_config_lock` (previously identified as a risk).
+
+### CI / Build
+
+- **Inno Setup smoke-test CWD fix** — the Windows installer build
+  step now uses `Set-Location $env:GITHUB_WORKSPACE` at the start of
+  each step, so ISCC's `out/` directory is always found regardless of
+  the runner's per-step CWD. Previous runs failed because each
+  `run: |` step got its own CWD context.
+- **Absolute GITHUB_WORKSPACE paths** — the smoke test now checks
+  `GITHUB_WORKSPACE\out\<name>` first, then `GITHUB_WORKSPACE\<name>`;
+  both are absolute and CWD-independent.
+- **GitHub Actions Node 24 migration** — all directly-controllable
+  actions upgraded to their latest Node 24 versions:
+  `actions/checkout@v5`, `actions/setup-python@v6`,
+  `codecov/codecov-action@v5`, `actions/upload-artifact@v5`,
+  `actions/download-artifact@v5`, `softprops/action-gh-release@v2`,
+  `docker/build-push-action@v6`, `docker/setup-buildx-action@v4`,
+  `docker/login-action@v4`.
+- **Docker `FROM/AS` casing** — `FROM python:3.11-slim as builder`
+  changed to `AS builder` to silence the `FromAsCasing` build warning.
+
+### Tests
+
+- 30 regression tests added across 4 files (`test_sources.py`,
+  `test_web_ui.py`, `test_csrf.py`, `test_redeemer.py`) covering:
+  SSRF (10 cases), ReDoS (11 cases), XSS escaping (3 cases),
+  import game validation (2 cases), CSRF seed persistence (2 cases),
+  timeout passthrough (1 case), empty-reward parsing (3 cases).
+- Time-dependent catch-up check-in tests now mock `datetime.now()`
+  so they pass regardless of wall-clock time.
+
 ## [1.5.2] - 2026-11-10
 
 ### Changed

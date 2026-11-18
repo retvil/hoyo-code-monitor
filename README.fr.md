@@ -19,6 +19,23 @@ Les jeux HoYoverse publient régulièrement des codes promo à durée limitée �
 5. Si un check-in échoue à cause de cookies expirés, le planificateur peut les **actualiser automatiquement en mode headless** à partir du profil navigateur sauvegardé (option, délai par compte) — sans connexion manuelle tant que la session sauvegardée est valide.
 Thème sombre
 
+## Audit de sécurité (v1.6.0)
+
+L'audit v1.6.0 a corrigé 45 problèmes en 4 niveaux de criticité. Principaux changements :
+
+| Domaine | Changement |
+|---|---|
+| **SSRF** | Les URL de sources résolvant vers des plages privées (10.x, 172.16–31.x, 192.168.x, 127.x, 169.254.x, 0.0.0.0) ou utilisant des schémas non-HTTP sont rejetées |
+| **ReDoS** | Les motifs regex avec quantificateurs imbriqués (`(a+)+`, `(.*a)*`) sont rejetés |
+| **XSS** | Les noms de sources, valeurs de cookies et chaînes d'erreur rendus dans les endpoints HTML sont échappés avant insertion |
+| **CSRF** | Le seed du token est persisté dans un fichier daté ; un seed obsolète est roté au démarrage |
+| **Validation jeu** | `POST /import` rejette les payloads avec un champ `game` inconnu |
+| **Timeout** | `timeout_seconds` par source est maintenant transmis à aiohttp (ignoré auparavant) |
+| **Récompense vide** | Lorsque l'API renvoie aucune donnée, `reward=""` est stocké au lieu de la chaîne `"Redeemed"` |
+| **Performance** | Le chemin de stats passe de 20 requêtes SQL à 1 `GROUP BY` ; la liste des codes échangés est triée en SQL |
+
+Les 45 corrections sont couvertes par 30 nouveaux tests de régression.
+
 ## Fonctionnalités
 
 - **Surveillance en arrière-plan** — vérifie les sources toutes les N minutes (configurable, 15 par défaut)

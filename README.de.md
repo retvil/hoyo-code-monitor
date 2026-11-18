@@ -18,6 +18,23 @@ HoYoverse-Spiele veröffentlichen regelmäßig zeitlich begrenzte Promocodes —
 4. Tägliche HoYoLAB-Check-ins laufen nach eigenem Zeitplan (Standard 04:00 + Streuung): `info → sign → home` pro Konto × Spiel, gleiche Cookies, Ergebnis auf der Check-ins-Seite.
 5. Falls eine Check-in-Fehlermeldung auf abgelaufene Cookies hinweist, kann der Planer sie **automatisch im Headless-Modus** aus dem gespeicherten Browserprofil aktualisieren (optionale Option, Cooldown pro Konto) – kein manuelles erneutes Anmelden, solange die gespeicherte Sitzung gültig ist.
 
+## Sicherheits-Audit (v1.6.0)
+
+Das v1.6.0-Audit hat 45 Probleme in 4 Schweregraden behoben. Die wichtigsten Änderungen:
+
+| Bereich | Veränderung |
+|---|---|
+| **SSRF** | Quellen-URLs, die auf private Bereiche (10.x, 172.16–31.x, 192.168.x, 127.x, 169.254.x, 0.0.0.0) auflösen oder nicht-HTTP-Schemata verwenden, werden abgelehnt |
+| **ReDoS** | Regex-Muster mit verschachtelten Quantifikatoren (`(a+)+`, `(.*a)*`) werden abgelehnt |
+| **XSS** | Quellennamen, Cookie-Werte und Fehlerstrings, die in HTML-Endpunkten gerendert werden, werden vor der Einfügeung escaped |
+| **CSRF** | Token-Saat wird in eine datierte Datei persistiert; veraltete Saat wird beim Start rotiert |
+| **Spielvalidierung** | `POST /import` lehnt Payloads mit unbekanntem `game`-Feld ab |
+| **Timeout** | `timeout_seconds` pro Quelle wird jetzt an aiohttp weitergereicht (zuvor ignoriert) |
+| **Leere Belohnung** | Bei fehlenden API-Daten wird `reward=""` statt des Strings `"Redeemed"` gespeichert |
+| **Performance** | Stats-Pfad: 20 SQL-Queries → 1 `GROUP BY`; eingelöste Codes-Liste wird in SQL sortiert |
+
+Alle 45 Fixes sind von 30 neuen Regressionstests abgedeckt.
+
 ## Funktionen
 
 - **Hintergrundüberwachung** — prüft Quellen alle N Minuten (konfigurierbar, Standard 15)

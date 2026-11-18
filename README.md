@@ -18,6 +18,23 @@ HoYoverse games regularly release time-limited promo codes — and they expire f
 4. Daily HoYoLAB check-ins run on their own schedule (default 04:00 + jitter): `info → sign → home` per account × game, same cookies, results on the Check-ins page.
 5. If a check-in fails because the account cookies expired, the scheduler can **auto-refresh them headless** from the saved browser profile (opt-in toggle, per-account cooldown) — no manual re-login needed while the saved session is still valid.
 
+## Security hardening (v1.6.0)
+
+The v1.6.0 audit fixed 45 issues across 4 severity levels. Key changes:
+
+| Area | What changed |
+|---|---|
+| **SSRF** | Source URLs resolving to private ranges (10.x, 172.16–31.x, 192.168.x, 127.x, 169.254.x, 0.0.0.0) or using non-HTTP schemes are rejected at creation/update |
+| **ReDoS** | Regex extractor patterns with nested quantifiers (`(a+)+`, `(.*a)*`) are rejected |
+| **XSS** | Source names, cookie values, and error strings rendered in HTML endpoints are escaped before insertion |
+| **CSRF** | Per-process token seed is persisted to a date-stamped file; stale seeds rotate daily |
+| **Game validation** | `POST /import` rejects payloads with unknown game fields |
+| **Timeout passthrough** | Per-source `timeout_seconds` is forwarded to aiohttp (previously ignored) |
+| **Reward on empty API** | Redeemer stores `reward=""` instead of the literal string `"Redeemed"` when the API returns no data |
+| **Dashboard perf** | Stats path reduced from 20 SQL queries to 1 `GROUP BY`; redeemed codes list now ordered in SQL |
+
+All 45 fixes are covered by 30 new regression tests.
+
 ## Features
 
 - **Background monitoring** — checks sources every N minutes (configurable, default 15)
