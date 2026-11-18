@@ -289,5 +289,87 @@ class TestMiscApi:
         assert Storage(temp_db).get_code("MOCKCODE1")["redeemed"] == 1
 
 
+class TestXssEscaping:
+    """Regression: user-supplied names/cookie values must be escaped in HTML responses."""
+
+    def test_source_name_with_script_tag_is_escaped(self, client: TestClient, temp_db: str) -> None:
+        """A source name containing a script tag must not appear unescaped on the /sources page.
+
+        Guards the audit finding that reflected user input in Jinja templates was
+        escaped (autoescape is on for .html). If a future refactor switches to
+        raw/unsafe rendering, this test will catch it.
+        """
+        s = Storage(temp_db)
+        s.add_source(
+            "<script>alert(1)</script>",
+            "https://example.com",
+            "css",
+            ".code",
+        )
+        r = client.get("/sources")
+        assert r.status_code == 200
+        assert "<script>alert(1)</script>" not in r.text
+        # The escaped form must be present (proves it was escaped, not deleted)
+        assert "&lt;script&gt;alert(1)&lt;/script&gt;" in r.text
+
+    def test_cookie_value_with_script_tag_is_escaped(
+        self, client: TestClient, temp_db: str
+    ) -> None:
+        """Cookie names/values containing script tags must not appear unescaped
+        in the /accounts/{name}/cookies response."""
+        s = Storage(temp_db)
+        s.add_account("cookie_xss", "9", "os_usa")
+        s.store_account_cookies("cookie_xss", {"<script>alert(2)</script>": "value"})
+        r = client.get("/accounts/cookie_xss/cookies")
+        assert r.status_code == 200
+        assert "<script>alert(2)</script>" not in r.text
+        assert "&lt;script&gt;alert(2)&lt;/script&gt;" in r.text
+
+    def test_cookie_value_with_script_tag_shows_masked_escaped(
+        self, client: TestClient, temp_db: str
+    ) -> None:
+        """Long cookie values are masked, but the mask result must still be escaped."""
+        s = Storage(temp_db)
+        s.add_account("cookie_mask", "9", "os_usa")
+        malicious_long_value = "A" * 50 + "<script>alert(3)</script>"
+        s.store_account_cookies("cookie_mask", {"longkey": malicious_long_value})
+        r = client.get("/accounts/cookie_mask/cookies")
+        assert r.status_code == 200
+        # The raw value must not appear in the HTML response
+        assert "<script>alert(3)</script>" not in r.text
+
+
+class TestImportGameData:
+    """Regression: import_data must reject items with unknown game ids."""
+
+    def test_import_skips_invalid_game(self, client: TestClient, temp_db: str) -> None:
+        """A code whose game field is not in GAMES is skipped, not imported."""
+        payload = {
+            "app": "genshin-code-monitor",
+            "version": 1,
+            "codes": [
+                {"code": "INVALIDGAME1", "game": "unknown_game", "sources": ["test"]},
+            ],
+        }
+        r = client.post("/import", data={"payload": json.dumps(payload)})
+        assert r.status_code == 200
+        assert "Imported 0, skipped 1" in r.json()["result"]
+        assert Storage(temp_db).get_code("INVALIDGAME1") is None
+
+    def test_import_accepts_valid_game(self, client: TestClient, temp_db: str) -> None:
+        """A code with game='hsr' is imported normally."""
+        payload = {
+            "app": "genshin-code-monitor",
+            "version": 1,
+            "codes": [
+                {"code": "VALIDHSR1", "game": "hsr", "sources": ["test"]},
+            ],
+        }
+        r = client.post("/import", data={"payload": json.dumps(payload)})
+        assert r.status_code == 200
+        assert "Imported 1, skipped 0" in r.json()["result"]
+        assert Storage(temp_db).get_code("VALIDHSR1", game="hsr") is not None
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

@@ -232,5 +232,60 @@ class TestRotation:
         assert web_ui._csrf_token() != web_ui._CSRF_SEED
 
 
+class TestCsrfSeedPersistence:
+    """Regression: the on-disk seed is replaced after a UTC-day rollover."""
+
+    @pytest.mark.usefixtures("client")
+    def test_stale_seed_is_replaced(self, monkeypatch, tmp_path) -> None:
+        """A seed file from yesterday's UTC date is rewritten, not reused.
+
+        Guards ``_load_or_create_csrf_seed``: the stored format is
+        ``<date>|<seed>`` and a date that no longer matches today must not
+        be loaded.
+        """
+        from datetime import UTC, datetime, timedelta
+
+        from src import web_ui
+
+        monkeypatch.setenv("HCM_DATA_DIR", str(tmp_path))
+        try:
+            today = datetime.now(UTC).strftime("%Y-%m-%d")
+            yesterday = (datetime.now(UTC) - timedelta(days=1)).strftime("%Y-%m-%d")
+            stale_seed = "stale-seed-value-that-is-not-todays-seed"
+            seed_file_in_tmp = tmp_path / web_ui._CSRF_SEED_FILE
+            seed_file_in_tmp.write_text(f"{yesterday}|{stale_seed}", encoding="utf-8")
+
+            new_seed = web_ui._load_or_create_csrf_seed()
+
+            # The stale seed must not be returned.
+            assert new_seed != stale_seed
+            # The file was rewritten with today's date.
+            raw = seed_file_in_tmp.read_text(encoding="utf-8").strip()
+            stored_date, stored_seed = raw.split("|", 1)
+            assert stored_date == today
+            assert stored_seed == new_seed
+        finally:
+            monkeypatch.delenv("HCM_DATA_DIR", raising=False)
+
+    @pytest.mark.usefixtures("client")
+    def test_today_seed_is_reused(self, monkeypatch, tmp_path) -> None:
+        """A seed file matching today's date is loaded without being replaced."""
+        from datetime import UTC, datetime
+
+        from src import web_ui
+
+        monkeypatch.setenv("HCM_DATA_DIR", str(tmp_path))
+        today = datetime.now(UTC).strftime("%Y-%m-%d")
+        known_seed = "k" * 40
+        seed_file_in_tmp = tmp_path / web_ui._CSRF_SEED_FILE
+        seed_file_in_tmp.write_text(f"{today}|{known_seed}", encoding="utf-8")
+
+        try:
+            loaded = web_ui._load_or_create_csrf_seed()
+            assert loaded == known_seed
+        finally:
+            monkeypatch.delenv("HCM_DATA_DIR", raising=False)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

@@ -230,8 +230,36 @@ class TestRedeemerParseResponse:
         assert result.message == "OK"
 
     def test_parse_response_missing_data(self, redeemer: Redeemer) -> None:
-        """Test parsing response with missing data field."""
+        """Test parsing response with missing data field.
+
+        Regression: when retcode==0 but ``data`` is absent or empty the reward
+        must be stored as ``""`` — not the placeholder string ``"Redeemed"`` —
+        so downstream consumers can distinguish "reward unknown" from
+        "reward literally named Redeemed".
+        """
         response = {"retcode": 0, "message": "OK"}
+        result = redeemer._parse_response(response)
+        assert result.success is True
+        assert result.reward == ""
+
+    def test_parse_response_empty_data_dict(self, redeemer: Redeemer) -> None:
+        """Regression: retcode==0 with an empty ``data`` dict also yields reward=''.
+
+        Guards the fix that replaces the old ``reward="Redeemed"`` default with
+        ``reward=""`` when the API returns success without reward payload.
+        """
+        response = {"retcode": 0, "message": "OK", "data": {}}
+        result = redeemer._parse_response(response)
+        assert result.success is True
+        assert result.reward == ""
+
+    def test_parse_response_no_data_at_all(self, redeemer: Redeemer) -> None:
+        """Regression: retcode==0 with no ``data`` key at all yields reward=''.
+
+        The key must be absent entirely, not just empty — mirrors the
+        Hoyolab shape where a successful redemption sometimes omits ``data``.
+        """
+        response = {"retcode": 0, "message": "Success"}
         result = redeemer._parse_response(response)
         assert result.success is True
         assert result.reward == ""

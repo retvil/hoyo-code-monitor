@@ -6,8 +6,10 @@ import asyncio
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
 
+import aiohttp
 import pytest
 
+from src.exceptions import SourceValidationError
 from src.sources import (
     EXTRACTORS,
     SOURCE_PRESETS,
@@ -17,10 +19,12 @@ from src.sources import (
     SourceConfig,
     SourceFetcher,
     XPathExtractor,
+    _validate_regex_safety,
     get_extractor,
     list_presets,
     register_extractor,
     seed_default_sources,
+    validate_source_url,
 )
 
 if TYPE_CHECKING:
@@ -611,6 +615,126 @@ class TestSeedDefaultSources:
         urls = [s["url"] for s in storage.list_sources()]
         assert len(urls) == len(set(urls))
         assert count == len(SOURCE_PRESETS) - 1
+
+
+class TestSSRFProtection:
+    """Regression: source URLs must not reach private/reserved ranges."""
+
+    @pytest.mark.parametrize(
+        ("url", "expected_ip"),
+        [
+            ("http://127.0.0.1:8000/admin", "127.0.0.1"),
+            ("http://10.0.0.5/secret", "10.0.0.5"),
+            ("https://172.16.0.1/lan", "172.16.0.1"),
+            ("https://172.31.255.255/lan", "172.31.255.255"),
+            ("http://192.168.1.1/router", "192.168.1.1"),
+            ("http://169.254.169.254/latest/meta-data/", "169.254.169.254"),
+            ("http://0.0.0.0/", "0.0.0.0"),
+        ],
+    )
+    def test_private_ips_rejected(self, url: str, expected_ip: str, monkeypatch) -> None:
+        """IP-literal URLs inside the blocked ranges raise before any network call.
+
+        The resolver is stubbed to *succeed* (returning the literal IP), so the
+        failure under test is the blocked-range check itself, not DNS.
+        """
+        import src.sources as sources_module
+
+        real_getaddrinfo = sources_module.socket.getaddrinfo
+
+        def fake_getaddrinfo(_host, _port):
+            return [real_getaddrinfo(expected_ip, None)[0]]
+
+        monkeypatch.setattr("src.sources.socket.getaddrinfo", fake_getaddrinfo)
+        with pytest.raises(SourceValidationError, match="private/reserved"):
+            validate_source_url(url)
+
+    @pytest.mark.parametrize("url", ["file:///etc/passwd", "ftp://ftp.example.com/code.json"])
+    def test_non_http_schemes_rejected(self, url: str) -> None:
+        """Only http/https may be fetched; file:// and ftp:// are rejected."""
+        with pytest.raises(SourceValidationError, match="scheme"):
+            validate_source_url(url)
+
+    def test_public_url_accepted(self, monkeypatch) -> None:
+        """A public IP outside the blocked ranges passes the SSRF gate."""
+        import src.sources as sources_module
+
+        real_getaddrinfo = sources_module.socket.getaddrinfo
+
+        def fake_getaddrinfo(_host, _port):
+            return [real_getaddrinfo("8.8.8.8", None)[0]]
+
+        monkeypatch.setattr("src.sources.socket.getaddrinfo", fake_getaddrinfo)
+        validate_source_url("https://example.com/codes.json")  # must not raise
+
+
+class TestRegexSafety:
+    """Regression: nested-quantifier patterns must be rejected (ReDoS guard)."""
+
+    @pytest.mark.parametrize(
+        "pattern",
+        [
+            r"(a+)+",
+            r"(.*a)*",
+            r"(a+b)+c*",
+            r"(\d+\d+)+",
+            r"(a*b*){2,4}",
+        ],
+    )
+    def test_nested_quantifiers_rejected(self, pattern: str) -> None:
+        with pytest.raises(SourceValidationError, match="nested quantifiers"):
+            _validate_regex_safety(pattern)
+
+    @pytest.mark.parametrize(
+        "pattern",
+        [
+            r"\w{4,8}",
+            r"\S+",
+            r"\b[A-Z0-9]{10,}\b",
+            r"promo-(\d{6})",
+        ],
+    )
+    def test_safe_patterns_accepted(self, pattern: str) -> None:
+        _validate_regex_safety(pattern)  # must not raise
+
+    @pytest.mark.parametrize("pattern", [r"(a+)+", r"(.*a)*"])
+    def test_regex_extractor_refuses_dangerous_pattern(self, pattern: str) -> None:
+        """The guard is enforced at extraction time, not only at compile time."""
+        extractor = RegexExtractor()
+        with pytest.raises(SourceValidationError):
+            extractor.extract("text", pattern)
+
+
+class TestTimeoutPassthrough:
+    """Regression: SourceConfig.timeout_seconds must reach the aiohttp request."""
+
+    @pytest.mark.asyncio
+    async def test_timeout_reaches_aiohttp(self, storage: Storage, monkeypatch) -> None:
+        def _noop_validate(_url: str) -> None:
+            return None
+
+        monkeypatch.setattr("src.sources.validate_source_url", _noop_validate)
+        source = SourceConfig(
+            name="t",
+            url="https://example.com",
+            selector_type="css",
+            selector=".code",
+            timeout_seconds=17,
+        )
+        mock_response = AsyncMock()
+        mock_response.text = AsyncMock(return_value='<html><div class="code">ABCDEF12</div></html>')
+        mock_response.raise_for_status = MagicMock()
+        mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_response.__aexit__ = AsyncMock(return_value=None)
+        mock_session = MagicMock()
+        mock_session.get = MagicMock(return_value=mock_response)
+
+        fetcher = SourceFetcher(storage, session=mock_session)
+        codes = await fetcher.fetch_source(source)
+
+        assert "ABCDEF12" in codes
+        expected_timeout = aiohttp.ClientTimeout(total=17)
+        assert mock_session.get.call_args.kwargs["timeout"] == expected_timeout
 
 
 if __name__ == "__main__":
