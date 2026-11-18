@@ -21,6 +21,7 @@ src/config.py                         @retvil
 
 # Build, packaging, release
 genshin-code-monitor.spec             @retvil
+installer.iss                         @retvil
 installer.nsi                         @retvil
 pyproject.toml                        @retvil
 requirements.txt                      @retvil

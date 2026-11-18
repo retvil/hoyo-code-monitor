@@ -86,7 +86,7 @@ v1.6.0の監査で45件を4つの重要度レベルにわたり修正しまし�
 
 [Releases](https://github.com/retvil/hoyo-code-monitor/releases) からインストーラをダウンロード:
 
-- **Windows** — `hoyo-code-monitor-1.4.0-setup.exe` (ユーザー単位インストール、管理者権限不要)
+- **Windows** — `hoyo-code-monitor-1.5.2-setup.exe` (ユーザー単位インストール、管理者権限不要)
 
 サイレントインストール: `setup.exe /S`。コンポーネント: デスクトップショートカット、Windows自動起動 (どちらもデフォルトでオン)。
 

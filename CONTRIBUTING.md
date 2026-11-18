@@ -30,9 +30,9 @@ All three must be green before opening a PR.
 ## Release checklist (maintainer)
 
 1. Bump `APP_VERSION` in `src/constants.py`, `version` in `pyproject.toml`,
-   `!define APP_VERSION` in `installer.nsi` (all three must match).
+   and `MyAppVersion` in `installer.iss` (all three must match).
 2. Update `CHANGELOG.md` (Keep a Changelog format).
-3. Build locally: `pyinstaller genshin-code-monitor.spec --clean && makensis installer.nsi`.
+3. Build locally: `pyinstaller genshin-code-monitor.spec --clean && iscc /DMyAppVersion=<ver> installer.iss`.
 4. Run `pytest` + `ruff` + `mypy` once more.
 5. `git tag v<version> && git push --tags` — CI creates a draft release;
    review and publish from the GitHub UI.

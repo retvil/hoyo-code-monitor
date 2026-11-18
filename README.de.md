@@ -86,7 +86,7 @@ Alle 45 Fixes sind von 30 neuen Regressionstests abgedeckt.
 
 Installer aus [Releases](https://github.com/retvil/hoyo-code-monitor/releases) herunterladen:
 
-- **Windows** — `hoyo-code-monitor-1.4.0-setup.exe` (Installation pro Benutzer, keine Adminrechte nötig)
+- **Windows** — `hoyo-code-monitor-1.5.2-setup.exe` (Installation pro Benutzer, keine Adminrechte nötig)
 
 Stille Installation: `setup.exe /S`. Komponenten: Desktop-Verknüpfung, Windows-Autostart (beide standardmäßig an).
 
