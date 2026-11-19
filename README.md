@@ -79,15 +79,90 @@ All 45 fixes are covered by 30 new regression tests.
 | `api.ennead.cc` (x2 endpoints) | JSON API | Working |
 | Pocket Tactics, TheClick, Eurogamer, MMO Culture, Playnforge | CSS guides | Working |
 
-## Ready builds
+## Install from the installer
 
-Download the installer from [Releases](https://github.com/retvil/hoyo-code-monitor/releases):
+Download the latest release from [GitHub Releases](https://github.com/retvil/hoyo-code-monitor/releases):
 
-- **Windows** — `hoyo-code-monitor-1.5.2-setup.exe` (per-user install, no admin rights needed)
+| File | Description |
+|---|---|
+| `hoyo-code-monitor-X.Y.Z-setup.exe` | Inno Setup installer (per-user, no admin rights needed) |
 
-Silent install: `setup.exe /S`. Components: desktop shortcut, Windows autostart (both on by default).
+### Interactive install
 
-> **Note:** On first browser login the app downloads Chromium (~170MB, one-time).
+1. Run the `.exe` — it asks where to install (default: `C:\Users\<you>\AppData\Local\Programs\hoyo-code-monitor`)
+2. Click **Next** — two components are included:
+   - **Desktop shortcut** — create a desktop icon
+   - **Windows autostart** — launch the tray app on login
+3. Click **Install** — done in ~30 s. The app starts automatically in the system tray.
+
+### Silent install (scriptable / GPO / SCCM)
+
+```powershell
+# Per-user install, no prompts
+hoyo-code-monitor-1.5.3-setup.exe /S
+
+# Install to a specific directory
+hoyo-code-monitor-1.5.3-setup.exe /S /D=C:\Games\HoYoMonitor
+
+# No desktop shortcut, no autostart
+hoyo-code-monitor-1.5.3-setup.exe /S /desktop=no /startup=no
+```
+
+### Uninstall
+
+- **Control Panel** → Programs and Features → "HoYo Code Monitor" → Uninstall
+- **Silent**: `uninstall.exe /S` (created by the installer in the install dir)
+- Or delete the install folder and the registry key `HKCU\Software\HoYoCodeMonitor`
+
+### Data locations (persist across uninstall/reinstall)
+
+| What | Location |
+|---|---|
+| SQLite database | `%LOCALAPPDATA%\HoYoCodeMonitor\monitor.db` |
+| `config.toml` (settings, source definitions) | `%LOCALAPPDATA%\HoYoCodeMonitor\config.toml` |
+| Encrypted Fernet key | OS keyring (Windows Credential Manager) |
+| Logs | `%LOCALAPPDATA%\HoYoCodeMonitor\logs\` |
+| Browser profile (Playwright Chromium) | `%LOCALAPPDATA%\HoYoCodeMonitor\browser-profile\` |
+
+Back up `data/` + `config.toml` before a major version upgrade.
+
+---
+
+## Auto-update
+
+The app checks for new releases on startup (configurable via `update_check_enabled = false` in `config.toml`). A banner appears in the dashboard when a newer release is available.
+
+### Manual auto-update script
+
+`auto-update.ps1` (in this repo, or download from the release) downloads the latest installer, stops running instances, installs silently, and restarts the app:
+
+```powershell
+# One-off update
+powershell -ExecutionPolicy Bypass -File auto-update.ps1
+```
+
+### Scheduled auto-update (Windows Task Scheduler)
+
+Run the script daily at 03:00 so the app self-updates without user interaction:
+
+```powershell
+# Create the scheduled task (run as admin once)
+schtasks /create ^
+  /tn "HoYoCodeMonitorUpdate" ^
+  /sc daily /st 03:00 ^
+  /ru SYSTEM ^
+  /tr "powershell -ExecutionPolicy Bypass -File \"C:\Scripts\auto-update.ps1\"" ^
+  /f
+
+# Verify
+schtasks /query /tn "HoYoCodeMonitorUpdate"
+
+# Remove
+schtasks /delete /tn "HoYoCodeMonitorUpdate" /f
+```
+
+> The script is idempotent: if the installed version already matches the latest
+> release tag, it exits without downloading anything.
 
 ## Quick start
 
