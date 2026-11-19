@@ -1,43 +1,38 @@
 # Changelog
 
-## [Unreleased] — security & reliability audit
+## [1.5.3] — 2026-11-19 — release
 
-### Security
+### Added
 
-**45 issues fixed across Critical / High / Medium / Low severity. All have
-regression tests (30 new tests, full suite: 507 passed, 1 skipped).**
+- **Styled redemption result** — `/codes/{code}/redeem` and `/redeem/all` now
+  return an HTML fragment (when `HX-Request: true`) with a `.redeem-result-ok`
+  (green) or `.redeem-result-err` (red) badge, plus a floating toast
+  notification in the bottom-right corner (4s success, 8s error). Both inline
+  badge and toast show the account name + reward/error message.
 
-- **SSRF in source fetching** — source URLs that resolve to private ranges
-  (`10.x`, `172.16–31.x`, `192.168.x`, `127.x`, `169.254.x`, `0.0.0.0`)
-  or use non-HTTP schemes (`file://`, `ftp://`) are now rejected at
-  validation time (`sources.validate_source_url`).
-- **ReDoS in regex extractors** — patterns with nested quantifiers
-  (`(a+)+`, `(.*a)*`, `(\d+\d+)+`) are rejected when creating or updating
-  regex-type sources.
-- **XSS in HTML endpoints** — source names, cookie values, and error
-  strings rendered in `/sources`, `/accounts/{name}/cookies`, and other
-  HTML endpoints are now `html.escape`-d before insertion. Both Jinja
-  autoescape and the manual `html.escape` path (cookie masking) are
-  covered.
-- **CSRF token seed persistence** — the per-process random seed is now
-  persisted to a date-stamped file (`_csrf_seed`) in the app-data dir;
-  stale seeds (from a previous day) are rotated on startup, and the
-  file format is `YYYY-MM-DD|seed`.
-- **CSRF token URL-encoding** — the `/api/csrf-token` response now
-  URL-encodes the token value so tokens containing special characters
-  do not break `X-CSRF-Token` header comparisons.
-- **Game validation on import** — `POST /import` now rejects payloads
-  with unknown `game` fields (skips the row, reports "Imported N,
-  skipped M"); previously unknown games were stored without a `game`
-  column value and broke the per-game dashboard.
-- **Per-source timeout passthrough** — `source.timeout_seconds` is now
-  forwarded to the `aiohttp.ClientTimeout(total=…)` keyword argument;
-  previously all fetches used the global default regardless of the
-  per-source setting.
-- **Empty reward when API returns no data** — the redeemer now stores
-  `reward=""` instead of the literal string `"Redeemed"` when the
-  `webExchangeCdkey` response has no `data` dict (retcode 0 but no
-  payload).
+- **PROJECT_OVERVIEW.md** — project purpose, 8 key scenarios, architecture
+  diagram, module map, data model, technology stack rationale, 10 key
+  invariants, and critical known issues (C-1 through C-4) documented.
+
+### Security (from 45-issue audit, released here)
+
+- SSRF source-URL validation (reject private ranges + non-HTTP schemes)
+- ReDoS guard for regex source patterns
+- XSS: `html.escape` on all user-controlled values in HTML endpoints
+- CSRF seed persisted to date-stamped file; stale seeds rotated on startup
+- CSRF token URL-encoded in `/api/csrf-token` response
+- Game field validated on `/import` (unknown games skipped, not stored)
+- Per-source `timeout_seconds` forwarded to `aiohttp.ClientTimeout`
+- Empty reward stored as `""` not literal `"Redeemed"` when API returns no data
+- `_safe_detail` scrubs cookie/token patterns from all log messages
+- `storage.save_source` validates `enabled` is boolean
+- `web_ui.delete_account` validates account exists before deleting
+- `web_ui` login guard uses `secrets.compare_digest` for timing-safe compare
+- `system_notify` WinRT COM errors no longer leak stack traces to console
+- `tray.py` web-server thread joined cleanly on `SystemExit` / `KeyboardInterrupt`
+- `cookies_login` Playwright browser closed in `finally` block
+- `update_checker` polls GitHub with 5s timeout, never raises
+- `config.py` Fernet key fallback path `data/.key` deprecated (legacy only)
 
 ### Performance
 
