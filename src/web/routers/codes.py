@@ -110,6 +110,7 @@ async def redeem_all_codes(request: Request) -> dict[str, Any] | HTMLResponse:
     gap = int(storage.get_config("redemption_min_gap_seconds", "8") or 8)
     done, failed = 0, 0
     from src.web.services.redemption import RedemptionService
+
     redeemer = Redeemer()
     svc = RedemptionService(storage=storage, redeemer=redeemer)
     async with redeemer:

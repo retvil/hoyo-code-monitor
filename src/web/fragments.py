@@ -24,10 +24,7 @@ def render_result_fragment(
         ``data-toast`` and ``data-toast-ok`` attributes for the client-side
         toast handler.
     """
-    items = [
-        f"{r['account']}: {'✓' if r['ok'] else '✗'} {r['msg']}"
-        for r in results
-    ]
+    items = [f"{r['account']}: {'✓' if r['ok'] else '✗'} {r['msg']}" for r in results]
     text = "; ".join(items)
     cls = "redeem-result-ok" if ok else "redeem-result-err"
     return (

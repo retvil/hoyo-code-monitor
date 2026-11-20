@@ -10,20 +10,18 @@ class TestRenderResultFragment:
         results = [{"account": "main", "ok": True, "msg": "OK"}]
         html = render_result_fragment(results, True)
         assert 'class="redeem-result-ok"' in html
-        assert "data-toast-ok=\"true\"" in html
+        assert 'data-toast-ok="true"' in html
         assert "main: ✓ OK" in html
 
     def test_single_failure(self) -> None:
         results = [{"account": "main", "ok": False, "msg": "expired"}]
         html = render_result_fragment(results, False)
         assert 'class="redeem-result-err"' in html
-        assert "data-toast-ok=\"false\"" in html
+        assert 'data-toast-ok="false"' in html
         assert "main: ✗ expired" in html
 
     def test_html_injection_is_escaped(self) -> None:
-        results = [
-            {"account": "<script>alert(1)</script>", "ok": True, "msg": "OK"}
-        ]
+        results = [{"account": "<script>alert(1)</script>", "ok": True, "msg": "OK"}]
         html = render_result_fragment(results, True)
         # The raw script tag must not appear
         assert "<script>" not in html

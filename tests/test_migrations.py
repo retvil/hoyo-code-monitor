@@ -92,8 +92,7 @@ class TestMigrationV17Indexes:
         """After running all migrations to v17, both new indexes exist."""
         with sqlite3.connect(fresh_db) as conn:
             idx_names = {
-                row[0]
-                for row in conn.execute("SELECT name FROM sqlite_master WHERE type='index'")
+                row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='index'")
             }
             assert "idx_codes_unredeemed" in idx_names
             assert "idx_redemption_log_code_acc" in idx_names
@@ -104,8 +103,7 @@ class TestMigrationV17Indexes:
         with sqlite3.connect(fresh_db) as conn:
             conn.executescript(down_sql)
             idx_names = {
-                row[0]
-                for row in conn.execute("SELECT name FROM sqlite_master WHERE type='index'")
+                row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='index'")
             }
             assert "idx_codes_unredeemed" not in idx_names
             assert "idx_redemption_log_code_acc" not in idx_names

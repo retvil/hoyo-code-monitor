@@ -276,6 +276,4 @@ def capture_cookies_sync(
     account_slug: str = "default",
 ) -> dict[str, str]:
     """Sync wrapper for capture_cookies."""
-    return asyncio.run(
-        capture_cookies(timeout_seconds=timeout_seconds, account_slug=account_slug)
-    )
+    return asyncio.run(capture_cookies(timeout_seconds=timeout_seconds, account_slug=account_slug))

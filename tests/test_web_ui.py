@@ -415,7 +415,9 @@ class TestImportGameData:
             mock_redeemer = AsyncMock()
             mock_redeemer.redeem_code = AsyncMock(
                 return_value=RedemptionResult(
-                    success=True, reward="100 Primogems", message="OK",
+                    success=True,
+                    reward="100 Primogems",
+                    message="OK",
                     raw_response={"retcode": 0},
                 )
             )
@@ -440,7 +442,10 @@ class TestImportGameData:
         mock_redeemer = AsyncMock()
         mock_redeemer.redeem_code = AsyncMock(
             return_value=RedemptionResult(
-                success=True, reward="R", message="OK", raw_response={"retcode": 0},
+                success=True,
+                reward="R",
+                message="OK",
+                raw_response={"retcode": 0},
             )
         )
         mock_redeemer.__aenter__ = AsyncMock(return_value=mock_redeemer)

@@ -429,6 +429,7 @@ class TestCatchUpMissedCheckins:
 
         scheduler = Scheduler(storage=storage)
         with patch.object(storage, "get_config", return_value="false"):
+
             async def run():
                 return await scheduler.catch_up_missed_checkins()
 
