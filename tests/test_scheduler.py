@@ -406,5 +406,35 @@ class TestSchedulerCheckCycle:
         assert "Network error" in result["errors"][0]
 
 
+class TestCatchUpMissedCheckins:
+    """Catch-up cooldown: only runs once per calendar day."""
+
+    def test_catch_up_skips_if_already_done_today(self, storage: Storage) -> None:
+        """If _last_checkin_date == today, catch_up_missed_checkins returns None."""
+        import asyncio
+        from datetime import date
+
+        scheduler = Scheduler(storage=storage)
+        scheduler._last_checkin_date = date.today().isoformat()
+
+        async def run():
+            return await scheduler.catch_up_missed_checkins()
+
+        result = asyncio.new_event_loop().run_until_complete(run())
+        assert result is None
+
+    def test_catch_up_skips_when_checkin_disabled(self, storage: Storage) -> None:
+        """If daily check-in is disabled in config, catch-up is skipped."""
+        import asyncio
+
+        scheduler = Scheduler(storage=storage)
+        with patch.object(storage, "get_config", return_value="false"):
+            async def run():
+                return await scheduler.catch_up_missed_checkins()
+
+            result = asyncio.new_event_loop().run_until_complete(run())
+        assert result is None
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

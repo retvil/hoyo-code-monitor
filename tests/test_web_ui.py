@@ -376,6 +376,98 @@ class TestImportGameData:
         assert "Imported 1, skipped 0" in r.json()["result"]
         assert Storage(temp_db).get_code("VALIDHSR1", game="hsr") is not None
 
+    def test_redeem_all_no_pending_codes(self, client: TestClient, temp_db: str) -> None:
+        """POST /redeem/all with no pending codes returns 'Nothing to redeem'."""
+        s = Storage(temp_db)
+        s.add_account("ra", "1", "os_usa")
+        s.set_account_redeem("ra", True)
+        s.add_code("CLAIMED1", "t1")
+        s.update_code_redemption("CLAIMED1", redeemed=True)
+
+        r = client.post("/redeem/all")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["success"] is True
+        assert "Nothing to redeem" in body["result"]
+
+    def test_redeem_all_no_accounts(self, client: TestClient, temp_db: str) -> None:
+        """POST /redeem/all with no accounts returns 400."""
+        s = Storage(temp_db)
+        s.add_code("CODE1", "t1")
+
+        r = client.post("/redeem/all")
+        assert r.status_code == 400
+
+    def test_redeem_all_htmx_fragment(self, client: TestClient, temp_db: str) -> None:
+        """HTMX request to /redeem/all returns a styled span fragment."""
+        from src.redeemer import RedemptionResult
+
+        s = Storage(temp_db)
+        s.add_account("ra", "1", "os_usa")
+        s.set_account_redeem("ra", True)
+        s.store_account_cookies("ra", {"ltuid": "1", "ltoken": "x"})
+        s.add_code("PENDING1", "t1")
+
+        # redeem_all filters list_codes(only_unredeemed=True) by display_status.
+        # Mock list_codes to return a row with display_status="pending".
+        fake_row = {"code": "PENDING1", "game": "genshin", "display_status": "pending"}
+        with patch.object(Storage, "list_codes", return_value=[fake_row]):
+            mock_redeemer = AsyncMock()
+            mock_redeemer.redeem_code = AsyncMock(
+                return_value=RedemptionResult(
+                    success=True, reward="100 Primogems", message="OK",
+                    raw_response={"retcode": 0},
+                )
+            )
+            mock_redeemer.__aenter__ = AsyncMock(return_value=mock_redeemer)
+            mock_redeemer.__aexit__ = AsyncMock(return_value=None)
+            with patch("src.redeemer.Redeemer", return_value=mock_redeemer):
+                r = client.post("/redeem/all", headers={"HX-Request": "true"})
+        assert r.status_code == 200
+        assert "text/html" in r.headers["content-type"]
+        assert "redeem-result-ok" in r.text
+
+    def test_redeem_single_htmx_fragment(self, client: TestClient, temp_db: str) -> None:
+        """HTMX request to /codes/{code}/redeem returns styled span."""
+        from src.redeemer import RedemptionResult
+
+        s = Storage(temp_db)
+        s.add_account("ra", "1", "os_usa")
+        s.set_account_redeem("ra", True)
+        s.store_account_cookies("ra", {"ltuid": "1", "ltoken": "x"})
+        s.add_code("MOCKCODE2", "t1")
+
+        mock_redeemer = AsyncMock()
+        mock_redeemer.redeem_code = AsyncMock(
+            return_value=RedemptionResult(
+                success=True, reward="R", message="OK", raw_response={"retcode": 0},
+            )
+        )
+        mock_redeemer.__aenter__ = AsyncMock(return_value=mock_redeemer)
+        mock_redeemer.__aexit__ = AsyncMock(return_value=None)
+        with patch("src.redeemer.Redeemer", return_value=mock_redeemer):
+            r = client.post("/codes/MOCKCODE2/redeem", headers={"HX-Request": "true"})
+        assert r.status_code == 200
+        assert "text/html" in r.headers["content-type"]
+        assert "redeem-result-ok" in r.text
+
+
+class TestBrowserProfileCollision:
+    """Regression C-2: per-account profile dirs must not collide."""
+
+    def test_two_accounts_get_different_profile_dirs(self) -> None:
+        from src.cookies_login import profile_dir
+
+        a = profile_dir("account-a")
+        b = profile_dir("account-b")
+        assert a != b
+
+    def test_profile_dir_contains_slug(self) -> None:
+        from src.cookies_login import profile_dir
+
+        d = profile_dir("my-game-account")
+        assert "my-game-account" in d
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
