@@ -725,17 +725,6 @@ SOURCE_PRESETS: dict[str, SourceConfig] = {
         max_retries=3,
         retry_base_delay=1.0,
     ),
-    "genshin_codes_github": SourceConfig(
-        name="genshin_codes_github",
-        url="https://raw.githubusercontent.com/GenshinCodeArchive/codes/main/codes.json",
-        selector_type="json",
-        selector="",
-        enabled=False,  # Repo removed (404 as of 2026-09)
-        timeout_seconds=30,
-        rate_limit_seconds=1.0,
-        max_retries=3,
-        retry_base_delay=1.0,
-    ),
     "hoyo_codes_hsr": SourceConfig(
         name="hoyo_codes_hsr",
         url="https://hoyo-codes.seria.moe/codes?game=hkrpg",
@@ -974,32 +963,16 @@ SOURCE_PRESETS: dict[str, SourceConfig] = {
         max_retries=3,
         retry_base_delay=1.0,
     ),
-    "discord_webhook": SourceConfig(
-        name="discord_webhook",
-        url="https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN",
-        selector_type="json",
-        selector="content",
-        enabled=False,  # Requires webhook URL configuration
-        headers={"Content-Type": "application/json"},
-        timeout_seconds=10,
-        rate_limit_seconds=1.0,
-        max_retries=3,
-        retry_base_delay=1.0,
-    ),
 }
 
 
 def get_preset(name: str) -> SourceConfig | None:
-    """Get a source preset by name."""
+    """Get a source preset by name (kept for test compatibility)."""
     return SOURCE_PRESETS.get(name)
 
 
 def list_presets() -> list[str]:
-    """List available source preset names.
-
-    Public extension point for custom-source/plugin use; not used by the
-    built-in fetch flow (which reads from SOURCE_PRESETS only via presets).
-    """
+    """List available source preset names (kept for test compatibility)."""
     return list(SOURCE_PRESETS.keys())
 
 
