@@ -1311,44 +1311,20 @@ async def redeem_single_code(code: str, request: Request) -> dict[str, Any] | HT
         raise HTTPException(status_code=400, detail="No accounts with auto-redeem enabled")
     gap = int(storage.get_config("redemption_min_gap_seconds", "8") or 8)
     results: list[dict[str, Any]] = []
+    from src.web.services.redemption import RedemptionService
+
     redeemer = Redeemer()
+    svc = RedemptionService(storage=storage, redeemer=redeemer)
     async with redeemer:
         for acc in accounts:
-            cookies = storage.load_account_cookies(acc["name"])
             try:
-                from src.constants import (
-                    GAME_CONF as _GC,
-                )
-
-                _ag = acc.get("game") or "genshin"
-                res = await redeemer.redeem_code(
-                    code=row["code"],
-                    cookies=cookies,
-                    uid=acc["uid"],
-                    region=acc["region"],
-                    game_biz=acc.get("game_biz") or _GC.get(_ag, _GC["genshin"])["game_biz"],
-                    lang=acc.get("lang", "en-us"),
-                    s_lang_key=acc.get("s_lang_key", "en-us"),
-                    game=_ag,
-                )
-                claimed = res.success or res.raw_response.get("retcode") in (-2017, -2018)
-                _rc = res.raw_response.get("retcode")
-                if _rc in (10001, -100):
-                    storage.set_account_cookie_state(acc["name"], "expired")
-                existing = storage.get_code(row["code"], game=row_game)
-                reward = res.reward if res.success else (existing or {}).get("reward")
-                storage.update_code_redemption(row["code"], claimed, reward, game=row_game)
-                storage.add_redemption_log(
-                    code=row["code"],
-                    account_id=acc["id"],
-                    status="success" if claimed else "failed",
-                    reward=res.reward if res.success else None,
-                    error_message=None
-                    if claimed
-                    else f"{res.message} (retcode {res.raw_response.get('retcode')})",
-                )
+                claimed = await svc.redeem_code_for_account(row["code"], acc)
                 results.append(
-                    {"account": acc["name"], "ok": claimed, "msg": "OK" if claimed else res.message}
+                    {
+                        "account": acc["name"],
+                        "ok": claimed,
+                        "msg": "OK" if claimed else "error found",
+                    }
                 )
             except Exception as e:
                 results.append({"account": acc["name"], "ok": False, "msg": str(e)})
@@ -1415,42 +1391,16 @@ async def redeem_all_codes(request: Request) -> dict[str, Any] | HTMLResponse:
         return {"success": True, "result": "Nothing to redeem"}
     gap = int(storage.get_config("redemption_min_gap_seconds", "8") or 8)
     done, failed = 0, 0
+    from src.web.services.redemption import RedemptionService
     redeemer = Redeemer()
+    svc = RedemptionService(storage=storage, redeemer=redeemer)
     async with redeemer:
         for row in codes:
             row_game = row.get("game") or "genshin"
             matched = [a for a in accounts if (a.get("game") or "genshin") == row_game] or accounts
             for acc in matched:
-                cookies = storage.load_account_cookies(acc["name"])
                 try:
-                    from src.constants import (
-                        GAME_CONF as _GC2,
-                    )
-
-                    _ag2 = acc.get("game") or "genshin"
-                    res = await redeemer.redeem_code(
-                        code=row["code"],
-                        cookies=cookies,
-                        uid=acc["uid"],
-                        region=acc["region"],
-                        game_biz=acc.get("game_biz") or _GC2.get(_ag2, _GC2["genshin"])["game_biz"],
-                        lang=acc.get("lang", "en-us"),
-                        s_lang_key=acc.get("s_lang_key", "en-us"),
-                        game=_ag2,
-                    )
-                    claimed = res.success or res.raw_response.get("retcode") in (-2017, -2018)
-                    storage.update_code_redemption(
-                        row["code"], claimed, res.reward if res.success else None, game=row_game
-                    )
-                    storage.add_redemption_log(
-                        code=row["code"],
-                        account_id=acc["id"],
-                        status="success" if claimed else "failed",
-                        reward=res.reward if res.success else None,
-                        error_message=None
-                        if claimed
-                        else f"{res.message} (retcode {res.raw_response.get('retcode')})",
-                    )
+                    claimed = await svc.redeem_code_for_account(row["code"], acc)
                     if claimed:
                         done += 1
                     else:
