@@ -37,7 +37,6 @@ dependencies = [
     "portalocker>=2.8.0",
     "colorlog>=6.8.0",
     "lxml>=5.0.0",
-    "prometheus-client>=0.19.0",
     "fastapi>=0.109.0",
     "uvicorn>=0.27.0",
     "python-multipart>=0.0.9",
