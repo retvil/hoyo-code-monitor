@@ -11,7 +11,7 @@
 
 ; CI injects the real version; fall back to the last known release.
 #ifndef MyAppVersion
-  #define MyAppVersion "1.5.2"
+  #define MyAppVersion "1.6.0"
 #endif
 
 [Setup]

@@ -38,7 +38,6 @@ a = Analysis(
         *playwright_hidden,
         'psutil',
         'portalocker',
-        'prometheus_client',
         'fastapi',
         'uvicorn',
         'uvicorn.loops.auto',
