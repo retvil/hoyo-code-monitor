@@ -133,3 +133,38 @@ class TestNormalize:
     def test_empty_input(self) -> None:
         """No cookies in, no cookies out."""
         assert _normalize([]) == {}
+
+
+class TestProfileDir:
+    """profile_dir() returns a per-account isolated directory."""
+
+    def test_default_account_slug(self) -> None:
+        """Without account_slug, path ends with 'default'."""
+        from src.cookies_login import profile_dir
+
+        d = profile_dir()
+        assert d.endswith("default")
+
+    def test_custom_account_slug(self) -> None:
+        """Custom account name appears in the path."""
+        from src.cookies_login import profile_dir
+
+        d = profile_dir("MyAccount")
+        assert "myaccount" in d.lower()
+
+    def test_slash_in_account_slug_is_sanitised(self) -> None:
+        """Spaces become dashes; the slug itself contains no path separators."""
+        from src.cookies_login import profile_dir
+
+        d = profile_dir("my account")
+        # The account slug portion (after "browser-profile") must be just "my-account"
+        suffix = d.split("browser-profile")[-1].replace("\\", "").replace("/", "")
+        assert suffix == "my-account"
+
+    def test_two_different_accounts_get_different_dirs(self) -> None:
+        """Account A and B get distinct profile directories."""
+        from src.cookies_login import profile_dir
+
+        a = profile_dir("Alice")
+        b = profile_dir("Bob")
+        assert a != b

@@ -257,7 +257,7 @@ def login(name: str, timeout: int) -> None:
 
     click.echo("Opening HoYoLAB in browser - log in, cookies will be saved automatically...")
     try:
-        cookies = capture_cookies_sync(timeout_seconds=timeout)
+        cookies = capture_cookies_sync(timeout_seconds=timeout, account_slug=name)
     except TimeoutError:
         click.echo("Login timed out, no cookies saved.", err=True)
         sys.exit(1)

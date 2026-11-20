@@ -342,7 +342,10 @@ class Scheduler:
         logger.info("Auto-refreshing cookies for %s (headless)", account_name)
         try:
             fresh = await _capture_cookies(
-                timeout_seconds=30, headless=True, prefer_saved_session=True
+                timeout_seconds=30,
+                headless=True,
+                prefer_saved_session=True,
+                account_slug=account_name,
             )
         except Exception as e:
             logger.warning("Auto cookie refresh failed for %s: %s", account_name, e)

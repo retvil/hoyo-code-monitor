@@ -658,7 +658,7 @@ async def login_account(name: str, timeout: int = 300) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail="Account not found")
 
     try:
-        cookies = await capture_cookies(timeout_seconds=timeout)
+        cookies = await capture_cookies(timeout_seconds=timeout, account_slug=name)
     except TimeoutError as e:
         raise HTTPException(status_code=408, detail=_safe_detail(e)) from e
     except RuntimeError as e:

@@ -27,13 +27,26 @@ SKIP_EXACT: frozenset[str] = frozenset({"mi18nLang", "DEVICEFP", "_MHYUUID", "Hm
 POLL_SECONDS = 2.0
 
 
-def profile_dir() -> str:
-    """Persistent browser profile dir (login survives restarts)."""
+def profile_dir(account_slug: str = "default") -> str:
+    """Persistent browser profile dir, isolated per account.
+
+    Each account gets its own Chromium profile so that logging in as
+    account B in the shared profile cannot overwrite account A's session.
+
+    Args:
+        account_slug: Account name (sanitised). Defaults to "default"
+            for legacy single-account setups or CLI calls without a
+            specific account context.
+
+    Returns:
+        Path string to the per-account profile directory.
+    """
     from src.paths import (
         app_data_dir,
     )
 
-    d = app_data_dir() / "browser-profile"
+    slug = account_slug.strip().lower().replace(" ", "-")
+    d = app_data_dir() / "browser-profile" / slug
     d.mkdir(parents=True, exist_ok=True)
     return str(d)
 
@@ -188,6 +201,7 @@ async def capture_cookies(
     timeout_seconds: int = 300,
     headless: bool = False,
     prefer_saved_session: bool = False,
+    account_slug: str = "default",
 ) -> dict[str, str]:
     """Open login page and wait until auth cookies appear.
 
@@ -197,6 +211,8 @@ async def capture_cookies(
         prefer_saved_session: When headless is set, skip opening the login
             page if the persistent profile already holds valid auth cookies.
             This is the fast path for automatic cookie refresh.
+        account_slug: Account name — each account gets its own browser
+            profile directory so sessions don't collide.
 
     Returns:
         Dict with at least ltuid + ltoken.
@@ -224,7 +240,7 @@ async def capture_cookies(
     async with async_playwright() as p:
         # Persistent profile: login survives restarts, user logs in once
         context = await p.chromium.launch_persistent_context(
-            profile_dir(),
+            profile_dir(account_slug),
             headless=headless,
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             locale="en-US",
@@ -255,6 +271,11 @@ async def capture_cookies(
             await context.close()
 
 
-def capture_cookies_sync(timeout_seconds: int = 300) -> dict[str, str]:
+def capture_cookies_sync(
+    timeout_seconds: int = 300,
+    account_slug: str = "default",
+) -> dict[str, str]:
     """Sync wrapper for capture_cookies."""
-    return asyncio.run(capture_cookies(timeout_seconds))
+    return asyncio.run(
+        capture_cookies(timeout_seconds=timeout_seconds, account_slug=account_slug)
+    )
