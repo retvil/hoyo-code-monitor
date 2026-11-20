@@ -590,3 +590,38 @@ class TestRedeemerConcurrentGames:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+class TestParseResponsePydantic:
+    """_parse_response uses _HoyolabApiResponse for structural validation."""
+
+    def test_success_dict_response(self, redeemer: Redeemer) -> None:
+        """Standard dict response with retcode=0 parses correctly."""
+        data = {
+            "retcode": 0,
+            "message": "OK",
+            "data": {"award": "Primogem x100"},
+        }
+        result = redeemer._parse_response(data)
+        assert result.success is True
+        assert result.reward == "Primogem x100"
+        assert result.message == "OK"
+
+    def test_error_response_with_code(self, redeemer: Redeemer) -> None:
+        """Non-zero retcode produces failure result."""
+        data = {
+            "retcode": -2001,
+            "message": "Invalid redemption code",
+            "data": None,
+        }
+        result = redeemer._parse_response(data)
+        assert result.success is False
+        assert result.reward == ""
+        assert "Invalid redemption code" in result.message
+
+    def test_unknown_shape_logs_warning(self, redeemer: Redeemer) -> None:
+        """If retcode is a string (type drift), validation fails gracefully."""
+        data = {"retcode": "not-an-int", "message": "OK", "data": None}
+        result = redeemer._parse_response(data)
+        assert result.success is False
+        assert "Unexpected API response" in result.message

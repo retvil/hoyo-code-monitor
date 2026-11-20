@@ -9,11 +9,33 @@ from types import TracebackType
 from typing import Any, Self
 
 import aiohttp
+from pydantic import BaseModel
 
 from src.exceptions import RedeemerError
 from src.http_session import get_session
 
 logger = logging.getLogger(__name__)
+
+
+class _HoyolabApiResponse(BaseModel):
+    """Typed view over a HoYoLAB API JSON response.
+
+    ``extra="allow"`` is deliberate: HoYoLAB sometimes returns unannounced
+    fields (debug flags, new envelope shapes). Unknown fields are silently
+    accepted rather than causing a ``ValidationError`` that would blanket-bomb
+    every redemption. Only a *structural* mismatch (e.g. ``retcode`` is a
+    string instead of an int) raises — and that is exactly the kind of silent
+    data-drift we want to surface immediately.
+
+    ``data`` is typed as ``dict[str, Any]`` because the reward payload
+    varies by game (dict with ``award`` key, dict with ``name``/``cnt``,
+    flat list of reward items, or ``null``).
+    """
+
+    model_config = {"extra": "allow"}
+    retcode: int = -1
+    message: str = "Unknown error"
+    data: dict[str, Any] | list[Any] | None = None
 
 
 @dataclass
@@ -193,15 +215,32 @@ class Redeemer:
             }
         }
 
+        Uses ``_HoyolabApiResponse`` (a Pydantic model) so that structural
+        drift — e.g. ``retcode`` changing type or the top-level envelope
+        gaining/losing required fields — raises ``ValidationError`` instead
+        of silently returning a wrong result. Unknown extra fields are
+        accepted (``extra="allow"``).
+
         Args:
             data: Parsed JSON response from the API.
 
         Returns:
             RedemptionResult with parsed fields.
         """
-        retcode = data.get("retcode", -1)
-        message = data.get("message", "Unknown error")
-        response_data = data.get("data", {})
+        try:
+            parsed = _HoyolabApiResponse.model_validate(data)
+        except Exception as exc:
+            logger.warning("Hoyolab API response validation failed: %s", exc)
+            return RedemptionResult(
+                success=False,
+                reward="",
+                message=f"Unexpected API response shape: {exc}",
+                raw_response=data,
+            )
+
+        retcode = parsed.retcode
+        message = parsed.message
+        response_data = parsed.data
 
         success = retcode == 0
         reward = ""
