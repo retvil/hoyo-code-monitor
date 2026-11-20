@@ -134,11 +134,57 @@ The app checks for new releases on startup (configurable via `update_check_enabl
 
 ### Manual auto-update script
 
-`auto-update.ps1` (in this repo, or download from the release) downloads the latest installer, stops running instances, installs silently, and restarts the app:
+`auto-update.ps1` downloads the latest installer, verifies the SHA-256
+checksum, optionally checks a PGP signature, stops running instances,
+installs silently, and restarts the app. All events are written to
+`%LOCALAPPDATA%\HoYoCodeMonitor\logs\auto-update.log`.
 
 ```powershell
-# One-off update
+# One-off update (with PGP signature check if a .sig asset is published)
 powershell -ExecutionPolicy Bypass -File auto-update.ps1
+
+# Skip PGP check (SHA-256 still verified)
+powershell -ExecutionPolicy Bypass -File auto-update.ps1 -SkipSignature
+
+# Custom log location
+powershell -ExecutionPolicy Bypass -File auto-update.ps1 -LogDir "C:\Logs\hcm"
+```
+
+| Parameter | Default | Description |
+|---|---|---|
+| `-SkipSignature` | off | Skip PGP signature verification |
+| `-LogDir <path>` | `%LOCALAPPDATA%\HoYoCodeMonitor\logs` | Where `auto-update.log` is written |
+
+**Release signing (maintainer):**
+
+To enable PGP verification, publish two extra release assets alongside the
+`.exe` installer:
+
+```bash
+# 1. Generate a detached PGP signature
+gpg --detach-sign --armor -o installer.exe.sig installer.exe
+
+# 2. Export your public key (users import it automatically if named pubkey.asc)
+gpg --armor --export YOUR_KEY_ID > pubkey.asc
+
+# 3. Upload all three as release assets:
+#    - installer.exe        (the app)
+#    - installer.exe.sig    (detached PGP signature)
+#    - pubkey.asc           (public key, auto-imported by the updater)
+```
+
+If no `.sig` asset is present, the script logs a warning and continues
+without PGP verification. If `sha256.txt` or `checksum.txt` is uploaded,
+the SHA-256 is verified against it automatically.
+
+**Check the log:**
+
+```powershell
+# Tail the log from the terminal
+Get-Content "$env:LOCALAPPDATA\HoYoCodeMonitor\logs\auto-update.log" -Wait
+
+# Search for errors
+Select-String -Path "$env:LOCALAPPDATA\HoYoCodeMonitor\logs\auto-update.log" -Pattern "ERROR"
 ```
 
 ### Scheduled auto-update (Windows Task Scheduler)
