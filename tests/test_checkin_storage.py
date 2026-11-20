@@ -10,7 +10,7 @@ from src.migrations import CURRENT_VERSION
 from src.storage import Storage
 
 #: Shared expectations (avoid PLR2004 magic values).
-EXPECTED_SCHEMA_VERSION: int = 16
+EXPECTED_SCHEMA_VERSION: int = 17
 EXPECTED_REWARD_AMOUNT: int = 100
 EXPECTED_LOG_COUNT: int = 2
 UUID_HEX_LENGTH: int = 32

@@ -502,9 +502,34 @@ MIGRATIONS: list[Migration] = [
         UPDATE schema_version SET version = 15;
         """,
     ),
+    (
+        17,
+        """
+        -- Migration v17: composite indexes on hot query paths.
+        --
+        -- idx_codes_unredeemed: covers the dominant dashboard + auto-redeem
+        -- path where list_codes(only_unredeemed=True) filters redeemed = 0
+        -- and orders by attempted_at DESC or redeemed_at DESC. Without this
+        -- composite index SQLite does a full table scan on every call.
+        --
+        -- idx_redemption_log_code_acc: covers _attach_sources_and_status
+        -- which looks up the latest redemption_log row per (code, account_id)
+        -- to compute display_status. The existing single-column
+        -- idx_redemption_log_code only helps the code side of the lookup.
+        CREATE INDEX IF NOT EXISTS idx_codes_unredeemed ON codes(redeemed, attempted_at);
+        CREATE INDEX IF NOT EXISTS idx_redemption_log_code_acc ON redemption_log(code, account_id, attempted_at);
+        UPDATE schema_version SET version = 17;
+        """,
+        """
+        -- Rollback v17: drop the two composite indexes.
+        DROP INDEX IF EXISTS idx_redemption_log_code_acc;
+        DROP INDEX IF EXISTS idx_codes_unredeemed;
+        UPDATE schema_version SET version = 16;
+        """,
+    ),
 ]
 
-CURRENT_VERSION = 16
+CURRENT_VERSION = 17
 
 
 def get_db_version(conn: sqlite3.Connection) -> int:

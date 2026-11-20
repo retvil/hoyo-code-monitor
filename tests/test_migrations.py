@@ -72,17 +72,44 @@ class TestMigrationUpChain:
 
 class TestMigrationDownStep:
     def test_v16_down_drops_last_success(self, fresh_db: str) -> None:
-        """The newest step (v16) must actually roll back on its own down SQL."""
-        _, _, down_sql = next(m for m in MIGRATIONS if m[0] == LATEST_MIGRATION_VERSION)
+        """The v16 step must actually roll back on its own down SQL."""
+        _, _, down_sql = next(m for m in MIGRATIONS if m[0] == 16)
         with sqlite3.connect(fresh_db) as conn:
             conn.executescript(down_sql)
             assert "last_success" not in _table_columns(conn, "sources")
-            assert get_db_version(conn) == PREVIOUS_MIGRATION_VERSION
+            assert get_db_version(conn) == 15
             # Re-applying the same up SQL restores the column (round-trip).
-            up_sql = next(m for m in MIGRATIONS if m[0] == LATEST_MIGRATION_VERSION)[1]
+            up_sql = next(m for m in MIGRATIONS if m[0] == 16)[1]
             conn.executescript(up_sql)
             assert "last_success" in _table_columns(conn, "sources")
-            assert get_db_version(conn) == LATEST_MIGRATION_VERSION
+            assert get_db_version(conn) == 16
+
+
+class TestMigrationV17Indexes:
+    """v17 adds composite indexes on hot query paths."""
+
+    def test_v17_up_creates_indexes(self, fresh_db: str) -> None:
+        """After running all migrations to v17, both new indexes exist."""
+        with sqlite3.connect(fresh_db) as conn:
+            idx_names = {
+                row[0]
+                for row in conn.execute("SELECT name FROM sqlite_master WHERE type='index'")
+            }
+            assert "idx_codes_unredeemed" in idx_names
+            assert "idx_redemption_log_code_acc" in idx_names
+
+    def test_v17_down_drops_indexes(self, fresh_db: str) -> None:
+        """v17's down SQL removes both composite indexes."""
+        _, _, down_sql = next(m for m in MIGRATIONS if m[0] == LATEST_MIGRATION_VERSION)
+        with sqlite3.connect(fresh_db) as conn:
+            conn.executescript(down_sql)
+            idx_names = {
+                row[0]
+                for row in conn.execute("SELECT name FROM sqlite_master WHERE type='index'")
+            }
+            assert "idx_codes_unredeemed" not in idx_names
+            assert "idx_redemption_log_code_acc" not in idx_names
+            assert get_db_version(conn) == PREVIOUS_MIGRATION_VERSION
 
 
 class TestMigrationV8Idempotent:
