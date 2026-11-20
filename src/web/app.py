@@ -193,11 +193,11 @@ from src.web.routers.codes import router as codes_router  # noqa: E402
 from src.web.routers.sources import router as sources_router  # noqa: E402
 from src.web.routers.system import router as system_router  # noqa: E402
 
-app.include_router(system_router)
-app.include_router(sources_router)
-app.include_router(accounts_router)
-app.include_router(codes_router)
-app.include_router(checkin_router)
+app.include_router(system_router)  # type: ignore[has-type]
+app.include_router(sources_router)  # type: ignore[has-type]
+app.include_router(accounts_router)  # type: ignore[has-type]
+app.include_router(codes_router)  # type: ignore[has-type]
+app.include_router(checkin_router)  # type: ignore[has-type]
 
 
 def main() -> None:
