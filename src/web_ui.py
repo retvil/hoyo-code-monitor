@@ -1334,17 +1334,9 @@ async def redeem_single_code(code: str, request: Request) -> dict[str, Any] | HT
     # When called via HTMX, return a styled HTML fragment instead of raw JSON
     # so the swap renders a readable result next to the button.
     if request.headers.get("HX-Request") == "true":
-        import html as _html
+        from src.web.fragments import render_result_fragment
 
-        items = [
-            _html.escape(f"{r['account']}: {'✓' if r['ok'] else '✗'} {_html.escape(r['msg'])}")
-            for r in results
-        ]
-        cls = "redeem-result-ok" if any_success else "redeem-result-err"
-        return HTMLResponse(
-            content=f'<span class="{cls}" data-toast="{_html.escape("; ".join(items))}" '
-            f'data-toast-ok="{str(any_success).lower()}">{_html.escape("; ".join(items))}</span>'
-        )
+        return HTMLResponse(content=render_result_fragment(results, any_success))
 
     return {
         "success": any_success,
@@ -1412,13 +1404,9 @@ async def redeem_all_codes(request: Request) -> dict[str, Any] | HTMLResponse:
     ok = failed == 0
 
     if request.headers.get("HX-Request") == "true":
-        import html as _html
+        from src.web.fragments import render_summary_fragment
 
-        cls = "redeem-result-ok" if ok else "redeem-result-err"
-        return HTMLResponse(
-            content=f'<span class="{cls}" data-toast="{_html.escape(result_text)}" '
-            f'data-toast-ok="{str(ok).lower()}">{_html.escape(result_text)}</span>'
-        )
+        return HTMLResponse(content=render_summary_fragment(result_text, ok))
 
     return {"success": True, "result": result_text}
 
