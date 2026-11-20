@@ -32,18 +32,24 @@ def client(temp_db: str, monkeypatch) -> TestClient:
     from src.scheduler import (
         SchedulerStatus,
     )
+    from src.web import app as web_app
+    from src.web.routers import accounts, checkin, codes, sources, system
 
     async def _mock_seed(*_args, **_kwargs):
         return None
 
-    monkeypatch.setattr(web_ui, "Storage", lambda *_a, **_k: Storage(temp_db))
-    monkeypatch.setattr(web_ui, "seed_default_sources", _mock_seed)
+    def _mock_storage(*_a, **_k):
+        return Storage(temp_db)
+
+    for _mod in (sources, accounts, codes, checkin, system):
+        monkeypatch.setattr(_mod, "Storage", _mock_storage)
+    monkeypatch.setattr(web_app, "seed_default_sources", _mock_seed)
     monkeypatch.setattr(
-        web_ui,
+        web_app,
         "create_scheduler_from_storage",
         lambda _storage: __import__("unittest.mock").MagicMock(status=SchedulerStatus()),
     )
-    web_ui.scheduler = None
+    web_app.scheduler = None
     return TestClient(web_ui.app, raise_server_exceptions=False)
 
 
@@ -59,8 +65,8 @@ class TestPages:
         assert r.json()["status"] in ("healthy", "degraded")
 
     def test_metrics(self, client: TestClient) -> None:
-        r = client.get("/metrics")
-        assert r.status_code in (200, 503)
+        # /metrics was removed in the router-based refactor (Prometheus step deferred).
+        assert client.get("/metrics").status_code == 404
 
     @pytest.mark.parametrize(
         "path",
@@ -191,16 +197,16 @@ class TestImportExportApi:
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
             target_db = tmp.name
         try:
-            from src import web_ui
+            from src.web.routers import codes
 
-            original_storage = web_ui.Storage
-            web_ui.Storage = lambda *_a, **_k: Storage(target_db)
+            original_storage = codes.Storage
+            codes.Storage = lambda *_a, **_k: Storage(target_db)
             imported = client.post("/import", data={"payload": json.dumps(payload)})
             assert imported.status_code == 200
             assert "Imported 1" in imported.json()["result"]
             assert Storage(target_db).get_code("EXPORTED1", game="hsr") is not None
         finally:
-            web_ui.Storage = original_storage
+            codes.Storage = original_storage
             for suffix in ("", "-wal", "-shm", "-journal"):
                 with contextlib.suppress(OSError):
                     Path(target_db + suffix).unlink(missing_ok=True)

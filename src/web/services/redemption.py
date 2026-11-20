@@ -13,10 +13,12 @@ from __future__ import annotations
 
 import contextlib
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from src.constants import GAME_CONF
-from src.redeemer import RedemptionResult
+
+if TYPE_CHECKING:
+    from src.redeemer import RedemptionResult
 
 logger = logging.getLogger(__name__)
 

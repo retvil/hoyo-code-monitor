@@ -14,7 +14,6 @@ from typing import Any
 import click
 import uvicorn
 
-from src import web_ui as web_ui_module
 from src.autostart import disable as autostart_disable
 from src.autostart import enable as autostart_enable
 from src.autostart import is_enabled as autostart_is_enabled
@@ -28,7 +27,7 @@ from src.single_instance import SingleInstance
 from src.sources import SourceFetcher
 from src.storage import Storage
 from src.system_tray import create_tray_icon
-from src.web_ui import app
+from src.web.app import _set_scheduler, app
 
 # Single-instance guard holder (mutable container avoids `global` statement;
 # ruff PLW0603 would flag the global keyword otherwise).
@@ -714,7 +713,7 @@ def tray() -> None:
     scheduler = create_scheduler_from_storage()
     # Share the live scheduler with the embedded web UI so the dashboard
     # shows and controls the real instance (lifespan won't replace it).
-    web_ui_module.scheduler = scheduler
+    _set_scheduler(scheduler)
     config_manager = ConfigManager()
     web_url = f"http://{WEB_HOST}:{WEB_PORT}"
 

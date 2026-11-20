@@ -43,16 +43,23 @@ def client(temp_db: str, monkeypatch) -> TestClient:
     from src import (
         web_ui,
     )
+    from src.web import app as web_app
+    from src.web.routers import accounts, checkin, codes, sources, system
 
     monkeypatch.delenv("HCM_TESTING", raising=False)
-    monkeypatch.setattr(web_ui, "Storage", lambda *_a, **_k: Storage(temp_db))
-    monkeypatch.setattr(web_ui, "seed_default_sources", _mock_seed)
+
+    def _mock_storage(*_a, **_k):
+        return Storage(temp_db)
+
+    for _mod in (sources, accounts, codes, checkin, system):
+        monkeypatch.setattr(_mod, "Storage", _mock_storage)
+    monkeypatch.setattr(web_app, "seed_default_sources", _mock_seed)
     monkeypatch.setattr(
-        web_ui,
+        web_app,
         "create_scheduler_from_storage",
         lambda _storage: MagicMock(status=MagicMock()),
     )
-    web_ui.scheduler = None
+    web_app.scheduler = None
     return TestClient(web_ui.app, raise_server_exceptions=False)
 
 
@@ -175,21 +182,21 @@ class TestRotation:
 
     @pytest.mark.usefixtures("client")
     def test_token_differs_across_days(self, monkeypatch) -> None:
-        from src import web_ui
+        from src.web import csrf
 
-        monkeypatch.setattr(web_ui, "_csrf_day", lambda: "2026-01-01")
-        first = web_ui._csrf_token()
-        monkeypatch.setattr(web_ui, "_csrf_day", lambda: "2026-01-02")
-        assert web_ui._csrf_token() != first
+        monkeypatch.setattr(csrf, "_csrf_day", lambda: "2026-01-01")
+        first = csrf._csrf_token()
+        monkeypatch.setattr(csrf, "_csrf_day", lambda: "2026-01-02")
+        assert csrf._csrf_token() != first
 
     def test_stale_token_rejected_after_rotation(self, client: TestClient, monkeypatch) -> None:
         """A token leaked yesterday must not work today."""
-        from src import web_ui
+        from src.web import csrf
 
-        monkeypatch.setattr(web_ui, "_csrf_day", lambda: "2026-01-01")
+        monkeypatch.setattr(csrf, "_csrf_day", lambda: "2026-01-01")
         stale = client.get("/api/csrf-token").json()["csrf_token"]
 
-        monkeypatch.setattr(web_ui, "_csrf_day", lambda: "2026-01-02")
+        monkeypatch.setattr(csrf, "_csrf_day", lambda: "2026-01-02")
         r = client.post(
             "/language",
             data={"language": "ru"},
@@ -200,11 +207,11 @@ class TestRotation:
 
     def test_fresh_token_accepted_after_rotation(self, client: TestClient, monkeypatch) -> None:
         """Rotation must not lock the legitimate client out."""
-        from src import web_ui
+        from src.web import csrf
 
-        monkeypatch.setattr(web_ui, "_csrf_day", lambda: "2026-01-01")
+        monkeypatch.setattr(csrf, "_csrf_day", lambda: "2026-01-01")
         client.get("/api/csrf-token")
-        monkeypatch.setattr(web_ui, "_csrf_day", lambda: "2026-01-02")
+        monkeypatch.setattr(csrf, "_csrf_day", lambda: "2026-01-02")
 
         fresh = client.get("/api/csrf-token").json()["csrf_token"]
         r = client.post(
@@ -216,9 +223,9 @@ class TestRotation:
 
     def test_token_stable_within_a_day(self, client: TestClient, monkeypatch) -> None:
         """Rotation is per-day, not per-request: one render must not break the next."""
-        from src import web_ui
+        from src.web import csrf
 
-        monkeypatch.setattr(web_ui, "_csrf_day", lambda: "2026-01-01")
+        monkeypatch.setattr(csrf, "_csrf_day", lambda: "2026-01-01")
         first = client.get("/api/csrf-token").json()["csrf_token"]
         second = client.get("/api/csrf-token").json()["csrf_token"]
         assert first == second
@@ -226,10 +233,10 @@ class TestRotation:
     @pytest.mark.usefixtures("client")
     def test_derivation_does_not_depend_on_seed_leakage(self, monkeypatch) -> None:
         """Token must be a one-way derivation, not the seed itself."""
-        from src import web_ui
+        from src.web import csrf
 
-        monkeypatch.setattr(web_ui, "_csrf_day", lambda: "2026-01-01")
-        assert web_ui._csrf_token() != web_ui._CSRF_SEED
+        monkeypatch.setattr(csrf, "_csrf_day", lambda: "2026-01-01")
+        assert csrf._csrf_token() != csrf._CSRF_SEED
 
 
 class TestCsrfSeedPersistence:
@@ -245,17 +252,17 @@ class TestCsrfSeedPersistence:
         """
         from datetime import UTC, datetime, timedelta
 
-        from src import web_ui
+        from src.web import csrf
 
         monkeypatch.setenv("HCM_DATA_DIR", str(tmp_path))
         try:
             today = datetime.now(UTC).strftime("%Y-%m-%d")
             yesterday = (datetime.now(UTC) - timedelta(days=1)).strftime("%Y-%m-%d")
             stale_seed = "stale-seed-value-that-is-not-todays-seed"
-            seed_file_in_tmp = tmp_path / web_ui._CSRF_SEED_FILE
+            seed_file_in_tmp = tmp_path / csrf._CSRF_SEED_FILE
             seed_file_in_tmp.write_text(f"{yesterday}|{stale_seed}", encoding="utf-8")
 
-            new_seed = web_ui._load_or_create_csrf_seed()
+            new_seed = csrf._load_or_create_csrf_seed()
 
             # The stale seed must not be returned.
             assert new_seed != stale_seed
@@ -272,16 +279,16 @@ class TestCsrfSeedPersistence:
         """A seed file matching today's date is loaded without being replaced."""
         from datetime import UTC, datetime
 
-        from src import web_ui
+        from src.web import csrf
 
         monkeypatch.setenv("HCM_DATA_DIR", str(tmp_path))
         today = datetime.now(UTC).strftime("%Y-%m-%d")
         known_seed = "k" * 40
-        seed_file_in_tmp = tmp_path / web_ui._CSRF_SEED_FILE
+        seed_file_in_tmp = tmp_path / csrf._CSRF_SEED_FILE
         seed_file_in_tmp.write_text(f"{today}|{known_seed}", encoding="utf-8")
 
         try:
-            loaded = web_ui._load_or_create_csrf_seed()
+            loaded = csrf._load_or_create_csrf_seed()
             assert loaded == known_seed
         finally:
             monkeypatch.delenv("HCM_DATA_DIR", raising=False)

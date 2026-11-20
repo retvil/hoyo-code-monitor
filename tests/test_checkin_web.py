@@ -14,6 +14,8 @@ from src import web_ui
 from src.checkin import GAME_CHECKIN_CONF, CheckinRunner
 from src.scheduler import Scheduler
 from src.storage import Storage
+from src.web import app as web_app
+from src.web.routers import accounts, checkin, codes, sources, system
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -32,8 +34,12 @@ def temp_db(tmp_path: Path) -> str:
 
 @pytest.fixture
 def client(temp_db: str, monkeypatch) -> TestClient:
-    monkeypatch.setattr(web_ui, "Storage", lambda *_a, **_k: Storage(temp_db))
-    web_ui.scheduler = None
+    def _mock_storage(*_a, **_k):
+        return Storage(temp_db)
+
+    for _mod in (sources, accounts, codes, checkin, system):
+        monkeypatch.setattr(_mod, "Storage", _mock_storage)
+    web_app.scheduler = None
     return TestClient(web_ui.app, raise_server_exceptions=False)
 
 
@@ -124,7 +130,7 @@ class TestRunNow:
         runner = CheckinRunner(transport=fake, retry_base_delay=0.0)
         config = SimpleNamespace(redemption_min_gap_seconds=0)
         sched = Scheduler(storage=storage, config=config, checkin_runner=runner)
-        web_ui.scheduler = sched
+        web_app.scheduler = sched
 
         r = client.post("/checkins/run-now")
 
@@ -177,11 +183,11 @@ class TestCheckinProgress:
         fake = FakeTransport(sign=[make_sign() for _ in GAME_CHECKIN_CONF])
         runner = CheckinRunner(transport=fake, retry_base_delay=0.0)
         config = SimpleNamespace(redemption_min_gap_seconds=0)
-        web_ui.scheduler = Scheduler(storage=storage, config=config, checkin_runner=runner)
+        web_app.scheduler = Scheduler(storage=storage, config=config, checkin_runner=runner)
 
         # Start a run in the background
         def run_checkins():
-            web_ui.scheduler.run_checkins_now()
+            web_app.scheduler.run_checkins_now()
 
         thread = threading.Thread(target=run_checkins)
         thread.start()
