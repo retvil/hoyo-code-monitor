@@ -25,7 +25,7 @@ AppUpdatesURL={#MyAppURL}
 VersionInfoVersion={#MyAppVersion}
 DefaultDirName={localappdata}\{#MyAppName}
 DefaultGroupName={#MyAppName}
-DisableDirPage=yes
+DisableDirPage=no
 ; Per-user install, no admin rights (mirrors NSIS RequestExecutionLevel user).
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
