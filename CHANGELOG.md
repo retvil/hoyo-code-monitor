@@ -1,20 +1,22 @@
 # Changelog
 
-## [1.5.3] — 2026-11-19 — release
+## [Unreleased]
+
+## [1.5.3] - 2026-11-19
 
 ### Added
 
-- **Styled redemption result** — `/codes/{code}/redeem` and `/redeem/all` now
+- **Styled redemption result** - `/codes/{code}/redeem` and `/redeem/all` now
   return an HTML fragment (when `HX-Request: true`) with a `.redeem-result-ok`
   (green) or `.redeem-result-err` (red) badge, plus a floating toast
   notification in the bottom-right corner (4s success, 8s error). Both inline
   badge and toast show the account name + reward/error message.
 
-- **PROJECT_OVERVIEW.md** — project purpose, 8 key scenarios, architecture
+- **PROJECT_OVERVIEW.md** - project purpose, 8 key scenarios, architecture
   diagram, module map, data model, technology stack rationale, 10 key
   invariants, and critical known issues (C-1 through C-4) documented.
 
-### Security (from 45-issue audit, released here)
+### Security (from 45-issue audit)
 
 - SSRF source-URL validation (reject private ranges + non-HTTP schemes)
 - ReDoS guard for regex source patterns
@@ -36,52 +38,46 @@
 
 ### Performance
 
-- **`get_all_stats_single_query()`** — the dashboard previously issued
-  5 separate `get_stats(game=…)` queries (one per game, each running
+- **`get_all_stats_single_query()`** - the dashboard previously issued
+  5 separate `get_stats(game=...)` queries (one per game, each running
   4 SQL statements = 20 queries). Now uses a single `GROUP BY game`
   query, reducing dashboard load by ~80% on the stats path.
-- **`order_by_redeemed` in `list_codes`** — the dashboard's redeemed
+- **`order_by_redeemed` in `list_codes`** - the dashboard's redeemed
   codes list was fetched unordered and sorted in Python over up to
   200 rows. `list_codes` now accepts `order_by_redeemed=True` which
   uses `ORDER BY redeemed_at DESC` in SQL.
 
 ### Refactoring
 
-- **`_redeem_code_for_account` extracted** — the ~30-line per-account
+- **`_redeem_code_for_account` extracted** - the ~30-line per-account
   redemption block was duplicated in `_run_check_cycle` and
   `_redeem_new_codes`. The shared logic (cookie load, redeemer call,
   claimed-status determination, cookie-expiry handling, storage
   updates, notification) now lives in a single helper method.
-- **Bounded error list** — `_run_check_cycle` accumulates errors in an
+- **Bounded error list** - `_run_check_cycle` accumulates errors in an
   unbounded list; now capped at 50 entries to prevent memory growth
   during long check cycles.
-- **`reset_config_manager` thread-safety** — confirmed the method is
+- **`reset_config_manager` thread-safety** - confirmed the method is
   wrapped in `_config_lock` (previously identified as a risk).
 
 ### CI / Build
 
-- **Inno Setup smoke-test CWD fix** — the Windows installer build
+- **Inno Setup smoke-test CWD fix** - the Windows installer build
   step now uses `Set-Location $env:GITHUB_WORKSPACE` at the start of
   each step, so ISCC's `out/` directory is always found regardless of
   the runner's per-step CWD. Previous runs failed because each
   `run: |` step got its own CWD context.
-- **Absolute GITHUB_WORKSPACE paths** — the smoke test now checks
+- **Absolute GITHUB_WORKSPACE paths** - the smoke test now checks
   `GITHUB_WORKSPACE\out\<name>` first, then `GITHUB_WORKSPACE\<name>`;
   both are absolute and CWD-independent.
-- **GitHub Actions Node 24 migration** — all directly-controllable
-  actions upgraded to their latest Node 24 versions:
-  `actions/checkout@v5`, `actions/setup-python@v6`,
-  `codecov/codecov-action@v5`, `actions/upload-artifact@v5`,
-  `actions/download-artifact@v5`, `softprops/action-gh-release@v2`,
-  `docker/build-push-action@v6`, `docker/setup-buildx-action@v4`,
-  `docker/login-action@v4`.
-- **Docker `FROM/AS` casing** — `FROM python:3.11-slim as builder`
-  changed to `AS builder` to silence the `FromAsCasing` build warning.
+- **GitHub Actions Node 24 migration** - all directly-controllable
+  actions upgraded to their latest Node 24 versions.
+- **Docker `FROM/AS` casing** - `FROM python:3.11-slim AS builder`
+  casing normalized.
 
 ### Tests
 
-- 30 regression tests added across 4 files (`test_sources.py`,
-  `test_web_ui.py`, `test_csrf.py`, `test_redeemer.py`) covering:
+- 30 regression tests added across 4 files covering:
   SSRF (10 cases), ReDoS (11 cases), XSS escaping (3 cases),
   import game validation (2 cases), CSRF seed persistence (2 cases),
   timeout passthrough (1 case), empty-reward parsing (3 cases).
@@ -91,488 +87,28 @@
 ## [1.5.2] - 2026-11-10
 
 ### Changed
-- **CI/CD hardening after GitHub runner image migration to Windows Server 2025:**
-  - `makensis` (NSIS) is no longer on the hosted-runner `PATH`; the installer
-    build has moved to Inno Setup (`ISCC.exe`, preinstalled on the new image).
-    `installer.iss` now drives the build; the old `installer.nsi` is kept for
-    reference but is no longer invoked by CI.
-  - `docker` job: fixed a docker-tag syntax error that emitted
-    `ghcr.io/<repo>:` (invalid reference) on non-release pushes; the
-    release-only tag is now emitted conditionally. `Dockerfile` now installs
-    `libatomic1` (the runtime shared-lib the Playwright node driver links
-    against; `libatomic-dev` is not packaged for Debian trixie slim).
-  - `requirements.txt` / `pyproject.toml`: pinned `ruff==0.17.4` so local
-    dev and CI use the identical toolchain (a 0.17.3 → 0.17.4 drift had
-    introduced the new `PLR0917` positional-arg metric that red-lined CI).
-  - `pyproject.toml` [tool.ruff.lint] ignore-list: added `PLR0917` alongside
-    `PLR0913` (both flag the deliberately-wide CLI/storage signatures).
+- CI/CD hardening after GitHub runner image migration to Windows Server 2025.
 - **Packaging fix:** `tool.setuptools.packages.find` now uses `where=["."]`
   instead of `where=["src"]`, so the top-level `src` package is actually
-  discovered. Previously `pip install -e .` produced an empty package wheel
-  and CI's `pytest` failed with `ModuleNotFoundError: No module named 'src'`.
+  discovered.
 
 ### Fixed
-- **`test_redeemer.py` unawaited-coroutine `RuntimeWarning`:** the logging
-  test mocked `session.get` as an `AsyncMock`, but `session.get(url)` is
-  entered via `async with` without an `await`, so the `AsyncMock`'s
-  returned coroutine was never awaited and surfaced at GC time as a warning.
-  Switched to `MagicMock` (matching the 5 sibling tests in the same file)
-  so the async context manager is entered synchronously and no coroutine leaks.
+- **`test_redeemer.py` unawaited-coroutine `RuntimeWarning`:** switched
+  to `MagicMock` so the async context manager is entered synchronously.
 - `test_storage.py` rollback test: kept `pytest.raises` on the *outer* side
-  of `storage._connection()` so the exception reaches the context manager's
-  `__exit__` and triggers `conn.rollback()`; reordering the two blocks broke
-  the assertion.
-
-### Notes
-- This release is primarily infrastructure/tooling: no user-facing feature
-  changes. The 1.5.1 runtime behavior is unchanged; the app version string
-  (constants.APP_VERSION, wheel metadata, Inno Setup) now reports 1.5.2.
+  of `storage._connection()`.
 
 ## [1.5.1] - 2026-11-03
 
 ### Fixed
 - **Recover source "error" status after a transient failure**: a source's
-  `error_count` only ever went up (incremented on each failure) and was never
-  reset, so a source that recovered from a transient outage but had earlier
-  piled up >3 failures kept showing `error`/`degraded` in the dashboard and
-  `/health` indefinitely. `Storage.clear_source_error(name)` now resets the
-  counter to 0 on the fetch success path (right after `mark_source_success`),
-  so a recovered source drops back to `active`/`idle` instead of staying
-  pinned to `error` from stale, now-moot failures.
-- **`/health` no longer counts "forgotten" sources as broken**: `source_status`
-  was keyed off `last_checked` (a column that is never actually populated),
-  making its staleness check effectively dead. It now keys off `last_success`
-  and only classifies a source as `error` when it has *never* succeeded and
-  has a genuinely high consecutive-failure count; a source that simply hasn't
-  been checked recently but last succeeded is now `idle`, not `error`.
+  `error_count` only ever went up and was never reset, so a source that
+  recovered from a transient outage kept showing `error`/`degraded` in the
+  dashboard and `/health` indefinitely. `Storage.clear_source_error(name)`
+  now resets the counter to 0 on the fetch success path.
 
-### Changed
-- **Leaner installer bundle**: dev/analysis tooling that was accidentally
-  shipped in the PyInstaller onedir bundle (`IPython`, `mypy`, `sqlalchemy`,
-  `werkzeug`, `flask`, `black`, `prompt_toolkit`, `parso`, `wcwidth`,
-  `ast_serialize`, `pyreadline3`, `blib2to3`, `yapf_third_party`, `librt`,
-  `patchright`, `greenlet`, `jedi`, `ipykernel`) is now excluded — these are
-  only present in local dev/build environments and are never imported by the
-  app; excluding them drops ~130 MB of dead weight from the installed app
-  without changing runtime behavior.
-- Removed project-local agent skills (`.agents/`) and `skills-lock.json`
-  from version control; these are developer tooling, not part of the shipped
-  application.
-
-### Tests
-- 9 new tests lock in the `clear_source_error` reset-on-success behavior and
-  the new `source_status` decision tree (`tests/test_storage.py`,
-  `tests/test_sources.py`, `tests/test_web_views.py`); two pre-existing
-  `TestSourceHealth` assertions that assumed the old `last_checked`-based
-  behavior were updated to match. Full suite: 475 passed, 2 skipped;
-  `mypy src`: 0 errors.
-
-## [1.5.0] - 2026-10-29
-
-### Added
-- **Per-account "enabled games" filter**: new `accounts.games` column
-  (migration v15) stores a JSON array of game ids; `NULL` (the default) means
-  "all games". The scheduler loop now reads this column before the check-in
-  pass and skips any game the account hasn't enabled (`scheduler.py`
-  `_enabled_games_for` / `_run_checkin_slot` gating). The Accounts page
-  gains an "Enabled Games" checkbox group per account
-  (`GET/POST /accounts/{name}/games`). Concrete benefit: an account that only
-  plays Genshin no longer generates daily `-10002 no-character` "skipped"
-  log rows for HSR/ZZZ/HI3/ToT — the check-in pass now only attempts the
-  games actually in use.
-- **Sources "active" status is now real**: `sources.last_success` was a
-  read-only column that `web_ui`/`web_views` read to decide whether a source
-  shows "active" vs "idle"/"warning", but nothing ever wrote to it, so the
-  "active" branch was permanently dead. Two new `Storage` methods —
-  `mark_source_success(name, at=None)` (writes a UTC ISO-8601 timestamp) and
-  `clear_source_success(name)` (resets to NULL) — are now called from
-  `SourceFetcher.fetch_all_enabled`'s per-source success/failure paths: a
-  successful `fetch_source` records the timestamp; a caught exception calls
-  both `increment_source_error` and `clear_source_success` so a fresh
-  failure immediately drops the source out of "active" rather than letting a
-  stale success linger until the next error_count threshold. Migration v16
-  adds the column itself (nullable, no default). Two new tests lock in the
-  behaviour (`test_fetch_all_enabled_success_records_last_success`,
-  `test_fetch_all_enabled_failure_clears_last_success`).
-
-### Changed
-- **`update_check_enabled` config flag is now a real off-switch**:
-  `version_check.py` now reads the flag via `ConfigManager` and short-circuits
-  the GitHub API call when it's `false` (returns `None` immediately, no
-  outbound request, banner stays hidden). Previously the flag existed in
-  `Settings` and was documented in the module docstring, but no code ever
-  read it, so the banner was always active regardless of the config value.
-
-### Docs
-- Check-in UI strings now translated in all 6 languages
-  (de/fr/ja/zh previously fell back to English on the Check-ins page; the
-  14+ missing `checkin_*` keys were added to each of the four language
-  blocks, plus `checkin_auto_refresh` and `checkin_manual_hint`).
-
-## [1.4.1] - 2026-10-28
-
-### Changed
-- **UPX-compressed executable**: the 1.4.1 build ships with real UPX
-  compression applied to all bundled C extension modules (.pyd/.dll) —
-  132 files confirmed with UPX signature. Previous installers (1.4.0 and
-  earlier) were built without the UPX binary present in PATH, so PyInstaller
-  silently skipped the compression step and the exe carried full-size native
-  modules. The dist payload dropped from ~132 MB (1.3.2) to ~111 MB.
-
-### Fixed
-- **CLI source management used nonexistent storage methods**: `sources remove`
-  called `Storage.remove_source` (→ `delete_source`), and `sources enable` /
-  `sources disable` called `Storage.enable_source` / `disable_source`
-  (→ `update_source(name, enabled=…)`). All three commands now target methods
-  that actually exist.
-- **`scheduler status` read a nonexistent attribute**: it called
-  `scheduler.next_run_time()`; now uses `scheduler.status.next_run`.
-- **Scheduler redemption path referenced undefined names**: the per-account
-  redemption loop called `notify_redeemed` / `notify_redeemed_toast` that were
-  only imported locally inside the check-cycle path. They are now module-level
-  imports so the run-once redemption path also works.
-- **Typing pass**: `mypy src` now reports 0 errors across all 27 source
-  modules (previously ~118). The `Settings` dataclass carries a `cookies` field
-  (excluded from TOML persistence so secrets never reach `config.toml`), the
-  `Scheduler` constructor accepts the legacy `SimpleNamespace` config shape, and
-  CLI/web-app endpoints are fully annotated.
-
-
-## [1.4.0] - 2026-10-27
-
-### Added
-- **Dark theme**: a Light/Dark toggle in the sidebar (below the language
-  switcher) as a visible two-button widget. The choice persists per browser
-  (localStorage); an early paint-time script applies it before first render so
-  there is no flash of the wrong theme.
-- **Automatic cookie refresh for expired accounts**: when a daily check-in slot
-  fails because the account's HoYoLAB cookies expired (retcode `10001`/`-100`),
-  the scheduler now optionally re-captures the cookies from the saved browser
-  profile - headless, no user interaction needed. If the saved session is still
-  valid the fresh cookies are stored and the next check-in pass picks them up
-  automatically. Controlled by two new check-in settings: an "auto-refresh
-  expired cookies (headless)" toggle and a per-account cooldown (default 60 min)
-  so it never hammers the browser. When the saved profile session is gone, the
-  log tells you to run the visible Auto-login once.
-- **Redemption in `run-once`**: the one-shot CLI now performs the redemption
-  cycle for newly found codes when redemption is enabled, reusing the same
-  `_redeem_new_codes` helper as the scheduler (previously it printed a
-  "not implemented, use scheduler" stub and skipped redemption).
-- **Configurable cookie skip-filters**: new HoYoLAB tracking cookies can be
-  filtered via `config.toml` (`[cookies] skip_cookie_prefixes` /
-  `skip_cookies`) without a code update; the built-in defaults are unchanged
-  when the section is absent.
-- **Release notes follow the UI language**: GitHub release bodies can carry
-  per-language sections under `##` headings (e.g. `## Что нового (Русский)`);
-  the update banner picks the section matching the selected language,
-  falling back to English, then to the whole body. Single-language notes keep
-  working unchanged.
-
-### Changed
-- **Accurate dashboard stat**: the hero counter previously labeled the
-  failed-code total as "pending"; it now reads "failed" (i18n `stats_failed`).
-- **Auto-login disabled while the scheduler runs**: the accounts page now
-  disables the Auto-login (cookie capture) button while the background scheduler
-  is active, to avoid conflicting browser sessions.
-- **`capture_cookies()` now accepts `headless` and `prefer_saved_session`**
-  parameters so the automatic refresh path can run without popping a visible
-  browser window.
-- **Dashboard scheduler card polls only while running**: the auto-refresh
-  trigger is conditional on the scheduler state, so a stopped scheduler no
-  longer re-fetches the status partial every 5 s.
-
-### Fixed
-- **Stale single-instance lock**: if the previous instance crashed, its lock
-  file now gets detected (dead PID) and cleaned up automatically instead of
-  blocking every future start.
-- **Retry thundering-herd**: source fetch retries now apply random jitter to
-  the exponential backoff instead of retrying in lockstep.
-- **Cookie-capture polling no longer starves the event loop**: the login wait
-  loop yields to the event loop between polls.
-- **Rate-limit cache leak**: the web UI's per-request rate-limit tracker is
-  pruned in place on a TTL instead of accumulating entries for the life of
-  the process.
-- **Silent update-check failures**: the background "check for update" task
-  now logs a warning instead of dropping the error.
-- **Reverted accidental regression in `stats` / `run-once` CLI structure**
-  (the two commands had an orphaned code block merged between them).
-- **Redeem-all button now has a confirmation dialog** (i18n `confirm_redeem_all`).
-- **Dead-code cleanup is a single batched transaction** instead of N separate
-  delete transactions.
-
-### Performance
-- `cleanup_dead_codes` now issues one batched `DELETE ... IN (...)` instead of
-  one `delete_code` call per doomed code.
-
-### CI / build
-- Added an NSIS installer smoke-test step to the Windows build.
-- Draft release is now auto-created on any `v*` tag push.
-- Fixed the release-artifact paths (they referenced the old
-  `genshin-code-monitor` directory name; the spec's COLLECT output is
-  `hoyo-code-monitor`).
-- `pyinstaller` moved into the cached `[dev]` extras; the unused `nsis` pip
-  install was dropped.
-- Docker image now uses Playwright's own chromium (the broken
-  `PLAYWRIGHT_BROWSERS_PATH=/usr/bin/chromium` env var was removed) and
-  pre-installs the browser at build time.
-- The PyInstaller `.spec` hiddenimports were trimmed to only the modules the
-  bytecode analysis cannot infer.
-
-### Docs
-- Added `CODEOWNERS`, `CONTRIBUTING.md`, and `ROADMAP.md`.
-- Removed the 10+ stale `*-setup.exe` build artifacts from the repo root.
-
-## [1.3.1] - 2026-10-24
-
-### Changed
-- **Update banner notes follow the UI language**: release bodies can now
-  carry per-language sections under `##` headings (e.g.
-  `## Что нового (Русский)`); the banner picks the section matching the
-  language selected in the app, falling back to the English section, then
-  to the whole body. Single-language release notes keep working unchanged.
-
-## [1.3.0] - 2026-10-23
-
-### Changed
-- **"No character in this game" is now `skipped`, not `failed`**: an account
-  without a role in a game (ZZZ, HI3, ToT all answer retcode `-10002` on
-  `/sign` - verified live for all three) no longer drags the pass-level
-  "check-in successful" indicator down. The slot is logged as `skipped` with
-  the API's own explanation and is retried the next day, so a character
-  created later is picked up automatically. Cookie-expired and real API
-  errors keep classifying as `failed`
-
-### Added
-- **Tears of Themis daily check-in**: ToT now joins the daily sign-in pass,
-  covering all 5 supported games. The OS `act_id` (`e202202281857121`) was
-  verified live rather than guessed: `/info` and `/home` answer `retcode 0`
-  with the Tears of Themis reward table (Intuition Impression, Oracle of
-  Justice, Home Deco Voucher), while a deliberately bogus `act_id` on the
-  same path is rejected with `retcode -500001` - so the activity is real,
-  not just well-formed. ToT runs on the `luna/os` event path shared with
-  Star Rail but under its own activity, and needs no `x-rpc-signgame`
-  header (confirmed live: the signed request is accepted without it).
-  Accounts without a ToT character get the same "Character info not found"
-  result ZZZ and HI3 already produce - no new failure mode.
-  Verified live: Genshin answers `already_claimed` and ToT answers
-  `Character info not found` on the same account, proving the act_id, path,
-  DS signature and error classification all behave as expected
-- **Windows toast notifications**: new code batches and successful
-  redemptions now pop a native desktop toast alongside the Telegram channel.
-  Zero configuration and zero network - toasts are a local side channel, so
-  events are announced on the machine even when no Telegram bot is set up.
-  Backed by the optional `winotify` dependency (new `[toast]` extra;
-  Windows-only, `sys_platform == 'win32'` marker). Without it the app runs
-  unchanged and simply skips toasts. Best-effort by contract: the toast path
-  never raises into the scheduler loop (every failure logs at DEBUG and
-  returns False), runs the blocking WinRT call through `asyncio.to_thread`
-  so the event loop is never held up, and carries no secrets - only title
-  and message text. Smoke-test from the CLI with `notify test-toast`.
-  Verified live on the dev box: toast appears, exit code 0
-
-### Fixed
-- **Flaky test in the shared-session pool suite**: `test_closes_session_owned_by_a_running_foreign_loop`
-  asserted that the session was *still open* immediately after `close_all()`,
-  which raced the schedule. `close_all()` hands the close back to the owning
-  loop via `call_soon_threadsafe`, and that call wakes the owning loop at once,
-  so the close landed before the caller regained control — the suite came back
-  `403 passed, 1 failed` while the code under test was correct (the contract
-  still held: the session ends up closed and the registry empties). The
-  assertion was replaced with the substantive check it was proxying for:
-  `_safe_close` is wrapped to record *which loop* ran the close, and the test
-  now asserts that close ran on the owning loop rather than the caller's.
-  Verified non-vacuous by mutation — awaiting the foreign session directly
-  (the bug this test guards) still fails it
-
-## [1.2.4] - 2026-10-14
-
-### Fixed
-- **Release notes in the update banner showed raw Markdown**: the banner renders
-  notes as plain text, but `_clean_notes()` only collapsed whitespace, so a
-  GitHub release body arrived with heading and bold markers visible as literal
-  syntax. Inline Markdown (headings, emphasis, strikethrough, code, links, list
-  markers, blockquotes, images) is now stripped, leaving readable prose. Notes
-  stay rendered as text rather than HTML, so upstream-authored markdown has no
-  injection surface. Caught by driving a real browser, not by the unit suite
-
-## [1.2.3] - 2026-10-11
-
-### Added
-- **In-app update check with release banner**: the Web UI now queries the public
-  GitHub Releases API and shows a dismissible banner when a newer version exists,
-  with the release notes and a download link. Updates are **manual** — the banner
-  links to the GitHub Releases page and you download and run the new installer
-  yourself; the app never downloads or applies an update on its own. This is the
-  only outbound call the app makes beyond the user-configured sources. The check
-  is read-only (no token, no telemetry, no device identifiers), cached for
-  `UPDATE_CHECK_INTERVAL_SECONDS` (6h, failed attempts included), never raises —
-  every failure keeps the banner hidden — and can be disabled with
-  `update_check_enabled = false` in config or by dismissing the banner (per
-  release, so a newer build re-arms it)
-
-### Fixed
-- **`increment_source_error()` crashed on every failed fetch**: the `sources.error_count`
-  column was referenced by `storage.increment_source_error()` (`src/storage.py:729`) and
-  by `web_ui`'s source-health payload (`error_count` / `"error"` state), but was never
-  created by any migration — every call raised `OperationalError: no such column:
-  error_count`. The exception was swallowed by a `try/except` in
-  `SourceFetcher.fetch_all_enabled()` (`src/sources.py:523`), so the failure was
-  invisible and the `"error"` source state in `/health` was dead code. Added migration
-  **v14** to create `sources.error_count INTEGER NOT NULL DEFAULT 0` and bumped
-  `CURRENT_VERSION` to 14
-
-## [1.2.2] - 2026-10-10
-
-### Added
-- **CSRF protection for Web UI**: all state-changing routes (POST/PUT/PATCH/DELETE)
-  require a valid `X-CSRF-Token` header; token served via `/api/csrf-token` endpoint
-  and double-submit cookie pattern; same-origin check blocks cross-origin mutations
-- **Scheduler health in `/health`**: endpoint now reports DB status, active source count,
-  scheduler state (running/stopped/missing), and external connectivity probe
-- **Config schema migrations**: `ConfigManager.MIGRATIONS` framework with `schema_version`
-  field for forward-compatible config upgrades
-- **`MAX_MASKED_UID` constant**: configurable UID masking width in CLI `config show`
-
-### Fixed
-- **Scheduler leaked HTTP/Playwright sessions on stop**: added async `_cleanup()` that
-  closes `checkin_runner` and `redeemer` sessions in the scheduler loop before thread
-  exit; removed the unsafe `asyncio.run(self.close())` call from the sync `stop()` path
-- **Telegram notifications failed silently on transient errors**: `send_telegram()` now
-  retries up to 3 times with exponential backoff (1s/2s/4s); logs HTTP status and
-  exception details per attempt
-- **Duplicate source-building boilerplate**: extracted `SourceConfig.from_row()` class
-  method to normalize legacy JSON-stringified headers and apply safe defaults in one place
-- **Win32 registry imports were inside functions**: moved `winreg` imports to module level
-  in `autostart.py` (linting/readability)
-- **Single-instance guard used `global`**: replaced with mutable list container to avoid
-  ruff `PLW0603` (global statement) warning
-- **Error messages leaked raw exception strings in API responses**: wrapped all
-  `HTTPException(detail=str(e))` with `_safe_detail()` that masks secret values
-
-### Changed
-- Test fixtures (`temp_db`, `storage`) moved from individual test classes to shared
-  `tests/conftest.py` (DRY, 6 test classes cleaned up)
-- Removed inline `import uvicorn`/`import app` from `cli.py` tray() — imported at
-  module level with `# noqa: F401` annotations
-
-## [1.2.1] - 2026-10-08
-
-### Fixed
-- **Tests broke on modern asyncio**: `signals._stop_scheduler()` used the deprecated
-  `loop.run_in_executor(None, ...)` path; updated to `asyncio.to_thread(...)` and
-  aligned all related test assertions accordingly
-
-## [1.2.0] - 2026-10-07
-
-### Fixed
-- **Autostart actually installs**: the NSIS section was off by default and skipped
-  on silent installs (no Run entry). Now default-on (opt-out in GUI), plus relative
-  icon paths so the installer builds on CI/other machines
-
-### Removed
-- Unfinished `dashboard_experiment` slice (routes, templates, static mount, assets),
-  internal design notes and stray logs — minus 1172 lines
-
-### Docs
-- Planning docs refreshed to v1.1.6 reality; README feature lists cover check-ins
-  in all 6 languages
-
-## [1.1.6] - 2026-09-30
-
-### Added
-- **Daily HoYoLAB check-ins (auto sign-in)**: second pipeline next to code redemption —
-  `GET info → POST sign → GET home` per account x game (MVP: Genshin + HSR, overseas).
-  Own schedule (`checkin_time`, default 04:00 + `checkin_jitter_minutes`), per-account
-  `Auto check-in` toggles, `/checkins` page with history, manual "Claim now" button
-  and `/api/checkins/status` JSON. Idempotent via `UNIQUE(account_id, game, claimed_date)`
-  (migration v13, `checkin_log` table); stable per-account `device_id` avoids re-logins.
-  Retcode `-5003` treated as already-claimed, expired cookies surface a refresh hint.
-  41 new tests (runner, storage, scheduler, web UI)
-- **Check-in wave 2**: Zenless Zone Zero and Honkai Impact 3rd (endpoints verified
-  against SIMNet/MihoyoBBSTools references; ToT pending — no verified OS act_id).
-  HI3 sends no `x-rpc-signgame`, like the reference clients
-
-### Fixed
-- **Fresh installs showed an incomplete sources list**: `seed_default_sources` used a
-  legacy hardcoded list instead of the full `SOURCE_PRESETS` (25 presets). Now seeds
-  all presets with name/URL dedup (upgrades never duplicate) and seeds on app startup,
-  so the Sources page is populated before the first scheduler cycle
-- **Check-in retries were silently skipped**: slots with a `failed`/`skipped` entry for
-  today were treated as done, so pressing "Claim now" after fixing cookies did nothing.
-  Only `success`/`already_claimed` now count as done; failed rows are cleared and retried.
-  Also fixed `/info` `today` parsing (real API returns `YYYY-MM-DD`, not a day number),
-  which crashed claims with `ValueError`
-- **Two app instances could run at once**: `portalocker` is missing from the frozen
-  build, silently disabling the single-instance guard. The guard now falls back to
-  stdlib `msvcrt` locking (5 new tests). Also the tray dashboard showed a dead
-  scheduler instance — tray now shares its live scheduler with the embedded web UI
-
-### Fixed
-- **Account auto-login crashed with bare 500 in frozen builds**: Playwright looked for
-  browsers inside the bundle temp dir (`_MEI...\playwright\driver\package\.local-browsers`).
-  Now `PLAYWRIGHT_BROWSERS_PATH` points to `%LOCALAPPDATA%\HoYoCodeMonitor\ms-playwright`
-  when frozen, missing Chromium auto-downloads on first login (~170MB, one-time),
-  and browser errors return HTTP 502 with detail instead of Internal Server Error
-- Browser profile moved to the app-data dir (was CWD-relative `data/browser-profile`)
-
-### Fixed
-- **Frozen exe failed to start** (hung silently, no tray, no web UI): missing runtime
-  dependencies in the PyInstaller bundle (`aiohttp`, `bs4`, `pystray`, `Pillow`, `qrcode`,
-  `python-multipart`) crashed the import chain; `console=False` hid the traceback
-- **Web server crashed in windowed builds**: uvicorn's default `dictConfig` calls
-  `sys.stdout.isatty()`, unavailable in PyInstaller windowed mode — now runs with
-  `log_config=None` and logs through the app's root logger
-- **Dashboard returned HTTP 500 in frozen builds**: Jinja2 templates resolved from CWD;
-  now resolved from `sys._MEIPASS` when frozen
-- **Data written to read-only install dir**: db/config/logs/lock/key now live in
-  `%LOCALAPPDATA%\HoYoCodeMonitor` when frozen (repo-relative paths in source mode,
-  override with `HCM_DATA_DIR`)
-- **Autostart registered a python+cli.py command in frozen builds** — now registers the exe
-- **Logging was never initialized** — `setup_logging()` now runs for every CLI command;
-  rotating file log at `%LOCALAPPDATA%\HoYoCodeMonitor\logs\app.log`
-- UPX disabled in PyInstaller spec (known to corrupt OpenSSL DLLs); PIL image plugins no
-  longer excluded (QR codes and tray icon rendering)
-- `requirements.txt` / `pyproject.toml` now declare `pystray`, `Pillow`, `qrcode`,
-  `python-multipart`
-
-### Added
-- Web UI in 6 languages (EN/RU/DE/FR/JA/ZH) with sidebar switcher; default language follows the OS
-- Per-account auto-redeem toggles (Accounts page)
-- Redeem-all button + per-code redeem buttons
-- Honest code statuses: Done / Expired / Invalid / Failed / Pending (from API retcodes)
-- Codes table: source/status/search filters, pagination (20 per page)
-- Per-code delete + bulk cleanup of dead codes (expired/invalid)
-- Published/expiry date columns (migration v10, filled when sources provide them)
-- Separate `/author` page: contacts, donate buttons, crypto addresses with copy + QR
-- System tray: live enable/disable menu, scan-interval submenu (5/15/30/60 min), one-click settings
-- Windows autostart commands (`autostart enable/disable/status`)
-- Single-instance guard (no duplicate schedulers)
-- Auto cookie capture via browser login (`accounts login`, persistent profile)
-- New sources: hoyo-codes API, ennead API (x2), Pocket Tactics, TheClick, Eurogamer, MMO Culture, Playnforge
-- Multi-game foundation (variant C): migration v11 `game` columns, `GAME_CONF` x5 with accents, per-game fetch/redeem endpoints (ZZZ Risk POST), game cards + filter on dashboard, HSR/ZZZ/HI3/ToT API presets
-- Rename to HoYo Code Monitor (package, CLI, docs, installer)
-- Game UI themes groundwork: per-game accent colors, starfield background, primogem brand mark
-- Dashboard themes (light/dark/AMOLED), export/import JSON, copy buttons, SVG sparkline, toast notifications, gift-page redeem links
-- Telegram notifications (new codes + redemptions)
-- Prometheus `/metrics`, `/health` endpoint, HTMX live partials
-- Docker support (Dockerfile, docker-compose)
-- READMEs in 6 languages
-
-### Fixed
-- Redeemer uses GET (was POST → HTTP 405)
-- Hoyolab API host corrected to `hoyoverse.com` (+ `x-rpc-*` headers)
-- Scheduler now updates `codes.redeemed` flag (dashboard showed Pending forever)
-- `-2017/-2018` (already claimed) count as success
-- Full cookie set capture (was 6 keys → `-1071` login errors)
-- Extractor case/length bugs (`MySnezhnayaCareer` mangled, 22-char codes dropped)
-- Stats partials stopped polling after first refresh (missing wrapper)
-- Form-data vs JSON mismatches on account/source/cookies/config endpoints
-- Account cookies stored unencrypted in two places (now Fernet everywhere)
-
-### Security
-- Cookies encrypted at rest (Fernet AES-128, key in env/keyring/local file)
-- Web UI binds to `127.0.0.1` only, no auth needed for local use
-- Sensitive data filtered from logs
-
-## [0.1.0] - 2026-09-06
-- Initial stabilized release: monitoring, 3 sources, auto-redeem, CLI, stats
+[Unreleased]: https://github.com/retvil/hoyo-code-monitor/compare/v1.5.3...HEAD
+[1.5.3]: https://github.com/retvil/hoyo-code-monitor/releases/tag/v1.5.3
+[1.5.2]: https://github.com/retvil/hoyo-code-monitor/releases/tag/v1.5.2
+[1.5.1]: https://github.com/retvil/hoyo-code-monitor/releases/tag/v1.5.1
+[0.1.0]: https://github.com/retvil/hoyo-code-monitor/releases/tag/v0.1.0

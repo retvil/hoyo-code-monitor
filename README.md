@@ -4,7 +4,7 @@
 
 **Never miss a HoYoverse promo code again — local monitoring and auto-redeem for 5 games, right on your PC.**
 
-**🇬🇧 English** | [🇷🇺 Русский](README.ru.md) | [🇩🇪 Deutsch](README.de.md) | [🇫🇷 Français](README.fr.md) | [🇯🇵 日本語](README.ja.md) | [🇨🇳 中文](README.zh.md)
+**[🇬🇧 English](README.md)** | [🇷🇺 Русский](docs/README.ru.md) | [🇺🇦 Українська](docs/README.uk.md) | [🇰🇿 Қазақша](docs/README.kk.md) | [🇩🇪 Deutsch](docs/README.de.md) | [🇫🇷 Français](docs/README.fr.md) | [🇪🇸 Español](docs/README.es.md) | [🇯🇵 日本語](docs/README.ja.md) | [🇵🇱 Polski](docs/README.pl.md) | [🇹🇷 Türkçe](docs/README.tr.md) | [🇨🇳 中文](docs/README.zh.md) | [🇹🇼 繁體中文](docs/README.zh-TW.md)
 
 ## What is this?
 
