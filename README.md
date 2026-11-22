@@ -40,7 +40,7 @@ All 45 fixes are covered by 30 new regression tests.
 - **Background monitoring** — checks sources every N minutes (configurable, default 15)
 - **Auto-redeem** — redeems new codes via Hoyolab `webExchangeCdkey` API (opt-in, per account)
 - **Daily check-ins** — auto sign-in on HoYoLAB for all 5 games: Genshin, Star Rail, ZZZ, HI3, Tears of Themis (opt-in, per account, own schedule, idempotent)
-- **Multi-source** — Wiki, Wiki API, community JSON APIs, guide sites (25 presets, see table)
+- **Multi-source** — Wiki, Wiki API, community JSON APIs, guide sites (23 presets, see table)
 - **Multi-account** — each account has its own encrypted cookies and redeem toggle
 - **Auto cookie refresh** — when a check-in fails on expired cookies, re-capture them headless from the saved browser profile (opt-in, per-account cooldown) so monitoring keeps working without a manual re-login
 - **Dark theme** — a Light/Dark toggle in the sidebar; the choice persists per browser
@@ -89,7 +89,7 @@ Download the latest release from [GitHub Releases](https://github.com/retvil/hoy
 
 ### Interactive install
 
-1. Run the `.exe` — it asks where to install (default: `C:\Users\<you>\AppData\Local\Programs\hoyo-code-monitor`)
+1. Run the `.exe` — it asks where to install (default: `%LOCALAPPDATA%\HoYo Code Monitor`)
 2. Click **Next** — two components are included:
    - **Desktop shortcut** — create a desktop icon
    - **Windows autostart** — launch the tray app on login
@@ -99,13 +99,13 @@ Download the latest release from [GitHub Releases](https://github.com/retvil/hoy
 
 ```powershell
 # Per-user install, no prompts
-hoyo-code-monitor-1.5.3-setup.exe /S
+hoyo-code-monitor-1.6.0-setup.exe /S
 
 # Install to a specific directory
-hoyo-code-monitor-1.5.3-setup.exe /S /D=C:\Games\HoYoMonitor
+hoyo-code-monitor-1.6.0-setup.exe /S /D=C:\Games\HoYoMonitor
 
 # No desktop shortcut, no autostart
-hoyo-code-monitor-1.5.3-setup.exe /S /desktop=no /startup=no
+hoyo-code-monitor-1.6.0-setup.exe /S /desktop=no /startup=no
 ```
 
 ### Uninstall

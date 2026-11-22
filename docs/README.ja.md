@@ -1,62 +1,149 @@
 # HoYo Code Monitor
 
-[![License MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE) [![Platform Windows](https://img.shields.io/badge/platform-Windows-blue)](https://github.com/retvil/GIPromoCode/releases)
+[![Release](https://img.shields.io/github/v/release/retvil/hoyo-code-monitor?sort=date)](https://github.com/retvil/hoyo-code-monitor/releases) [![License MIT](https://img.shields.io/badge/license-MIT-green)](../LICENSE) [![Platform Windows](https://img.shields.io/badge/platform-Windows-blue)](https://github.com/retvil/hoyo-code-monitor/releases)
 
-[🇬🇧 English](../README.md) | [🇩🇪 Deutsch](README.de.md) | [🇪🇸 Español](README.es.md) | [🇫🇷 Français](README.fr.md) | **[🇯🇵 日本語](README.ja.md)** | [🇰🇿 Қазақша](README.kk.md) | [🇵🇱 Polski](README.pl.md) | [🇷🇺 Русский](README.ru.md) | [🇹🇷 Türkçe](README.tr.md) | [🇺🇦 Українська](README.uk.md) | [🇨🇳 中文](README.zh.md) | [🇹🇼 繁體中文](README.zh-TW.md)
+**HoYoverseのプロモコードを見逃さない — 5つのゲームに対応したローカル監視・自動交換をあなたのPCで。**
 
-## これは何ですか？
+[🇬🇧 English](../README.md) | [🇷🇺 Русский](README.ru.md) | [🇺🇦 Українська](README.uk.md) | [🇰🇿 Қазақша](README.kk.md) | [🇩🇪 Deutsch](README.de.md) | [🇫🇷 Français](README.fr.md) | [🇪🇸 Español](README.es.md) | **🇯🇵 日本語** | [🇵🇱 Polski](README.pl.md) | [🇹🇷 Türkçe](README.tr.md) | [🇨🇳 中文](README.zh.md) | [🇹🇼 繁體中文](README.zh-TW.md)
 
-Never miss a HoYoverse promo code again — local monitoring and auto-redeem for 5 games, right on your PC.
+## これは何?
+
+HoYoverseのゲームでは期限付きプロモコードが定期的に配布されます — そしてすぐ期限切れになります。**HoYo Code Monitor** は5つのゲーム (原神、崩壊:スターレイル、ゼンレスゾーンゼロ、崩壊3rd、ティアーズ・オブ・THEMIS (Tears of Themis)) の16のコード情報源を監視し、新しいコードをあなたのアカウントに自動で交換します。すべてPC内のローカル動作です:SQLiteデータベース、暗号化Cookie、テレメトリーなし、クラウドなし。
+
+### 仕組み
+
+1. スケジューラが有効なソースを取得し、コード (`[A-Z0-9]{8,14}`) を抽出して保存。
+2. 自動交換ONのアカウントごとにCookie付きで `GET webExchangeCdkey`、交換間隔は設定可能 (デフォルト8秒)。
+3. 結果を記録: `success` → Done + 報酬、`-2017/-2018` → 交換済み (Done扱い)、`-2001` 期限切れ、`-2003` 無効/中国限定。
+4. HoYoLABデイリーチェックインは独自スケジュールで実行 (デフォルト04:00 + ジッター): アカウント × ゲームごとに `info → sign → home`、同じCookie、結果はCheck-insページに表示。
+5. チェックインがCookie期限切れで失敗した場合、スケジューラが保存済みブラウザプロファイルから **ヘッドレスで自動更新** できる (オプション、アカウント別クールダウン) — 保存セッションが有効なら手動再ログイン不要。
+ダークテーマ
+
+## セキュリティ監査 (v1.6.0)
+
+v1.6.0の監査で45件を4つの重要度レベルにわたり修正しました。主な変更:
+
+| 項目 | 変更内容 |
+|---|---|
+| **SSRF** | プライベート範囲 (10.x, 172.16–31.x, 192.168.x, 127.x, 169.254.x, 0.0.0.0) や非HTTPスキームを解決するソースURLは拒否 |
+| **ReDoS** | 入れ子クォアンティファイア (`(a+)+`, `(.*a)*`) を含むregexパターンは拒否 |
+| **XSS** | HTMLエンドポイントでレンダリングされるソース名・Cookie値・エラー文字列は挿入前にエスケープ |
+| **CSRF** | トークンのシードは日付付きファイルに永続化; 古いシードは起動時にローテーション |
+| **ゲーム検証** | `POST /import` は未知の `game` フィールドを含むペイロードを拒否 |
+| **タイムアウト** | ソースごとの `timeout_seconds` がaiohttpに伝播 (以前は無視) |
+| **空報酬** | APIがデータを返さない場合 `reward=""` を保存 (リテラル `"Redeemed"` ではなく) |
+| **パフォーマンス** | 統計取得: SQL 20クエリ → 1つの `GROUP BY`; 交換済みコード一覧はSQLでソート |
+
+45件の修正は30の新規回帰テストでカバーされています。
 
 ## 機能
 
-- См. оригинальный README для полного списка функций.
+- **バックグラウンド監視** — N分ごとにソースを確認 (設定可能、デフォルト15分)
+- **自動交換** — HoYolab `webExchangeCdkey` APIで新コードを交換 (オプトイン、アカウント別)
+- **デイリーチェックイン** — HoYoLABへの自動サインイン (全5タイトル: 原神、スターレイル、ZZZ、崩壊3rd、ティアーズ・オブ・THEMIS (Tears of Themis)、オプトイン、アカウント別、独自スケジュール、冪等)
+- **マルチソース** — Wiki、Wiki API、コミュニティJSON API、ガイドサイト (16プリセット)
+- **マルチアカウント** — アカウントごとに暗号化Cookieと交換スイッチ
+- **アカウントごとの対象ゲーム指定** — 各アカウントでチェックインを有効にするゲームを選択できる (`accounts.games`、マイグレーション v15)。未選択のゲームは自動的にスキップされるため、「-10002 no-character」の不要なログ行が発生しない
+- **Cookie自動更新** — チェックインがCookie期限切れで失敗した場合、保存済みブラウザプロファイルからヘッドレスで再取得 (オプション、アカウント別クールダウン) — 手動再ログインなしで監視を継続
+- **ソースの「アクティブ」ステータス** — 取得成功したソースは「アクティブ」と表示され、失敗時は即座に「idle」に戻す (カラム `last_success`、マイグレーション v16)
+- **アップデート確認の無効化** — `update_check_enabled = false` を設定するとGitHub APIへのリクエストが完全にスキップされ、更新バナーが表示されない
+- **統計** — 合計 / 交換済み / 失敗、ソース別内訳、交換ログ
+- **Web UI** — `http://127.0.0.1:8000` のローカルダッシュボード (6言語対応)
+- **システムトレイ** — 有効/無効、スキャン間隔メニュー、ワンクリック設定
+- **Cookie暗号化** — Fernet (AES-128)、鍵はenv / OSキーリング / ローカルファイル
+- **自動起動** — Windowsログイン時の自動起動 (デフォルトでオン)
+
+## スクリーンショット
+
+<details>
+<summary>ダッシュボード / ソース / 設定 / チェックイン / アカウント / 作者</summary>
+
+| ダッシュボード | ソース | 設定 |
+|---|---|---|
+| ![ダッシュボード](screenshots/dashboard_ja.png) | ![ソース](screenshots/sources_ja.png) | ![設定](screenshots/config_ja.png) |
+
+| 作者 |
+|---|
+| ![作者](screenshots/author_ja.png) |
+
+| チェックイン | アカウント |
+|---|---|
+| ![チェックイン](screenshots/checkins_ja.png) | ![アカウント](screenshots/accounts_ja.png) |
+
+</details>
+
+## ソース (実動作確認済み)
+
+| ソース | 種類 | 状態 |
+|---|---|---|
+| Genshin Wiki (Fandom) | CSS | 403の場合あり (Fandom保護) |
+| Genshin Wiki API | JSON | 動作 |
+| `hoyo-codes.seria.moe` | JSON API | 動作 |
+| `api.ennead.cc` (2エンドポイント) | JSON API | 動作 |
+| Pocket Tactics、TheClick、Eurogamer、MMO Culture、Playnforge | CSSガイド | 動作 |
+
+## 配布ビルド
+
+[Releases](https://github.com/retvil/hoyo-code-monitor/releases) からインストーラをダウンロード:
+
+- **Windows** — `hoyo-code-monitor-1.5.2-setup.exe` (ユーザー単位インストール、管理者権限不要)
+
+サイレントインストール: `setup.exe /S`。コンポーネント: デスクトップショートカット、Windows自動起動 (どちらもデフォルトでオン)。
+
+> **注意:** 初回のブラウザログイン時にChromium (~170MB) を自動ダウンロードします (一度だけ)。
 
 ## クイックスタート
 
 ```powershell
-git clone https://github.com/retvil/GIPromoCode.git
-cd GIPromoCode
-python -m venv .venv
-.venv\Scripts\activate
-pip install -e .
+# 1. インストールして起動 — アプリはシステムトレイに常駐
+# 2. アカウント追加 (region: os_usa / os_euro / os_asia / os_cht)
+hoyo-code-monitor accounts add main <UID> <REGION>
+
+# 3. Cookieを一度だけ取得 (ブラウザが開くので一度ログイン)
+hoyo-code-monitor accounts login main
+
+# 4. 自動交換を有効化 (またはWeb UIでアカウント別に切替)
+hoyo-code-monitor config set redemption_enabled true
 ```
 
-## インストール
+5. ダッシュボードを開く: `http://127.0.0.1:8000` — Dashboard、Sources、Accounts、Config (サイドバーでEN/RU/DE/FR/JA/ZH切替)。
 
-См. [LICENSE](LICENSE).
+## ソースからインストール
 
-## 使い方
-
-См. документацию в `docs/`.
-
-## プロジェクト構成
-
-См. исходный код проекта.
-
-## テスト
+Python 3.11+ が必要です ([python.org](https://python.org))。
 
 ```powershell
-pytest tests/ -v
+pip install -e .
+# JSソース用のPlaywrightブラウザ (任意)
+python -m playwright install chromium
 ```
 
-## Author & support
+トレイモード (推奨) / 単発チェック / Web UI:
 
-**[Nod33Eset](https://github.com/retvil)** | [sdinc.dev](https://sdinc.dev)
-Never miss a HoYoverse promo code again — local monitoring and auto-redeem for 5 games, right on your PC.
+```powershell
+hoyo-code-monitor tray
+hoyo-code-monitor run-once
+python -m uvicorn src.web_ui:app --host 127.0.0.1 --port 8000
+```
 
-**Support**
-- **Issues / PRs:** [github.com/retvil/GIPromoCode/issues](https://github.com/retvil/GIPromoCode/issues)
-- **Telegram:** [@Nod33Eset](https://t.me/Nod33Eset)
-- **Email:** [hello@sdinc.dev](mailto:hello@sdinc.dev)
+## FAQ
 
-**Crypto**
+- **Pendingのまま?** Cookie (失効します)、`redemption_enabled`、アカウントのスイッチ、交換ログのエラーを確認。
+- **`-1071 "Please log in"`?** `accounts login` を再実行 — Cookieセットが不完全です。
+- **データの場所?** `data/monitor.db`、`config.toml`、`logs/`、`data/.key`。バックアップは `data/` をコピー。
+
+## 作者と支援
+
+アプリのダッシュボード内「作者について」ブロック、または以下を参照:
+
+**暗号資産:**
+
 - BTC: `bc1qunld3rsp37qf5gg69aune50y0qqkd0eugg7j97`
 - TON: `UQDmvr4SKOxSION3Yky6aOgzAnCDXySPuAbG4EKJa5JUT7tC`
 - USDT (TRC20): `TBPJSSLu1mUcX54g9UyxUohYGf2fuRvbwd`
 - USDT (ERC20): `0x25CAED3776Ef5b18E03392bC5b254Bbd78E8180C`
 - USDT (SOL): `3qgN5z291CEcj2FUi2Zza5DioxKgNw72kC7P52pCcTrG`
 
-## License
+## ライセンス
 
-MIT License - see [LICENSE](LICENSE) for details.
+MIT
