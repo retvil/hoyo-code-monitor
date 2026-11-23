@@ -9,8 +9,8 @@ Local promo-code monitoring and auto-redemption for 5 HoYoverse games.
 | Document | What's inside |
 |---|---|
 | [README.md](../README.md) | Main README — features, install, quick start, FAQ (English) |
-| [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md) | Architecture, module map, data model, key invariants, known issues |
-| [ROADMAP.md](ROADMAP.md) | Planned and completed improvements, with priority markers |
+| [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md) | Architecture, module map, data model, key invariants, known issues (v1.6.0) |
+| [ROADMAP.md](ROADMAP.md) | Planned and completed improvements with priority markers (v1.6.0) |
 | [WORKFLOW.md](WORKFLOW.md) | Development workflow, branch/commit conventions |
 | [CHANGELOG.md](../CHANGELOG.md) | Full release history |
 | [CONTRIBUTING.md](../CONTRIBUTING.md) | How to contribute, coding standards, test requirements |
