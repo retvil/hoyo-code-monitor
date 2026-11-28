@@ -624,7 +624,7 @@ class Scheduler:
                             # Log redemption per account
                             for acc in redeem_accounts:
                                 try:
-                                    claimed = await self._redeem_code_for_account(code, acc)
+                                    claimed, _ = await self._redeem_code_for_account(code, acc)
                                     if claimed:
                                         codes_redeemed += 1
                                 except Exception as e:
@@ -681,7 +681,7 @@ class Scheduler:
         self,
         code: str,
         acc: dict[str, Any],
-    ) -> bool:
+    ) -> tuple[bool, str]:
         """Redeem a single code for one account (delegates to RedemptionService)."""
         svc = RedemptionService(
             storage=self.storage,
@@ -713,7 +713,7 @@ class Scheduler:
         for code in new_codes:
             for acc in redeem_accounts:
                 try:
-                    claimed = await self._redeem_code_for_account(code, acc)
+                    claimed, _ = await self._redeem_code_for_account(code, acc)
                     if claimed:
                         codes_redeemed += 1
                 except Exception as e:

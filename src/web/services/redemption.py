@@ -55,12 +55,13 @@ class RedemptionService:
         self,
         code: str,
         acc: dict[str, Any],
-    ) -> bool:
+    ) -> tuple[bool, str]:
         """Redeem a single code for one account.
 
         Mirrors the exact logic that was in ``scheduler._redeem_code_for_account``.
-        Returns True if the code was successfully claimed (including "already used"
-        retcodes -2017/-2018 which are treated as non-errors).
+        Returns (claimed, message) where claimed is True for success or
+        "already claimed" (retcodes -2017/-2018), and message is the
+        human-readable result from the API or the error that occurred.
         """
         from src.notify import notify_redeemed
         from src.system_notify import notify_redeemed_toast
@@ -72,7 +73,7 @@ class RedemptionService:
         acc_cookies = self.storage.load_account_cookies(acc_name)
         if not acc_cookies:
             logger.warning("No cookies saved for account %s; skipping redemption", acc_name)
-            return False
+            return False, "No cookies saved"
 
         res: RedemptionResult = await self.redeemer.redeem_code(
             code=code,
@@ -127,4 +128,4 @@ class RedemptionService:
                 with contextlib.suppress(Exception):
                     await notify_redeemed_toast(code, acc_name, reward_text)
 
-        return claimed
+        return claimed, res.message

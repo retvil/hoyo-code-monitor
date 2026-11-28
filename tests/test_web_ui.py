@@ -456,6 +456,41 @@ class TestImportGameData:
         assert "text/html" in r.headers["content-type"]
         assert "redeem-result-ok" in r.text
 
+    def test_redeem_single_propagates_api_error_message(
+        self, client: TestClient, temp_db: str
+    ) -> None:
+        """When the API returns an error, the actual message must reach the UI.
+
+        Regression: the router previously hardcoded 'error found' instead of
+        forwarding the API response message, making every failure look
+        identical and hiding the real cause (expired code, already claimed,
+        server error, etc.).
+        """
+        from src.redeemer import RedemptionResult
+
+        s = Storage(temp_db)
+        s.add_account("ra", "1", "os_usa")
+        s.set_account_redeem("ra", True)
+        s.store_account_cookies("ra", {"ltuid": "1", "ltoken": "x"})
+        s.add_code("EXPIRED1", "t1")
+
+        mock_redeemer = AsyncMock()
+        mock_redeemer.redeem_code = AsyncMock(
+            return_value=RedemptionResult(
+                success=False,
+                reward="",
+                message="This code has expired",
+                raw_response={"retcode": -2001, "message": "This code has expired"},
+            )
+        )
+        mock_redeemer.__aenter__ = AsyncMock(return_value=mock_redeemer)
+        mock_redeemer.__aexit__ = AsyncMock(return_value=None)
+        with patch("src.redeemer.Redeemer", return_value=mock_redeemer):
+            r = client.post("/codes/EXPIRED1/redeem", headers={"HX-Request": "true"})
+        assert r.status_code == 200
+        assert "This code has expired" in r.text
+        assert "error found" not in r.text
+
 
 class TestBrowserProfileCollision:
     """Regression C-2: per-account profile dirs must not collide."""

@@ -44,12 +44,12 @@ async def redeem_single_code(code: str, request: Request) -> dict[str, Any] | HT
     async with redeemer:
         for acc in accounts:
             try:
-                claimed = await svc.redeem_code_for_account(row["code"], acc)
+                claimed, msg = await svc.redeem_code_for_account(row["code"], acc)
                 results.append(
                     {
                         "account": acc["name"],
                         "ok": claimed,
-                        "msg": "OK" if claimed else "error found",
+                        "msg": "OK" if claimed else msg,
                     }
                 )
             except Exception as e:
@@ -119,7 +119,7 @@ async def redeem_all_codes(request: Request) -> dict[str, Any] | HTMLResponse:
             matched = [a for a in accounts if (a.get("game") or "genshin") == row_game] or accounts
             for acc in matched:
                 try:
-                    claimed = await svc.redeem_code_for_account(row["code"], acc)
+                    claimed, _ = await svc.redeem_code_for_account(row["code"], acc)
                     if claimed:
                         done += 1
                     else:
